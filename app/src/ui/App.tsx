@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX, type MouseEvent } from "react";
 import {
   deleteMessage, editMessage, fetchOlderRemote, listChats, listMessages, loadProfiles,
-  markRead, markUnread, primeRemote, profile, sendRemote, setReaction, splitQuote, undoDelete,
+  markRead, markUnread, myMri, primeRemote, profile, searchPeople, sendRemote, setReaction, splitQuote, undoDelete,
 } from "../teamsData";
 import { openNativeChat, sendMessage } from "../send";
 import {
@@ -19,6 +19,7 @@ import { isIdle, onTeamsChange } from "./lib/live";
 import { usePresence } from "./lib/presence";
 import { GROUP_GAP_MS, INITIAL_REMOTE, POLL_MS } from "./lib/constants";
 import type { Chat, Message as Msg, Quote } from "../types";
+import type { MentionPick } from "../mentions";
 
 // An optimistic message shown immediately after sending, before Teams syncs the
 // real one back.
@@ -54,6 +55,15 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   // A message being quote-replied to, shown as a chip above the composer: null
   // or { id, from, text }. Cleared on send or chat switch.
   const [quote, setQuote] = useState<Quote | null>(null);
+  // @mention picks for the open chat's draft: the members the user has inserted.
+  // Keyed per chat, like drafts. Entries whose `@Name` text is gone are dropped
+  // at send time (buildMentionContent only emits still-present names).
+  const [mentionPicks, setMentionPicks] = useState<Record<string, MentionPick[]>>({});
+  // @-autocomplete popup: open flag + current filter query (text after the @).
+  const [atOpen, setAtOpen] = useState(false);
+  const [atQuery, setAtQuery] = useState("");
+  // Org-directory @mention hits (debounced searchPeople), merged after local members.
+  const [atOrg, setAtOrg] = useState<MentionPick[]>([]);
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const paging = useRef(false);
@@ -212,7 +222,22 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     stick.current = near;
     setAtBottom(near);
+    updateStickyDay(el);
     if (el.scrollTop < 60) loadOlder();
+  };
+
+  // Sticky day label: the date of the last `.tc-day` divider scrolled past the
+  // top of the list, so the day stays pinned while reading within it.
+  const [stickyDay, setStickyDay] = useState("");
+  const updateStickyDay = (el: HTMLDivElement): void => {
+    const days = el.querySelectorAll<HTMLElement>(".tc-day");
+    let label = "";
+    const top = el.scrollTop;
+    for (const d of days) {
+      if (d.offsetTop - el.offsetTop <= top + 4) label = d.textContent || "";
+      else break;
+    }
+    setStickyDay(label);
   };
 
   const sections = useMemo<Array<[string, Chat[]]>>(() => {
@@ -296,6 +321,102 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
       try { el.setSelectionRange(pos, pos); } catch { /* ignore */ }
     });
   };
+
+  // Resolved, filtered @mention candidates for the open chat: its members (minus
+  // me) whose display name matches the text typed after the "@".
+  const myself = myMri();
+  const atCandidates = useMemo<MentionPick[]>(() => {
+    const chat = chats.find((c) => c.id === sel);
+    if (!chat) return [];
+    const q = atQuery.trim().toLowerCase();
+    const seen = new Set<string>();
+    const out: MentionPick[] = [];
+    for (const mri of chat.members) {
+      if (!mri || mri === myself || seen.has(mri)) continue;
+      seen.add(mri);
+      const name = profile(mri).displayName || "";
+      if (!name) continue;
+      if (q && !name.toLowerCase().includes(q)) continue;
+      out.push({ mri, name, mentionType: "person" });
+    }
+    out.sort((a, b) => a.name.localeCompare(b.name));
+    // Append org-directory hits (anyone, not just chat members), deduped by mri.
+    for (const p of atOrg) {
+      if (!p.mri || p.mri === myself || seen.has(p.mri)) continue;
+      seen.add(p.mri);
+      out.push(p);
+    }
+    return out.slice(0, 8);
+  }, [chats, sel, atQuery, myself, atOrg]);
+
+  // Watch the draft for an "@word" the caret sits at the end of; open the picker
+  // and track the query. Any other edit closes it.
+  const onDraftChange = (v: string): void => {
+    setDraft(v);
+    const el = composer.current;
+    const caret = el?.selectionStart ?? v.length;
+    // Match "@" preceded by start/space, up to the caret, name chars only.
+    const upto = v.slice(0, caret);
+    const m = /(?:^|\s)@([^\s@]{0,40})$/.exec(upto);
+    if (m) { setAtQuery(m[1]); setAtOpen(true); }
+    else { setAtOpen(false); setAtQuery(""); }
+  };
+
+  // Replace the half-typed "@query" at the caret with "@Display Name " and record
+  // the pick so the send path can emit a real mention span.
+  const pickMention = (pick: MentionPick): void => {
+    const el = composer.current;
+    const caret = el?.selectionStart ?? draft.length;
+    const upto = draft.slice(0, caret);
+    const m = /(?:^|\s)@([^\s@]{0,40})$/.exec(upto);
+    const start = m ? caret - m[1].length - 1 : caret; // back over "@query"
+    const insert = "@" + pick.name + " ";
+    const next = draft.slice(0, start) + insert + draft.slice(caret);
+    setDraft(next);
+    setMentionPicks((mp) => {
+      const cur = sel ? mp[sel] || [] : [];
+      if (cur.some((p) => p.mri === pick.mri)) return mp;
+      return sel ? { ...mp, [sel]: [...cur, pick] } : mp;
+    });
+    setAtOpen(false);
+    setAtQuery("");
+    setAtOrg([]);
+    requestAnimationFrame(() => {
+      el?.focus();
+      const pos = start + insert.length;
+      try { el?.setSelectionRange(pos, pos); } catch { /* ignore */ }
+    });
+  };
+
+  // Close the @-picker when the open chat changes.
+  useEffect(() => { setAtOpen(false); setAtQuery(""); setAtOrg([]); }, [sel]);
+
+  // Debounced org-directory search while the @-picker is open. Local chat members
+  // show instantly; org hits stream in ~250ms after typing stops. Stale responses
+  // are dropped via the `live` guard so an older query can't overwrite a newer one.
+  useEffect(() => {
+    if (!atOpen) { setAtOrg([]); return; }
+    const q = atQuery.trim();
+    if (q.length < 2) { setAtOrg([]); return; }
+    let live = true;
+    const h = setTimeout(() => {
+      searchPeople(q, 8)
+        .then((hits) => {
+          if (!live) return;
+          setAtOrg(hits.map((p) => ({ mri: p.mri, name: p.displayName, mentionType: "person" })));
+        })
+        .catch(() => { /* keep local-only candidates */ });
+    }, 250);
+    return () => { live = false; clearTimeout(h); };
+  }, [atOpen, atQuery]);
+
+  // Recompute the sticky day label when the chat opens or the list length changes
+  // (new messages, paged-in history), not just on scroll.
+  useEffect(() => {
+    const el = scroller.current;
+    if (el) updateStickyDay(el);
+  });
+
   const [emojiOpen, setEmojiOpen] = useState(false);
   // True while the message list is scrolled near the bottom; drives the
   // scroll-to-newest button (stick is a ref, so we mirror it into state here).
@@ -323,18 +444,22 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     if (!text || !selChat) return;
     const chat = selChat;
     const q = quote;
+    const picks = mentionPicks[chat.id] || [];
     const key = Date.now() + Math.random();
     setDrafts((d) => ({ ...d, [chat.id]: "" }));
     setQuote(null);
+    setMentionPicks((mp) => ({ ...mp, [chat.id]: [] }));
+    setAtOpen(false);
     setPending((p) => [...p, { key, chatId: chat.id, text, time: Date.now() }]);
     stick.current = true;
     // Prefer the direct chatsvc endpoint (works for any chat, cached or not).
     // Fall back to driving Teams' native composer only when no token is captured.
-    let r = await sendRemote(chat.id, text, q);
+    let r = await sendRemote(chat.id, text, q, picks);
     if (!r.ok && r.reason === "no-token") r = await sendMessage(chat.id, chat.title, text);
     if (!r.ok) {
       setPending((p) => p.filter((x) => x.key !== key));
       setDrafts((d) => ({ ...d, [chat.id]: d[chat.id] || text }));
+      setMentionPicks((mp) => ({ ...mp, [chat.id]: picks }));
       const why = ({
         "chat-not-open": "Teams has no visible row for this chat. Open it once in Teams (⌥⌘T), then retry.",
         "wrong-chat": "Teams switched to another chat. Not sent.",
@@ -682,7 +807,11 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                 <button className="tc-msgsearch-x" onClick={() => { setMsgSearch(""); setMsgSearchOpen(false); }} aria-label="Close search"><X size={14} /></button>
               </div>
             ) : null}
-            <div className="tc-msgs" ref={scroller} onScroll={onScroll}>
+            <div className="tc-msgs-wrap">
+              {stickyDay && !mq ? (
+                <div className="tc-day-sticky"><span>{stickyDay}</span></div>
+              ) : null}
+              <div className="tc-msgs" ref={scroller} onScroll={onScroll}>
               {mq && !body.length ? (
                 <div className="tc-empty"><p className="tc-sub">No messages match “{msgSearch}”.</p></div>
               ) : null}
@@ -717,6 +846,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                   <button className="tc-ghost" onClick={openInTeams}>Open in Teams</button>
                 </div>
               ) : null}
+              </div>
             </div>
             <div className="tc-composer">
               {!atBottom ? (
@@ -739,6 +869,20 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                   <EmojiPicker onPick={(em) => { insertAtCaret(em); setEmojiOpen(false); }} />
                 </div>
               ) : null}
+              {atOpen && atCandidates.length ? (
+                <div className="tc-at-pop" onMouseDown={(e) => e.stopPropagation()}>
+                  {atCandidates.map((c) => (
+                    <button
+                      key={c.mri}
+                      className="tc-at-opt"
+                      onClick={() => pickMention(c)}
+                    >
+                      <Avatar name={c.name} uri={avatarUri(c.mri)} mri={c.mri} small />
+                      <span className="tc-at-name">{c.name}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               <div className="tc-composer-box">
                 <button
                   className="tc-emoji-btn"
@@ -755,8 +899,16 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                   rows={1}
                   placeholder={"Message " + (selChat.isChannel ? "#" : "") + selChat.title}
                   value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
+                  onChange={(e) => onDraftChange(e.target.value)}
                   onKeyDown={(e) => {
+                    if (atOpen && atCandidates.length) {
+                      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                        e.preventDefault();
+                        pickMention(atCandidates[0]);
+                        return;
+                      }
+                      if (e.key === "Escape") { e.preventDefault(); setAtOpen(false); return; }
+                    }
                     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                       e.preventDefault();
                       doSend();

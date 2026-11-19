@@ -24,6 +24,7 @@
 // file ever touches an `any`.
 
 import type { Chat, ChatKind, FileRef, Message, Profile, Quote, Reaction, Token, WriteResult } from "./types";
+import { buildMentionContent, type MentionPick } from "./mentions";
 
 // --- Untyped-data accessors -----------------------------------------------
 // Narrow arbitrary external data at the boundary. Each returns a typed value or
@@ -213,6 +214,7 @@ async function favoriteIds(): Promise<Set<string>> {
 }
 
 export async function listChats(): Promise<Chat[]> {
+  void flushPendingHorizons();
   const db = await open("conversation");
   const rows = (await getAll(db, "conversations", 10000)).map(obj);
   const favs = await favoriteIds();
@@ -239,6 +241,9 @@ export async function listChats(): Promise<Chat[]> {
     const teamTp = obj(team && team.threadProperties);
     const teamName = team ? str(teamTp.spaceThreadTopic) || str(teamTp.topic) : "";
     const lastFromMe = mriOf(lm.from) === me;
+    // Read pointer = consumptionhorizon field 0 ("<msgId>;<ms>;<id>"). Checked
+    // against Teams' own threadProperties.isRead: matches on all 250 chats, while
+    // also honouring consumptionHorizonBookmark does not.
     const horizon = effectiveHorizon(str(c.id), toMs(String(props.consumptionhorizon ?? "").split(";")[0]));
 
     chats.push({
@@ -601,7 +606,8 @@ function newClientMessageId(): string {
 export async function sendRemote(
   conversationId: string,
   text: string,
-  quote: Quote | null
+  quote: Quote | null,
+  mentions: readonly MentionPick[] = []
 ): Promise<WriteResult> {
   const body = (text || "").trim();
   if (!body) return { ok: false, reason: "empty" };
@@ -610,10 +616,10 @@ export async function sendRemote(
   const reg = t.region || "de";
   const mri = myMri();
   const now = new Date().toISOString();
-  // HTML-escape, then wrap in <p> exactly as Teams' composer does.
-  const esc = body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // HTML-escape the body and splice in any @mention spans (native Teams format).
+  const mc = buildMentionContent(body, mentions);
   // Native quote-reply: prepend the Skype Reply blockquote (captured format).
-  const content = buildQuoteHtml(quote) + "<p>" + esc + "</p>";
+  const content = buildQuoteHtml(quote) + "<p>" + mc.html + "</p>";
   const payload = {
     id: "-1",
     type: "Message",
@@ -638,7 +644,7 @@ export async function sendRemote(
       title: "",
       cards: "[]",
       links: "[]",
-      mentions: "[]",
+      mentions: mc.mentions,
       onbehalfof: null,
       files: "[]",
       policyViolation: null,
@@ -665,6 +671,151 @@ export async function sendRemote(
   // Our cached view is now stale; drop it so the next poll re-fetches.
   remoteCache.delete(conversationId);
   return { ok: true, via: "endpoint" };
+}
+
+// ---------------------------------------------------------------------------
+// Org-wide people search (for @mentions).
+//
+// Teams' powerbar @-picker hits the SubstrateSearch "suggestions" endpoint on
+// substrate.office.com — a DIFFERENT origin and a DIFFERENT bearer than chatsvc
+// (aud 66a88757-… / SubstrateSearch, captured in tokenCapture.ts as __tcSubTok).
+// We replay the People EntityRequest from that same endpoint and map each hit to
+// a PeopleHit the composer can turn into a native person mention.
+// Request + field list verified against a live client (Nov 2026).
+
+export interface PeopleHit {
+  mri: string;
+  displayName: string;
+  email: string;
+  jobTitle: string;
+}
+
+function uuid(): string {
+  try {
+    const c = (typeof crypto !== "undefined" && crypto) || null;
+    if (c && typeof c.randomUUID === "function") return c.randomUUID();
+  } catch {
+    /* fall through */
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (ch) => {
+    const r = (Math.random() * 16) | 0;
+    return (ch === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
+function subToken(): string {
+  const s = (typeof window !== "undefined" && window.__tcSubTok) || null;
+  return s && s.tok ? s.tok : "";
+}
+
+// Pull the first non-empty string field (case-insensitive) off a loose object.
+function pick(obj: Record<string, unknown>, ...keys: string[]): string {
+  for (const k of keys) {
+    const v = obj[k];
+    if (typeof v === "string" && v) return v;
+  }
+  return "";
+}
+
+// Walk the suggestions response and collect People entities. The shape varies by
+// flight (ResultSets vs Groups vs flat EntitySets), so we scan defensively for
+// any object that carries an MRI/DisplayName pair rather than assume one layout.
+function collectPeople(root: unknown, out: PeopleHit[], seen: Set<string>): void {
+  if (!root || typeof root !== "object") return;
+  if (Array.isArray(root)) {
+    for (const el of root) collectPeople(el, out, seen);
+    return;
+  }
+  const o = root as Record<string, unknown>;
+  const mri = pick(o, "MRI", "Mri", "mri", "ImAddress");
+  const name = pick(o, "DisplayName", "displayName");
+  if (mri && name && /^8:/.test(mri) && !seen.has(mri)) {
+    seen.add(mri);
+    out.push({
+      mri,
+      displayName: name,
+      email: pick(o, "EmailAddress", "ImAddress", "UserPrincipalName"),
+      jobTitle: pick(o, "JobTitle", "Department"),
+    });
+  }
+  for (const key of Object.keys(o)) {
+    const v = o[key];
+    if (v && typeof v === "object") collectPeople(v, out, seen);
+  }
+}
+
+// Search the org directory for people matching `query`. Returns [] (never throws)
+// when no substrate token has been captured yet or the request fails, so callers
+// can fall back to local chat members.
+export async function searchPeople(query: string, size = 8): Promise<PeopleHit[]> {
+  const q = (query || "").trim();
+  if (!q) return [];
+  const tok = subToken();
+  if (!tok) return [];
+  const mri = myMri();
+  const body = {
+    EntityRequests: [
+      {
+        Query: { QueryString: q, DisplayQueryString: q, NormalizedQueryString: q },
+        EntityType: "People",
+        Size: size,
+        Fields: [
+          "Id", "MRI", "DisplayName", "EmailAddresses", "PeopleType", "PeopleSubtype",
+          "UserPrincipalName", "GivenName", "Surname", "CompanyName", "JobTitle",
+          "ImAddress", "Department",
+        ],
+        Filter: {
+          And: [
+            { Or: [{ Term: { PeopleType: "Person" } }, { Term: { PeopleType: "Other" } }] },
+            {
+              Or: [
+                { Term: { PeopleSubtype: "OrganizationUser" } },
+                { Term: { PeopleSubtype: "MTOUser" } },
+                { Term: { PeopleSubtype: "PersonalContact" } },
+                { Term: { PeopleSubtype: "Guest" } },
+              ],
+            },
+            { Or: [{ Term: { Flags: "NonHidden" } }] },
+          ],
+        },
+        Provenances: ["Mailbox", "Directory"],
+        From: 0,
+      },
+    ],
+    Scenario: {
+      Name: "powerbar",
+      Dimensions: [{ DimensionName: "QueryType", DimensionValue: "PeopleCentricSearch" }],
+    },
+    Cvid: uuid(),
+    AppName: "Microsoft Teams",
+    LogicalId: uuid(),
+    dataSource: "personScoped",
+  };
+  const url =
+    "https://substrate.office.com/search/api/v1/suggestions" +
+    "?scenario=powerbar&setflight=EnableMessageImageSearch,EnableTeamsChannelDomainPowerbar";
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        authorization: "Bearer " + tok,
+        "content-type": "application/json",
+        ...(mri ? { "x-anchormailbox": "Oid:" + CURRENT_OID } : {}),
+        "client-request-id": uuid(),
+        "x-ms-session-id": uuid(),
+        "x-client-version": "T2.1",
+      },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) return [];
+    const data: unknown = await r.json();
+    const out: PeopleHit[] = [];
+    collectPeople(data, out, new Set<string>());
+    return out.slice(0, size);
+  } catch {
+    return [];
+  }
 }
 
 // Local read-pointer overrides. listChats reads the horizon from Teams' IndexedDB,
@@ -710,16 +861,48 @@ async function putConversationProperty(conversationId: string, name: string, val
   return { ok: true };
 }
 
-// Move a conversation's read pointer. The read state lives in the
-// "consumptionhorizon" property ("<msgId>;<ms>;<msgId>"; message ids are arrival
-// ms) - that is what listChats reads back. "consumptionHorizonBookmark" is only
-// the native "mark as unread" marker; writing it alone never marks anything read.
+// Move a conversation's read pointer: PUT consumptionhorizon "<msgId>;<ms>;<msgId>"
+// (message ids are arrival ms), plus consumptionHorizonBookmark "0;<ms>;0", the
+// marker Teams' own mark-as-unread sets. Verified live: both return 200 and the
+// IDB row updates within a second. chatsvc only moves consumptionhorizon forward
+// (a backward PUT returns 200 but is ignored), so mark-unread lands only in the
+// bookmark and Teams' own isRead stays true; the overlay keeps it via the override.
 // Real server write that syncs to all the user's devices; nothing is sent/deleted.
+async function writeHorizon(conversationId: string, v: number): Promise<WriteResult> {
+  const a = await putConversationProperty(conversationId, "consumptionhorizon", `${v};${v};${v}`);
+  if (!a.ok) return a;
+  return putConversationProperty(conversationId, "consumptionHorizonBookmark", `0;${v};0`);
+}
+
+// With no captured token yet, the write is queued (latest pointer per chat wins)
+// and flushed by flushPendingHorizons() on the next chat-list poll that has one.
+// Setting the pointer is idempotent, so a late write is safe.
+const pendingHorizon = new Map<string, number>();
+
 async function setConsumptionHorizon(conversationId: string, ms: number): Promise<WriteResult> {
   const v = Math.round(ms);
-  const res = await putConversationProperty(conversationId, "consumptionhorizon", `${v};${v};${v}`);
+  if (!liveToken()) {
+    pendingHorizon.set(conversationId, v);
+    horizonOverride.set(conversationId, { ms: v });
+    return { ok: true, via: "queued" };
+  }
+  pendingHorizon.delete(conversationId);
+  const res = await writeHorizon(conversationId, v);
   if (res.ok) horizonOverride.set(conversationId, { ms: v });
   return res;
+}
+
+async function flushPendingHorizons(): Promise<void> {
+  if (!pendingHorizon.size || !liveToken()) return;
+  for (const [id, v] of [...pendingHorizon]) {
+    pendingHorizon.delete(id);
+    const res = await writeHorizon(id, v);
+    // Re-queue only transient failures (network, token gone, 5xx); a 4xx would
+    // fail forever. Skip if a newer write for this chat was queued meanwhile.
+    const transient = !res.ok && (res.reason === "fetch-failed" || res.reason === "no-token" || /^http-5/.test(res.reason));
+    if (transient && !pendingHorizon.has(id)) pendingHorizon.set(id, v);
+    else if (!res.ok) horizonOverride.delete(id);
+  }
 }
 
 // Mark read: push the pointer just past the newest message (default: now).
@@ -729,13 +912,10 @@ export function markRead(conversationId: string, lastMessageMs?: number): Promis
 }
 
 // Mark unread: pull the pointer to just before the newest message so it counts
-// as unread again, and set the bookmark the native client uses for the same
-// action. Needs the last message's time; falls back to now - 1s.
-export async function markUnread(conversationId: string, lastMessageMs?: number): Promise<WriteResult> {
-  const ms = Math.round((lastMessageMs || Date.now()) - 1000);
-  const res = await setConsumptionHorizon(conversationId, ms);
-  if (res.ok) await putConversationProperty(conversationId, "consumptionHorizonBookmark", `0;${ms};0`);
-  return res;
+// as unread again. Needs the last message's time; falls back to now - 1s.
+export function markUnread(conversationId: string, lastMessageMs?: number): Promise<WriteResult> {
+  const ms = (lastMessageMs || Date.now()) - 1000;
+  return setConsumptionHorizon(conversationId, ms);
 }
 
 // Add or remove a reaction on a message. Captured from the native client:
