@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+# teams-calm — run the Teams Calm overlay inside the new Microsoft Teams client.
+#
+# How: Teams ships local JS (Contents/Resources/client-bindings/bundle.js) that
+# it runs in a hidden host page; every visible window is opened from there.
+# `patch` appends the overlay to that file (needs sudo, the app is root-owned),
+# so Teams loads it by itself — no debug port, no injection step.
+#
+# Patching breaks the app's code signature seal (`codesign --verify` fails);
+# `unpatch` restores the exact original bytes. A Teams update overwrites the
+# patch — run `teams-calm` again afterwards.
+#
+# `dev` is different: it relaunches Teams with a DevTools port (9222) and
+# hot-reloads the overlay over CDP on every save. While that port is open, any
+# local process can control your signed-in Teams session. Leaving `dev`
+# (Ctrl-C) relaunches Teams without the port.
+#
+# Usage:
+#   teams-calm          Build, patch Teams if needed, relaunch it.
+#   teams-calm dev      Hot-reload dev mode (debug port while running).
+#   teams-calm patch    Build + patch, no relaunch (takes effect on next launch).
+#   teams-calm unpatch  Restore Teams' original bundle.js.
+#   teams-calm off      Unpatch and relaunch plain Teams.
+#   teams-calm status   Show patch / debug-port state.
+#
+# Toggle the overlay with Opt+Cmd+T.
+
+set -euo pipefail
+
+# Resolve this script's real location even when invoked via a symlink in PATH.
+SELF="$0"
+while [ -L "$SELF" ]; do SELF="$(readlink "$SELF")"; done
+DIR="$(cd "$(dirname "$SELF")" && pwd)"
+PORT=9222
+APP="Microsoft Teams"
+TEAMS_APP="/Applications/$APP.app"
+TARGET="$TEAMS_APP/Contents/Resources/client-bindings/bundle.js"
+BUNDLE="$DIR/app/dist/teams-calm-app.js"
+PAYLOAD="$DIR/app/dist/teams-calm-host.js"
+DEV_BUNDLE="$DIR/app/dist-dev/teams-calm-app.js"
+MARK='/*teams-calm:begin*/'
+
+# ---- root-only helpers (run via sudo by `patch` / `unpatch`) -----------------
+
+# Byte offset where our payload starts (the "\n" before the marker), or empty.
+payload_offset() {
+  local off
+  off="$(LC_ALL=C grep -abo -F "$MARK" "$TARGET" 2>/dev/null | head -1 | cut -d: -f1 || true)"
+  [ -n "$off" ] && echo $((off - 1))
+}
+
+root_strip() {
+  local off; off="$(payload_offset)"
+  [ -z "$off" ] && return 0
+  local tmp; tmp="$(mktemp)"
+  head -c "$off" "$TARGET" > "$tmp"
+  cat "$tmp" > "$TARGET"; rm -f "$tmp"
+}
+
+# ---- user-level helpers ------------------------------------------------------
+
+is_patched() { LC_ALL=C grep -qF "$MARK" "$TARGET" 2>/dev/null; }
+
+# Patched payload equals the current build?
+patch_current() {
+  is_patched || return 1
+  local off; off="$(payload_offset)"
+  cmp -s <(tail -c +"$((off + 1))" "$TARGET") "$PAYLOAD"
+}
+
+quit_teams() {
+  osascript -e "quit app \"$APP\"" >/dev/null 2>&1 || true
+  for _ in $(seq 1 20); do
+    pgrep -x "MSTeams" >/dev/null 2>&1 || return 0
+    sleep 0.5
+  done
+}
+
+port_open() { curl -s --max-time 1 "http://localhost:$PORT/json/version" >/dev/null 2>&1; }
+
+wait_for_port() {
+  for _ in $(seq 1 30); do port_open && return 0; sleep 0.5; done
+  echo "error: Teams did not open debug port $PORT within 15s" >&2
+  return 1
+}
+
+launch_plain() { open -a "$APP"; }
+launch_debug() { WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=$PORT" open -a "$APP"; }
+
+build() {
+  if [ ! -f "$BUNDLE" ] || [ -n "$(find "$DIR/app/src" -newer "$BUNDLE" 2>/dev/null)" ]; then
+    echo "Building overlay..."; ( cd "$DIR/app" && npm run --silent build )
+  fi
+  if [ ! -f "$PAYLOAD" ] || [ "$BUNDLE" -nt "$PAYLOAD" ] || [ "$DIR/build-host-patch.mjs" -nt "$PAYLOAD" ]; then
+    node "$DIR/build-host-patch.mjs" "$BUNDLE" "$PAYLOAD" >/dev/null
+  fi
+}
+
+# Returns 0 if bundle.js was changed.
+patch() {
+  build
+  if patch_current; then echo "Teams is already patched with the current build."; return 1; fi
+  echo "Patching $TARGET (sudo)..."
+  sudo "$DIR/teams-calm" __root-patch "$PAYLOAD"
+}
+
+unpatch() {
+  if ! is_patched; then echo "Teams is not patched."; return 1; fi
+  echo "Restoring original bundle.js (sudo)..."
+  sudo "$DIR/teams-calm" __root-unpatch
+  codesign --verify "$TEAMS_APP" 2>/dev/null && echo "Code signature valid again."
+}
+
+case "${1:-start}" in
+  start)
+    patch || true
+    if port_open; then echo "Teams has the debug port open; relaunching without it."; fi
+    echo "Relaunching Teams..."; quit_teams; launch_plain
+    echo "Done. Toggle the overlay with Option+Cmd+T."
+    ;;
+  patch)
+    patch && echo "Patched. Restart Teams to load it."
+    ;;
+  unpatch)
+    unpatch || true
+    ;;
+  off)
+    unpatch || true
+    echo "Relaunching plain Teams..."; quit_teams; launch_plain
+    ;;
+  dev)
+    echo "Relaunching Teams with debug port $PORT (dev only)..."
+    quit_teams; launch_debug; wait_for_port
+    PIDS=()
+    cleanup() {
+      trap - INT TERM EXIT
+      kill "${PIDS[@]}" 2>/dev/null || true
+      wait "${PIDS[@]}" 2>/dev/null || true
+      echo; echo "Leaving dev: relaunching Teams without the debug port..."
+      quit_teams; launch_plain
+    }
+    trap cleanup INT TERM EXIT
+    ( cd "$DIR/app" && exec ./node_modules/.bin/vite build --watch --minify false --outDir dist-dev --logLevel warn ) & PIDS+=($!)
+    mkdir -p "$(dirname "$DEV_BUNDLE")"
+    node "$DIR/dev.mjs" "$DEV_BUNDLE" & PIDS+=($!)
+    echo "Dev mode: edit app/src, the overlay reloads on save. Ctrl-C to stop."
+    wait
+    ;;
+  status)
+    if is_patched; then
+      patch_current 2>/dev/null && echo "patch: current build" || echo "patch: older build (run teams-calm)"
+    else echo "patch: not patched"; fi
+    port_open && echo "debug port $PORT: OPEN" || echo "debug port $PORT: closed"
+    ;;
+  __root-patch)
+    [ "$(id -u)" = 0 ] || { echo "must run as root" >&2; exit 1; }
+    root_strip
+    cat "$2" >> "$TARGET"
+    ;;
+  __root-unpatch)
+    [ "$(id -u)" = 0 ] || { echo "must run as root" >&2; exit 1; }
+    root_strip
+    ;;
+  *)
+    echo "Usage: teams-calm [start|dev|patch|unpatch|off|status]" >&2
+    exit 1
+    ;;
+esac

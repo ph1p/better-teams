@@ -1,0 +1,460 @@
+/* Tailwind v4 source for the injected overlay.
+   Compiled to a string (styles.js re-exports it via ?inline) and injected into
+   a <style> tag at runtime. Scoped under #tc-root so it never leaks into Teams'
+   own DOM. No preflight: an injected overlay must not reset the host page, and
+   our own base rules below cover what we need. Follows system light/dark. */
+@import "tailwindcss/theme.css";
+@import "tailwindcss/utilities.css";
+
+/* Design tokens. Exposed to @apply via Tailwind's theme namespaces so utilities
+   like text-fg2 / bg-accent resolve, and as --tc-* custom props for raw CSS and
+   color-mix(). Dark values are swapped in the media query on #tc-root below. */
+@theme {
+  /* Spacing in px, not the default 0.25rem. The overlay is injected into the
+     Teams page, whose root font-size is 62.5%; a rem-based scale would shrink
+     every gap/padding utility. 4px base keeps gap-2.5 = 10px etc. */
+  --spacing: 4px;
+  --color-tc-bg: #ffffff;
+  --color-tc-bg2: #f6f7f9;
+  --color-tc-bg3: #eceef1;
+  --color-tc-fg: #1b1d21;
+  --color-tc-fg2: #5b6069;
+  --color-tc-line: #e3e6ea;
+  --color-tc-accent: #4f6bed;
+  --color-tc-accent-soft: #e8edfb;
+  --color-tc-hover: #f1f3f6;
+  --color-tc-mine: #eef3ff;
+  --radius-tc: 10px;
+  --font-tc: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+
+/* --tc-* aliases for raw CSS (color-mix, var() in rules @apply can't express).
+   Kept in sync with the @theme values above. */
+#tc-root {
+  --tc-bg: var(--color-tc-bg);
+  --tc-bg2: var(--color-tc-bg2);
+  --tc-bg3: var(--color-tc-bg3);
+  --tc-fg: var(--color-tc-fg);
+  --tc-fg2: var(--color-tc-fg2);
+  --tc-line: var(--color-tc-line);
+  --tc-accent: var(--color-tc-accent);
+  --tc-accent-soft: var(--color-tc-accent-soft);
+  --tc-hover: var(--color-tc-hover);
+  --tc-mine: var(--color-tc-mine);
+  --tc-radius: var(--radius-tc);
+  --tc-font: var(--font-tc);
+}
+#tc-root, #tc-root * { box-sizing: border-box; }
+/* Keyboard focus: a single consistent accent ring on every interactive element,
+   only for keyboard users (not mouse clicks). Calm, not loud. */
+#tc-root :focus-visible { outline: 2px solid var(--tc-accent); outline-offset: 2px; border-radius: 6px; }
+#tc-root :focus:not(:focus-visible) { outline: none; }
+/* Respect the OS "reduce motion" setting: no slides, flashes, or lifts. */
+@media (prefers-reduced-motion: reduce) {
+  #tc-root *, #tc-root *::before, #tc-root *::after {
+    animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
+#tc-root {
+  position: fixed; inset: 0; z-index: 2147483000;
+  display: grid; grid-template-columns: 300px 1fr;
+  background: var(--tc-bg); color: var(--tc-fg);
+  font-family: var(--tc-font); font-size: 14px; line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+@media (prefers-color-scheme: dark) {
+  #tc-root {
+    --color-tc-bg: #1a1d21; --color-tc-bg2: #202327; --color-tc-bg3: #26292e;
+    --color-tc-fg: #e7e9ec; --color-tc-fg2: #9aa0a8; --color-tc-line: #2e3136;
+    --color-tc-accent: #7c93f6; --color-tc-accent-soft: #273049;
+    --color-tc-hover: #24272c; --color-tc-mine: #22304a;
+  }
+}
+
+/* Sidebar */
+#tc-root .tc-side { @apply flex flex-col min-h-0; background: var(--tc-bg2);
+  border-right: 1px solid var(--tc-line); }
+#tc-root .tc-side-head { @apply flex items-center gap-2; padding: 14px 16px 10px; }
+#tc-root .tc-side-head h1 { @apply flex-1 m-0; font-size: 16px; font-weight: 700; }
+#tc-root .tc-search { @apply relative; margin: 0 12px 8px; }
+#tc-root .tc-search input { @apply w-full outline-none; border: 1px solid var(--tc-line);
+  background: var(--tc-bg); color: var(--tc-fg); border-radius: 8px;
+  padding: 7px 10px 7px 32px; font-size: 13px; }
+#tc-root .tc-search input:focus { border-color: var(--tc-accent); }
+#tc-root .tc-search .tc-search-icon { @apply absolute pointer-events-none;
+  left: 10px; top: 50%; transform: translateY(-50%); color: var(--tc-fg2); }
+#tc-root .tc-list { @apply overflow-y-auto flex-1; padding: 4px 8px 16px; }
+#tc-root .tc-row { @apply flex items-center gap-2.5 cursor-pointer relative;
+  padding: 7px 8px; border-radius: 8px; transition: background .12s ease; }
+#tc-root .tc-row:hover { background: var(--tc-hover); }
+#tc-root .tc-row.sel { background: var(--tc-accent-soft); }
+/* Selected row gets a left accent bar so it reads apart from a plain hover. */
+#tc-root .tc-row.sel::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px;
+  width: 3px; border-radius: 3px; background: var(--tc-accent); }
+#tc-root .tc-av { @apply grid place-items-center overflow-hidden; flex: 0 0 auto;
+  width: 32px; height: 32px; border-radius: 50%; background: var(--tc-accent);
+  color: #fff; font-size: 12px; font-weight: 600; }
+#tc-root .tc-av img { @apply w-full h-full; object-fit: cover; }
+#tc-root .tc-av-btn { @apply cursor-pointer; transition: box-shadow .12s; }
+#tc-root .tc-av-btn:hover { box-shadow: 0 0 0 2px var(--tc-accent); }
+/* Presence ring: drawn as box-shadow on the avatar itself (gap in --tc-bg,
+   then the status colour), so it is always a perfect circle and hides together
+   with an invisible avatar. The wrapper never stretches with its flex row, and
+   its padding is cancelled by a negative margin so ringed and un-ringed
+   avatars line up. Colour comes from --tc-ring per status. */
+#tc-root .tc-av-ring { flex: 0 0 auto; align-self: flex-start; display: grid;
+  place-items: center; padding: 3px; margin: -3px; border-radius: 50%; height: max-content; }
+#tc-root .tc-row > .tc-av-ring, #tc-root .tc-me-btn > .tc-av-ring,
+#tc-root .tc-main-head > .tc-av-ring { align-self: center; }
+#tc-root .tc-av-ring .tc-av { box-shadow: 0 0 0 1.5px var(--tc-bg), 0 0 0 3px var(--tc-ring); }
+#tc-root .tc-av-ring.sm { padding: 2px; margin: -2px; }
+#tc-root .tc-av-ring.sm .tc-av { box-shadow: 0 0 0 1px var(--tc-bg), 0 0 0 2px var(--tc-ring); }
+/* Offline: thin grey hairline, quieter than a coloured status. */
+#tc-root .tc-av-ring.is-offline .tc-av { box-shadow: 0 0 0 1.5px var(--tc-bg), 0 0 0 2.5px var(--tc-ring); }
+#tc-root .tc-av-ring.is-offline.sm .tc-av { box-shadow: 0 0 0 1px var(--tc-bg), 0 0 0 1.75px var(--tc-ring); }
+/* Clickable avatar hover: keep the ring, add accent outside it. */
+#tc-root .tc-av-ring .tc-av-btn:hover { box-shadow: 0 0 0 1.5px var(--tc-bg), 0 0 0 3px var(--tc-ring), 0 0 0 5px var(--tc-accent); }
+#tc-root .tc-row-body { @apply flex-1; min-width: 0; }
+#tc-root .tc-row-top { @apply flex justify-between gap-2; }
+#tc-root .tc-name { @apply overflow-hidden whitespace-nowrap; font-weight: 600;
+  font-size: 13.5px; text-overflow: ellipsis; }
+#tc-root .tc-time { flex: 0 0 auto; font-size: 11px; color: var(--tc-fg2); }
+#tc-root .tc-prev { @apply overflow-hidden whitespace-nowrap; font-size: 12.5px;
+  color: var(--tc-fg2); text-overflow: ellipsis; }
+#tc-root .tc-unread { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--tc-accent); }
+
+/* Main */
+#tc-root .tc-main { @apply flex flex-col min-w-0 min-h-0; }
+#tc-root .tc-main-head { @apply flex items-center gap-2.5; height: 52px; flex: 0 0 auto;
+  border-bottom: 1px solid var(--tc-line); padding: 0 18px; }
+#tc-root .tc-main-head .tc-name { font-size: 15px; }
+#tc-root .tc-msgs { @apply flex-1 overflow-y-auto; padding: 16px 18px 8px; }
+/* Uniform vertical rhythm: every message row has the same gap above it,
+   group-start or continuation. Grouping shows via avatar + name, not extra space. */
+#tc-root .tc-msg { @apply flex gap-2.5 relative; padding: 3px 0; }
+#tc-root .tc-msg:hover { background: color-mix(in srgb, var(--tc-hover) 55%, transparent); border-radius: 8px; }
+#tc-root .tc-msg + .tc-msg { margin-top: 0; }
+#tc-root .tc-msg.first { margin-top: 0; }
+#tc-root .tc-msg.tc-flash { animation: tc-flash 1.4s ease; }
+@keyframes tc-flash {
+  0% { background: color-mix(in srgb, var(--tc-accent) 32%, transparent); }
+  100% { background: transparent; }
+}
+#tc-root .tc-msg .tc-av { @apply invisible; width: 36px; height: 36px; }
+#tc-root .tc-msg.first .tc-av { @apply visible; }
+#tc-root .tc-msg-body { @apply flex-1; min-width: 0; }
+#tc-root .tc-msg-meta { @apply flex gap-2 items-baseline; }
+#tc-root .tc-msg-meta .who { font-weight: 600; font-size: 13.5px; }
+#tc-root .tc-msg-meta .when { font-size: 11px; color: var(--tc-fg2); }
+#tc-root .tc-msg-content { font-size: 14px; word-wrap: break-word;
+  white-space: pre-wrap; line-height: 1.5; }
+/* HTML messages flow as block <p>; drop the intrinsic top/bottom margin so
+   multi-paragraph messages don't gain big gaps. First/last stay flush. */
+#tc-root .tc-msg-content p { margin: 2px 0; }
+#tc-root .tc-msg-content p:first-child { margin-top: 0; }
+#tc-root .tc-msg-content p:last-child { margin-bottom: 0; }
+#tc-root .tc-msg-content p + p { margin-top: 6px; }
+#tc-root .tc-msg-content br + br { display: none; }
+/* A quoted-reply blockquote is a jump affordance (injected HTML, not JSX). */
+#tc-root .tc-msg-content blockquote[itemtype="http://schema.skype.com/Reply"] {
+  margin: 0 0 4px; padding: 4px 10px; border-left: 3px solid var(--tc-accent);
+  background: color-mix(in srgb, var(--tc-accent) 8%, transparent);
+  border-radius: 4px; cursor: pointer; font-size: 13px; color: var(--tc-fg2); }
+#tc-root .tc-msg-content blockquote[itemtype="http://schema.skype.com/Reply"]:hover {
+  background: color-mix(in srgb, var(--tc-accent) 15%, transparent); }
+#tc-root .tc-msg-content blockquote[itemtype="http://schema.skype.com/Reply"] p { margin: 0; }
+#tc-root .tc-msg-content blockquote[itemtype="http://schema.skype.com/Reply"] strong { color: var(--tc-fg); font-weight: 600; }
+#tc-root .tc-msg-content img { max-width: 360px; max-height: 260px; border-radius: 6px; }
+#tc-root .tc-msg-content a { color: var(--tc-accent); }
+#tc-root .tc-deleted { color: var(--tc-fg2); font-style: italic; }
+
+/* Composer */
+#tc-root .tc-composer { flex: 0 0 auto; border-top: 1px solid var(--tc-line);
+  padding: 10px 18px 14px; background: var(--tc-bg2); }
+#tc-root .tc-composer-box { @apply flex gap-2 items-end; border: 1px solid var(--tc-line);
+  border-radius: 14px; background: var(--tc-bg); padding: 7px 7px 7px 14px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04); transition: border-color .15s, box-shadow .15s; }
+#tc-root .tc-composer-box:focus-within { border-color: var(--tc-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tc-accent) 22%, transparent); }
+#tc-root .tc-composer textarea { @apply flex-1 resize-none self-center;
+  border: 0; outline: 0; background: transparent; color: var(--tc-fg);
+  font-family: var(--tc-font); font-size: 14px; max-height: 180px; padding: 4px 0;
+  line-height: 1.45; }
+#tc-root .tc-composer textarea::placeholder { color: var(--tc-fg2); }
+#tc-root .tc-send { @apply grid place-items-center cursor-pointer; flex: 0 0 auto;
+  border: 0; background: var(--tc-accent); color: #fff; border-radius: 10px;
+  width: 34px; height: 34px; transition: opacity .15s, transform .1s; }
+#tc-root .tc-send:hover:not(:disabled) { transform: translateY(-1px); }
+#tc-root .tc-send:disabled { opacity: .4; cursor: default; }
+#tc-root .tc-composer-hint { @apply flex justify-between gap-3; margin: 6px 4px 0;
+  font-size: 11px; color: var(--tc-fg2); }
+#tc-root .tc-composer-hint .tc-kb { @apply whitespace-nowrap; opacity: .8; }
+
+#tc-root .tc-empty { @apply m-auto text-center; color: var(--tc-fg2); }
+#tc-root .tc-hint { @apply fixed; bottom: 10px; right: 14px; font-size: 11px;
+  color: var(--tc-fg2); background: var(--tc-bg2); border: 1px solid var(--tc-line);
+  padding: 4px 8px; border-radius: 6px; }
+#tc-root .tc-toast { @apply fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  background: #333; color:#fff; padding: 8px 14px; border-radius: 8px; font-size: 13px;
+  z-index: 10; }
+
+/* Sections, unread, threads, reactions, files */
+#tc-root .tc-badge { background: var(--tc-accent); color:#fff; font-size: 11px; font-weight: 700;
+  border-radius: 10px; padding: 1px 7px; }
+#tc-root .tc-caret { @apply inline-block; flex: 0 0 auto; width: 10px; opacity: .7; }
+#tc-root .tc-row.unread .tc-name { font-weight: 800; }
+#tc-root .tc-row.unread .tc-prev { color: var(--tc-fg); }
+#tc-root .tc-hash { background: var(--tc-bg3); color: var(--tc-fg2); font-size: 16px; border-radius: 8px; }
+#tc-root .tc-team { color: var(--tc-fg2); font-weight: 600; }
+#tc-root .tc-note { font-size: 12.5px; color: var(--tc-fg2); padding: 12px 8px; }
+#tc-root .tc-list-empty { font-size: 12.5px; color: var(--tc-fg2); text-align: center;
+  padding: 28px 16px; line-height: 1.5; }
+#tc-root .tc-head-text { @apply flex flex-col flex-1; min-width:0; }
+#tc-root .tc-sub { font-size: 12px; color: var(--tc-fg2); }
+#tc-root .tc-ghost { @apply inline-flex items-center gap-1.5 cursor-pointer;
+  border: 1px solid var(--tc-line); background: var(--tc-bg); color: var(--tc-fg);
+  border-radius: 8px; padding: 6px 12px; font-size: 12.5px;
+  transition: background .12s ease, border-color .12s ease, color .12s ease; }
+#tc-root .tc-ghost:hover { background: var(--tc-hover); }
+#tc-root .tc-ghost.tc-icon-only { padding: 6px; }
+#tc-root .tc-ghost.tc-icon-only.on { background: var(--tc-accent-soft); color: var(--tc-accent); }
+#tc-root .tc-day { @apply flex items-center gap-2.5; margin: 18px 0 4px;
+  font-size: 11.5px; font-weight: 600; color: var(--tc-fg2); }
+#tc-root .tc-day::before, #tc-root .tc-day::after { content:""; flex:1; height:1px; background: var(--tc-line); }
+#tc-root .tc-thread-sep { height: 1px; background: var(--tc-line); margin: 12px 0 0 46px; }
+#tc-root .tc-msg.reply { padding-left: 46px; }
+#tc-root .tc-msg.reply .tc-av.sm { width: 24px; height: 24px; font-size: 10px; }
+#tc-root .tc-msg.pending { opacity: .55; }
+#tc-root .tc-subject { font-weight: 700; font-size: 15px; margin: 2px 0; }
+#tc-root .tc-imp { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #fff;
+  background: #c4314b; border-radius: 4px; padding: 0 5px; }
+#tc-root .tc-edited { font-size: 11px; color: var(--tc-fg2); }
+#tc-root .tc-files { @apply flex flex-wrap gap-1.5; margin-top: 4px; }
+#tc-root .tc-file { @apply inline-flex items-center gap-1.5; font-size: 12.5px;
+  border: 1px solid var(--tc-line); border-radius: 6px; padding: 3px 8px;
+  color: var(--tc-fg); text-decoration: none; background: var(--tc-bg2); }
+#tc-root a.tc-file:hover { border-color: var(--tc-accent); }
+#tc-root .tc-reacts { @apply flex items-center flex-wrap gap-1; margin-top: 4px; }
+#tc-root .tc-react { @apply cursor-pointer; font-size: 12px; border: 1px solid var(--tc-line);
+  border-radius: 10px; padding: 1px 8px; background: var(--tc-bg2); color: var(--tc-fg);
+  line-height: 1.5; transition: background .12s, border-color .12s; }
+#tc-root .tc-react:hover { background: var(--tc-hover); }
+#tc-root .tc-react.mine { border-color: var(--tc-accent);
+  background: color-mix(in srgb, var(--tc-accent) 16%, transparent); }
+/* Slack-style hover toolbar, pinned top-right of a message. */
+#tc-root .tc-tools { @apply absolute; top: -10px; right: 6px;
+  opacity: 0; pointer-events: none; transition: opacity .1s; z-index: 6; }
+#tc-root .tc-msg:hover .tc-tools, #tc-root .tc-tools:focus-within,
+#tc-root .tc-tools:hover { opacity: 1; pointer-events: auto; }
+#tc-root .tc-tool-row { @apply flex gap-0.5; padding: 2px;
+  background: var(--tc-bg); border: 1px solid var(--tc-line); border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.16); }
+#tc-root .tc-tool { @apply grid place-items-center cursor-pointer; border: 0;
+  background: transparent; line-height: 0; border-radius: 6px; padding: 5px; color: var(--tc-fg2); }
+#tc-root .tc-tool:hover { background: var(--tc-hover); color: var(--tc-fg); }
+/* Reaction picker popover. */
+#tc-root .tc-react-pop { @apply absolute flex gap-0.5; top: 100%; right: 0; margin-top: 4px;
+  padding: 4px; background: var(--tc-bg); border: 1px solid var(--tc-line);
+  border-radius: 10px; box-shadow: 0 4px 14px rgba(0,0,0,.18); z-index: 7; }
+#tc-root .tc-react-pop::before { content: ""; position: absolute; left: 0; right: 0;
+  top: -6px; height: 6px; }
+#tc-root .tc-react-opt { @apply cursor-pointer; border: 0; background: transparent;
+  font-size: 18px; border-radius: 6px; padding: 3px 5px; line-height: 1;
+  transition: background .1s ease, transform .1s ease; }
+#tc-root .tc-react-opt:hover { background: var(--tc-hover); transform: scale(1.15); }
+/* Inline edit box + deleted/undo. */
+#tc-root .tc-edit { margin-top: 2px; }
+#tc-root .tc-edit-area { @apply w-full; box-sizing: border-box; min-height: 48px; resize: vertical;
+  font: inherit; color: var(--tc-fg); background: var(--tc-bg2); border: 1px solid var(--tc-accent);
+  border-radius: 8px; padding: 6px 8px; }
+#tc-root .tc-edit-actions { @apply flex gap-1.5; margin-top: 4px; }
+#tc-root .tc-edit-save, #tc-root .tc-edit-cancel { @apply cursor-pointer; font-size: 12px;
+  border-radius: 6px; padding: 3px 10px; border: 1px solid var(--tc-line);
+  background: var(--tc-bg2); color: var(--tc-fg); }
+#tc-root .tc-edit-save { background: var(--tc-accent); border-color: var(--tc-accent); color: #fff; }
+#tc-root .tc-undo { @apply inline-flex items-center gap-1 cursor-pointer; margin-left: 8px;
+  font-size: 12px; border: 0; background: transparent; color: var(--tc-accent);
+  text-decoration: underline; padding: 0; }
+#tc-root .tc-msgs .tc-empty { margin-top: 15vh; }
+#tc-root .tc-msgs .tc-empty p { margin: 4px 0; }
+#tc-root .tc-msgs .tc-empty .tc-ghost { margin-top: 10px; }
+#tc-root .tc-empty-actions { @apply flex gap-2 justify-center; margin-top: 10px; }
+#tc-root .tc-empty-actions .tc-ghost { margin-top: 0; }
+
+/* Rich message content (richText.jsx injected HTML) */
+#tc-root .tc-inline-img { @apply block; max-width: 360px; max-height: 300px; border-radius: 8px;
+  margin: 4px 0; border: 1px solid var(--tc-line); }
+#tc-root .tc-mention { color: var(--tc-accent); font-weight: 600; }
+#tc-root .tc-quote { border-left: 3px solid var(--tc-line); margin: 4px 0;
+  padding: 2px 0 2px 10px; color: var(--tc-fg2); }
+#tc-root .tc-quote p { margin: 1px 0; }
+#tc-root .tc-code { background: var(--tc-bg3); border-radius: 4px; padding: 1px 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+#tc-root .tc-pre { background: var(--tc-bg3); border: 1px solid var(--tc-line);
+  border-radius: 8px; padding: 10px 12px; margin: 6px 0; overflow-x: auto; }
+#tc-root .tc-pre .tc-code { background: none; padding: 0; }
+#tc-root .tc-ul, #tc-root .tc-ol { margin: 4px 0; padding-left: 22px; }
+#tc-root .tc-h { font-weight: 700; margin: 4px 0; }
+
+/* Shiki code blocks (injected HTML) */
+#tc-root .tc-pre.tc-shiki { background: #0d1117; border-color: #222a35; }
+@media (prefers-color-scheme: light) {
+  #tc-root .tc-pre.tc-shiki { background: #ffffff; border-color: var(--tc-line); }
+}
+#tc-root .tc-pre.tc-shiki .tc-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px; line-height: 1.5; white-space: pre; }
+#tc-root .tc-pre.tc-shiki .tc-code-line { display: inline; }
+#tc-root .tc-pre.tc-shiki[data-lang]::before { content: attr(data-lang);
+  display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--tc-fg2); margin: -2px 0 6px; font-family: var(--tc-font); }
+
+/* Sidebar: section header + show-more */
+#tc-root .tc-sec { @apply flex items-center gap-1 cursor-pointer select-none;
+  font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--tc-fg2); padding: 12px 8px 4px; }
+#tc-root .tc-sec:hover { color: var(--tc-fg); }
+#tc-root .tc-sec .tc-caret { flex: 0 0 auto; opacity: .7; }
+#tc-root .tc-sec-title { @apply flex-1; }
+#tc-root .tc-sec-n { font-weight: 600; opacity: .55; letter-spacing: 0; text-transform: none; }
+#tc-root .tc-sec-count { @apply grid place-items-center; background: var(--tc-accent); color: #fff;
+  border-radius: 9px; padding: 0 6px; font-size: 10px; line-height: 16px; }
+#tc-root .tc-more { @apply cursor-pointer text-left; width: calc(100% - 8px);
+  margin: 2px 4px 6px; border: 0; background: transparent; color: var(--tc-accent);
+  font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: 6px;
+  font-family: var(--tc-font); }
+#tc-root .tc-more:hover { background: var(--tc-hover); }
+
+/* Profile drawer (right) */
+#tc-root .tc-profile { @apply fixed flex flex-col; top: 0; right: 0; bottom: 0; width: 320px;
+  background: var(--tc-bg2); border-left: 1px solid var(--tc-line);
+  box-shadow: -8px 0 24px rgba(0,0,0,.18); z-index: 10; animation: tc-slide-in .16s ease; }
+@keyframes tc-slide-in { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+#tc-root .tc-profile-head { @apply flex justify-end; padding: 10px 12px 0; }
+#tc-root .tc-profile-close { @apply grid place-items-center cursor-pointer; border: 0;
+  background: transparent; color: var(--tc-fg2); width: 28px; height: 28px; border-radius: 7px; }
+#tc-root .tc-profile-close:hover { background: var(--tc-hover); color: var(--tc-fg); }
+#tc-root .tc-profile-id { @apply flex flex-col items-center text-center; padding: 4px 20px 18px;
+  border-bottom: 1px solid var(--tc-line); }
+#tc-root .tc-profile-av-ring { display: grid; place-items: center; margin-bottom: 12px;
+  border-radius: 50%; }
+#tc-root .tc-profile-av-ring.on { padding: 6px; }
+#tc-root .tc-profile-av-ring.on .tc-profile-av { box-shadow: 0 0 0 3px var(--tc-bg), 0 0 0 6px var(--tc-ring); }
+#tc-root .tc-profile-av-ring.on.is-offline .tc-profile-av { box-shadow: 0 0 0 3px var(--tc-bg), 0 0 0 4.5px var(--tc-ring); }
+#tc-root .tc-profile-av { @apply grid place-items-center overflow-hidden; width: 84px; height: 84px;
+  border-radius: 50%; color: #fff; font-size: 30px; font-weight: 600; }
+#tc-root .tc-profile-av img { @apply w-full h-full; object-fit: cover; }
+#tc-root .tc-profile-name { font-size: 18px; font-weight: 700; }
+#tc-root .tc-profile-mail { font-size: 12.5px; color: var(--tc-fg2); margin-top: 2px; }
+#tc-root .tc-profile-details { @apply flex flex-col gap-2; padding: 14px 20px;
+  border-bottom: 1px solid var(--tc-line); }
+#tc-root .tc-profile-detail { @apply flex items-center gap-2; font-size: 13px; color: var(--tc-fg); }
+#tc-root .tc-profile-detail svg { color: var(--tc-fg2); flex: 0 0 auto; }
+#tc-root .tc-profile-detail span { @apply overflow-hidden whitespace-nowrap; min-width: 0; text-overflow: ellipsis; }
+#tc-root .tc-profile-sec { @apply flex items-center gap-1.5; padding: 12px 8px 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--tc-fg2); }
+#tc-root .tc-profile-sec svg { color: var(--tc-fg2); flex: 0 0 auto; }
+/* Single scroll region holding every group, so the whole panel scrolls. */
+#tc-root .tc-profile-scroll { @apply flex-1 overflow-y-auto; min-height: 0; padding: 0 12px 16px; }
+#tc-root .tc-profile-group + .tc-profile-group { margin-top: 4px; }
+#tc-root .tc-profile-chats { padding: 0; }
+#tc-root .tc-profile-chat { @apply flex items-center gap-2 w-full cursor-pointer text-left; border: 0;
+  background: transparent; color: var(--tc-fg); padding: 8px 10px; border-radius: 8px;
+  font-size: 13.5px; font-family: var(--tc-font); }
+#tc-root .tc-profile-chat:hover { background: var(--tc-hover); }
+#tc-root .tc-profile-chat.sel { background: var(--tc-accent-soft); }
+#tc-root .tc-profile-chat svg { color: var(--tc-fg2); flex: 0 0 auto; }
+#tc-root .tc-profile-chat-title { @apply flex-1 overflow-hidden whitespace-nowrap; min-width: 0; text-overflow: ellipsis; }
+#tc-root .tc-profile-empty { color: var(--tc-fg2); font-size: 13px; padding: 10px 10px; }
+/* Message + call action row under the profile identity. */
+#tc-root .tc-profile-actions { @apply flex gap-2 items-stretch; padding: 14px 16px; }
+#tc-root .tc-profile-call { @apply grid place-items-center cursor-pointer; flex: 0 0 auto; width: 40px;
+  border: 1px solid var(--tc-line); border-radius: 10px; background: var(--tc-bg); color: var(--tc-fg); }
+#tc-root .tc-profile-call:hover { background: var(--tc-hover); border-color: var(--tc-accent); color: var(--tc-accent); }
+#tc-root .tc-profile-dm { @apply flex flex-1 items-center gap-2 cursor-pointer; padding: 9px 12px;
+  border: 0; border-radius: 10px; background: var(--tc-accent); color: #fff;
+  font: inherit; font-size: 13.5px; font-weight: 600; }
+#tc-root .tc-profile-dm:hover { filter: brightness(1.08); }
+#tc-root .tc-profile-dm .tc-unread { background: #fff; }
+
+/* In-conversation search bar. */
+#tc-root .tc-msgsearch { @apply flex items-center gap-2; padding: 8px 16px;
+  border-bottom: 1px solid var(--tc-line); background: var(--tc-bg); }
+#tc-root .tc-msgsearch .tc-search-icon { color: var(--tc-fg2); flex: 0 0 auto; }
+#tc-root .tc-msgsearch input { @apply flex-1 outline-none; min-width: 0; border: 0;
+  background: transparent; color: var(--tc-fg); font: inherit; font-size: 14px; }
+#tc-root .tc-msgsearch-n { color: var(--tc-fg2); font-size: 12px; flex: 0 0 auto; }
+#tc-root .tc-msgsearch-x { @apply grid place-items-center cursor-pointer; border: 0;
+  background: transparent; color: var(--tc-fg2); padding: 3px; border-radius: 6px; }
+#tc-root .tc-msgsearch-x:hover { background: var(--tc-hover); color: var(--tc-fg); }
+
+/* Quote-reply chip above the composer. */
+#tc-root .tc-quote-chip { @apply flex items-start gap-2; margin: 0 0 8px; padding: 8px 10px;
+  background: var(--tc-accent-soft); border-left: 3px solid var(--tc-accent); border-radius: 6px; }
+#tc-root .tc-quote-chip-icon { color: var(--tc-accent); flex: 0 0 auto; margin-top: 2px; }
+#tc-root .tc-quote-chip-body { @apply flex flex-col flex-1; min-width: 0; gap: 1px; }
+#tc-root .tc-quote-chip-from { font-size: 12px; font-weight: 600; color: var(--tc-accent); }
+#tc-root .tc-quote-chip-text { @apply overflow-hidden whitespace-nowrap; font-size: 13px;
+  color: var(--tc-fg2); text-overflow: ellipsis; }
+#tc-root .tc-quote-chip-x { @apply grid place-items-center cursor-pointer; border: 0;
+  background: transparent; color: var(--tc-fg2); padding: 2px; border-radius: 6px; flex: 0 0 auto; }
+#tc-root .tc-quote-chip-x:hover { background: var(--tc-hover); color: var(--tc-fg); }
+
+/* Right-click chat context menu. */
+#tc-root .tc-menu { @apply fixed; z-index: 20; min-width: 170px; padding: 4px;
+  background: var(--tc-bg); border: 1px solid var(--tc-line); border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.22); }
+#tc-root .tc-menu-item { @apply flex items-center gap-2 w-full cursor-pointer text-left; border: 0;
+  background: transparent; color: var(--tc-fg); font: inherit; font-size: 14px;
+  padding: 8px 10px; border-radius: 6px; }
+#tc-root .tc-menu-item:hover { background: var(--tc-hover); }
+#tc-root .tc-menu-item svg { color: var(--tc-fg2); flex: 0 0 auto; }
+
+/* Keep the sidebar title clear of the macOS traffic-light buttons (top-left). */
+#tc-root .tc-side-head { padding-top: 14px; padding-bottom: 8px; padding-left: 82px; }
+#tc-root .tc-side-head h1 { font-size: 15px; line-height: 1.4; }
+
+/* Slack-style unread link: a full-width row under the title, count on the right. */
+#tc-root .tc-unread-link { @apply flex items-center cursor-pointer text-left;
+  width: calc(100% - 24px); margin: 2px 12px 8px; padding: 6px 10px; border: 0;
+  border-radius: 8px; background: transparent; color: var(--tc-accent);
+  font: inherit; font-size: 13px; font-weight: 600; }
+#tc-root .tc-unread-link:hover { background: var(--tc-accent-soft); }
+#tc-root .tc-unread-link-label { @apply flex-1; }
+#tc-root .tc-unread-link-n { @apply grid place-items-center; flex: 0 0 auto; min-width: 18px;
+  height: 18px; padding: 0 5px; border-radius: 9px; background: var(--tc-accent);
+  color: #fff; font-size: 11px; font-weight: 700; }
+
+/* Scrollbars: thin, themed. */
+#tc-root .tc-list, #tc-root .tc-msgs, #tc-root .tc-profile-chats,
+#tc-root .tc-composer textarea, #tc-root .tc-edit-area {
+  scrollbar-width: thin; scrollbar-color: var(--tc-line) transparent; }
+#tc-root ::-webkit-scrollbar { width: 10px; height: 10px; }
+#tc-root ::-webkit-scrollbar-track { background: transparent; }
+#tc-root ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--tc-fg2) 35%, transparent);
+  border-radius: 8px; border: 3px solid transparent; background-clip: padding-box; }
+#tc-root ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--tc-fg2) 60%, transparent);
+  background-clip: padding-box; }
+#tc-root ::-webkit-scrollbar-corner { background: transparent; }
+
+/* Sidebar footer: signed-in user, presence, status + view switch menu. */
+#tc-root .tc-me { @apply relative; flex: 0 0 auto; padding: 8px; border-top: 1px solid var(--tc-line); }
+#tc-root .tc-me-btn { @apply flex items-center gap-2.5 w-full cursor-pointer text-left; border: 0;
+  background: transparent; color: var(--tc-fg); font: inherit; padding: 6px 8px; border-radius: 8px; }
+#tc-root .tc-me-btn:hover, #tc-root .tc-me-btn.on { background: var(--tc-hover); }
+#tc-root .tc-me-text { @apply flex flex-col min-w-0 flex-1; line-height: 1.25; }
+#tc-root .tc-me-name { @apply truncate; font-size: 13.5px; font-weight: 600; }
+#tc-root .tc-me-status { @apply truncate; font-size: 12px; color: var(--tc-fg2); }
+#tc-root .tc-me-chev { color: var(--tc-fg2); flex: 0 0 auto; }
+#tc-root .tc-me-menu { @apply absolute; left: 8px; right: 8px; bottom: calc(100% - 2px); z-index: 20;
+  padding: 4px; background: var(--tc-bg); border: 1px solid var(--tc-line); border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.22); }
+#tc-root .tc-me-menu-sec { padding: 6px 10px 4px; font-size: 11.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--tc-fg2); }
+#tc-root .tc-me-menu-label { @apply flex-1 min-w-0 truncate; }
+#tc-root .tc-me-menu-sep { height: 1px; margin: 4px 6px; background: var(--tc-line); }
+#tc-root .tc-me-kb { font-size: 12px; color: var(--tc-fg2); }
+#tc-root .tc-me-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto;
+  background: var(--tc-ring); }
+#tc-root .tc-me-dot.is-offline { background: transparent; box-shadow: inset 0 0 0 2px var(--tc-ring); }
