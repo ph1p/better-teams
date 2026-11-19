@@ -1,48 +1,78 @@
 import { useState, type JSX, type MouseEvent } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Row } from "./Row";
-import { SECTION_CAP } from "../lib/constants";
+import { RECENT_MS, SECTION_CAP, SECTION_MIN } from "../lib/constants";
+import { usePref } from "../lib/prefs";
 import type { Chat } from "../../types";
 
 interface SectionProps {
+  // Stable key for the persisted collapsed state ("dms", "channels", ...).
+  id: string;
   title: string;
   rows: Chat[];
   sel: string | null;
+  compact: boolean;
+  // false: list every row (Unread filter, search results), no "Show more".
+  capped?: boolean;
+  // Starts collapsed until the user opens it once (Meetings).
+  defaultCollapsed?: boolean;
+  // Rows arrive sorted by team; print a small team label above each run.
+  groupByTeam?: boolean;
   onPick: (id: string) => void;
   onOpenProfile: (mri: string) => void;
   onMenu: (e: MouseEvent, chat: Chat) => void;
 }
 
-// A collapsible sidebar group (Favorites / Chats / Channels / Meetings). Shows
-// the newest SECTION_CAP rows with a "Show more" toggle for the rest.
-export function Section({ title, rows, sel, onPick, onOpenProfile, onMenu }: SectionProps): JSX.Element {
-  const [open, setOpen] = useState(true);
+// A collapsible sidebar group; an empty title renders the rows alone, without a
+// header. A section shows what is current, not everything: at least
+// SECTION_MIN rows, then those active within RECENT_MS (up to SECTION_CAP);
+// older ones sit behind "Show N older". Unread rows and the open chat always
+// show — even in a collapsed section, so collapsing never hides new messages.
+export function Section({
+  id, title, rows, sel, compact, capped = true, defaultCollapsed = false, groupByTeam = false,
+  onPick, onOpenProfile, onMenu,
+}: SectionProps): JSX.Element {
+  const [collapsed, setCollapsed] = usePref<boolean>("sec:" + id, defaultCollapsed);
   const [all, setAll] = useState(false);
   const unread = rows.filter((r) => r.unread).length;
-  // Show the 10 newest by default; "Show more" reveals the rest. rows arrive
-  // already sorted newest-first from listChats.
-  const shown = all ? rows : rows.slice(0, SECTION_CAP);
+  const open = !collapsed || !title;
+  const cutoff = Date.now() - RECENT_MS;
+  const shown = !open
+    ? rows.filter((r) => r.unread || r.id === sel)
+    : all || !capped
+      ? rows
+      : rows.filter((r, i) => i < SECTION_MIN || (i < SECTION_CAP && r.time >= cutoff) || r.unread || r.id === sel);
   const hidden = rows.length - shown.length;
+
+  const body: JSX.Element[] = [];
+  let team: string | null = null;
+  for (const c of shown) {
+    if (groupByTeam && c.team !== team) {
+      team = c.team;
+      body.push(<div key={"t:" + c.team} className="tc-team-label">{c.team || "Other"}</div>);
+    }
+    body.push(
+      <Row key={c.id} chat={c} compact={compact} showTeam={!groupByTeam} selected={c.id === sel}
+        onClick={() => onPick(c.id)} onOpenProfile={onOpenProfile} onMenu={onMenu} />
+    );
+  }
+
   return (
-    <>
-      <div className="tc-sec" onClick={() => setOpen((o) => !o)}>
-        {open ? <ChevronDown size={14} className="tc-caret" /> : <ChevronRight size={14} className="tc-caret" />}
-        <span className="tc-sec-title">{title}</span>
-        <span className="tc-sec-n">{rows.length}</span>
-        {!open && unread ? <span className="tc-sec-count">{unread}</span> : null}
-      </div>
-      {open && (
-        <>
-          {shown.map((c) => (
-            <Row key={c.id} chat={c} selected={c.id === sel} onClick={() => onPick(c.id)} onOpenProfile={onOpenProfile} onMenu={onMenu} />
-          ))}
-          {rows.length > SECTION_CAP ? (
-            <button className="tc-more" onClick={() => setAll((a) => !a)}>
-              {all ? "Show less" : `Show ${hidden} more`}
-            </button>
-          ) : null}
-        </>
-      )}
-    </>
+    <div className={"tc-section" + (open ? "" : " collapsed")}>
+      {title ? (
+        <button className="tc-sec" onClick={() => setCollapsed((c) => !c)} aria-expanded={open}>
+          {open ? <ChevronDown size={13} className="tc-caret" /> : <ChevronRight size={13} className="tc-caret" />}
+          <span className="tc-sec-title">{title}</span>
+          {/* One number only, and only when it says something: unread count. */}
+          {unread ? <span className="tc-sec-count" title={`${unread} unread`}>{unread}</span> : null}
+        </button>
+      ) : null}
+      {body}
+      {open && capped && (all || hidden > 0) ? (
+        <button className="tc-more" onClick={() => setAll((a) => !a)}>
+          {all ? "Show less" : `Show ${hidden} older`}
+        </button>
+      ) : null}
+    </div>
   );
 }

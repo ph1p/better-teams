@@ -25,11 +25,6 @@ declare module "shiki/wasm" {
 declare const __BUILD__: string;
 
 interface Window {
-  __tcTok?: { ic3: string; region: string; at: number };
-  __tcSubTok?: { tok: string; at: number };
-  __tcMtRegion?: string;
-  __tcCapOn?: boolean;
-  __tcXhrOn?: boolean;
   __teamsCalmApp?: {
     show: () => void;
     hide: () => void;

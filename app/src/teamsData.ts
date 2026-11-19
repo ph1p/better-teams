@@ -23,8 +23,12 @@
 // accessors below (`str`, `num`, `obj`, `arr`, `get`), so nothing outside this
 // file ever touches an `any`.
 
-import type { Chat, ChatKind, FileRef, Message, Profile, Quote, Reaction, Token, WriteResult } from "./types";
+import type { Chat, ChatKind, FileRef, Message, Profile, Quote, Reaction, WriteResult } from "./types";
 import { buildMentionContent, type MentionPick } from "./mentions";
+import { chat, chatsvc, substrate, region, token, type Res } from "./services";
+
+// Service-layer result -> the UI's WriteResult.
+const toWrite = (r: Res): WriteResult => (r.ok ? { ok: true } : { ok: false, reason: r.reason });
 
 // --- Untyped-data accessors -----------------------------------------------
 // Narrow arbitrary external data at the boundary. Each returns a typed value or
@@ -93,13 +97,12 @@ export const myMri = (): string => (CURRENT_OID ? "8:orgid:" + CURRENT_OID : "")
 
 // Teams profile photo URL. Captured shape (cookie-auth, no bearer):
 //   /api/mt/<mtRegion>/beta/users/<my-guid>/profilepicturev2/<target-mri>
-// mtRegion differs from the chatsvc region (e.g. emea vs de); tokenCapture
-// records it as window.__tcMtRegion. Only org users (8:orgid:) have photos.
+// mtRegion differs from the chatsvc region (e.g. emea vs de); the service
+// layer records it off Teams' own traffic. Only org users (8:orgid:) have photos.
 export function profilePhotoUrl(mri: string): string {
   if (!CURRENT_OID || !mri || mri.indexOf("8:orgid:") !== 0) return "";
-  const reg = (typeof window !== "undefined" && window.__tcMtRegion) || "emea";
   return (
-    `/api/mt/${reg}/beta/users/${CURRENT_OID}/profilepicturev2/` +
+    `/api/mt/${region("mt")}/beta/users/${CURRENT_OID}/profilepicturev2/` +
     encodeURIComponent(mri)
   );
 }
@@ -232,6 +235,8 @@ export async function listChats(): Promise<Chat[]> {
     const lm = obj(c.lastMessage);
     const time = toMs(c.lastMessageTimeUtc) || toMs(lm.originalarrivaltime) || toMs(lm.composetime);
     if (!time) continue;
+    const lmTime = toMs(lm.originalarrivaltime) || time;
+    if (lm.id) lastByConv.set(str(c.id), { id: String(lm.id), clientMessageId: str(lm.clientmessageid), time: lmTime });
 
     const others = arr(c.members)
       .map((m) => str(get(m, "id")) || str(get(m, "mri")))
@@ -245,6 +250,14 @@ export async function listChats(): Promise<Chat[]> {
     // against Teams' own threadProperties.isRead: matches on all 250 chats, while
     // also honouring consumptionHorizonBookmark does not.
     const horizon = effectiveHorizon(str(c.id), toMs(String(props.consumptionhorizon ?? "").split(";")[0]));
+    // A thread we left (lastleaveat after lastjoinat) keeps a stale horizon that
+    // read writes can't move (we're no longer a member), so it would show unread
+    // forever, even right after marking it read.
+    const left = (Number(tp.lastleaveat) || 0) > (Number(tp.lastjoinat) || 0);
+    // Hidden (Teams' "Hide"): the worker keeps the hide time in the user
+    // property unpinnedTime; a newer message brings the chat back.
+    const hiddenAt = Number(props.unpinnedTime) || 0;
+    const hidden = effectiveHidden(str(c.id), hiddenAt > 0 && time <= hiddenAt);
 
     chats.push({
       id: str(c.id),
@@ -258,8 +271,9 @@ export async function listChats(): Promise<Chat[]> {
       members: others,
       favorite: favs.has(str(c.id)),
       pinned: props.ispinned === "true" || props.ispinned === true,
+      hidden,
       time,
-      unread: !lastFromMe && horizon > 0 && time > horizon,
+      unread: !left && (effectiveMarked(str(c.id), props) || (!lastFromMe && horizon > 0 && time > horizon)),
       last: {
         from: lastFromMe ? "You" : str(lm.imdisplayname),
         content: str(lm.content),
@@ -341,6 +355,25 @@ function asImportance(v: unknown): Message["importance"] {
   return v === "high" || v === "urgent" ? v : "normal";
 }
 
+// messageId -> {clientMessageId, time} for every message we normalized: CDL
+// edit/delete/read take these, while the UI only passes message ids. Bounded.
+const msgRefs = new Map<string, { clientMessageId: string; time: number }>();
+const MAX_REFS = 5000;
+
+function rememberRef(id: string, clientMessageId: string, time: number): void {
+  if (!id || !time) return;
+  msgRefs.delete(id);
+  msgRefs.set(id, { clientMessageId, time });
+  if (msgRefs.size > MAX_REFS) msgRefs.delete(msgRefs.keys().next().value as string);
+}
+
+// Each chat's newest message, from the chat list: what Teams' mark read/unread key on.
+const lastByConv = new Map<string, chat.MsgRef>();
+
+// Channel posts carry reply-chain state the CDL layer does not model yet; they
+// stay on the chatsvc REST path.
+const isChannelId = (id: string): boolean => /@thread\.(tacv2|skype)$/.test(id);
+
 function normMessage(raw: unknown, rc: ChainCtx | null): Message {
   const m = obj(raw);
   const props = obj(m.properties);
@@ -352,6 +385,7 @@ function normMessage(raw: unknown, rc: ChainCtx | null): Message {
     toMs(m.clientArrivalTime ?? m.clientarrivaltime);
   const isRoot = !rc || String(m.id) === String(rc.replyChainId);
   const deletetime = Number(get(m.properties, "deletetime")) || 0;
+  rememberRef(String(m.id), str(m.clientmessageid) || str(m.clientMessageId), time);
   return {
     id: String(m.id),
     rootId: rc ? String(rc.replyChainId) : String(m.id),
@@ -406,6 +440,10 @@ export async function listMessages(
   // Uncached chat: Teams never opened it natively, so no replychain is stored
   // locally. Fetch it from the same backend Teams uses, with Teams' own token.
   if (msgs.length === 0) {
+    // Same query Teams' chat pane sends; the worker may hold the chat in memory.
+    // Channels too: the worker answers them as one flat list, replies included.
+    const fromWorker = await cdlFirstPage(conversationId, channel);
+    if (fromWorker && fromWorker.length) return fromWorker.slice(-remoteLimit);
     const remote = await fetchRemoteMessages(conversationId, remoteLimit, channel);
     if (remote && remote.length) return remote;
     // remote === null means the backend couldn't be reached (no token yet, http
@@ -431,13 +469,6 @@ function sortMessages(msgs: Message[], channel: boolean): void {
   );
 }
 
-// Live ic3 bearer captured in-page from Teams' own traffic (tokenCapture.ts
-// wraps window.fetch) and parked on window.__tcTok = { ic3, region, at }.
-function liveToken(): Token | null {
-  const t = (typeof window !== "undefined" && window.__tcTok) || null;
-  return t && t.ic3 ? t : null;
-}
-
 // Uncached chats poll every few seconds but their IndexedDB stays empty, so
 // cache the remote result briefly to avoid hammering chatsvc on every tick.
 // Kept just under the UI poll interval (4s) so a new message shows within one
@@ -455,22 +486,9 @@ async function fetchRemoteMessages(
 ): Promise<Message[] | null> {
   const cached = remoteCache.get(conversationId);
   if (cached && Date.now() - cached.at < REMOTE_TTL) return cached.msgs;
-  const t = liveToken();
-  if (!t) return null;
-  const reg = t.region || "de";
-  // chatsvc caps pageSize at 200 (HTTP 400 "PageSize ... should be <= 200").
-  const pageSize = Math.min(limit, 200);
-  const url =
-    `/api/chatsvc/${reg}/v1/users/ME/conversations/${encodeURIComponent(conversationId)}` +
-    `/messages?view=msnp24Equivalent%7CsupportsMessageProperties&pageSize=${pageSize}&startTime=1`;
-  let j: unknown;
-  try {
-    const r = await fetch(url, { headers: { authorization: "Bearer " + t.ic3 } });
-    if (!r.ok) return null;
-    j = await r.json();
-  } catch {
-    return null;
-  }
+  const r = await chatsvc.getMessages(conversationId, limit);
+  if (!r.ok) return null;
+  const j: unknown = r.data;
   const out = parseRemotePage(j, channel).slice(-limit);
   // Stash the backward-paging link so scroll-up can load older messages.
   backwardLinks.set(conversationId, str(get(get(j, "_metadata"), "backwardLink")) || null);
@@ -504,30 +522,113 @@ function parseRemotePage(j: unknown, channel: boolean): Message[] {
   return msgs;
 }
 
+// Teams' worker `Message` (ComponentsChatQueriesMessageListQuery) -> our Message.
+// Chats only: flat timeline, every message its own root.
+function normCdlMessage(raw: unknown, channel = false): Message | null {
+  const m = obj(raw);
+  const messageType = str(m.messageType);
+  if (m.content === undefined || SKIP_TYPES.test(messageType)) return null;
+  const id = String(m.id);
+  const time = toMs(m.originalArrivalTime);
+  const fromMri = str(get(m.fromUser, "mri")) || str(m.fromUserId) || mriOf(m.from);
+  const deleted = Number(m.deleteTime) > 0;
+  // Teams hides deleted messages unless it flags them to show as deleted.
+  if (deleted && get(m.deletionInfo, "showMessageAsDeleted") !== true && !deletedHere.has(id)) return null;
+  rememberRef(id, str(m.clientMessageId), time);
+  // Channel posts carry their thread root as parentMessageId (a root points at
+  // itself). Message ids are arrival times in ms, so a reply whose root is not
+  // on this page still sorts under it.
+  const parent = channel ? str(m.parentMessageId) : "";
+  const isReply = !!parent && parent !== id;
+  const me = myMri();
+  const counts = new Map<string, number>();
+  for (const e of arr(m.emotionsSummary)) counts.set(str(get(e, "key")), Number(get(e, "count")) || 0);
+  const reactions = arr(m.emotions)
+    .map((e): Reaction => {
+      const key = str(get(e, "key"));
+      const users = arr(get(e, "users"));
+      return {
+        key,
+        glyph: reactionGlyph(key),
+        count: users.length || counts.get(key) || 0,
+        mine: users.some((u) => (str(get(u, "userId")) || str(get(u, "id"))) === me),
+      };
+    })
+    .filter((r) => r.key && r.count > 0);
+  return {
+    id,
+    rootId: isReply ? parent : id,
+    rootTime: isReply ? Number(parent) || time : time,
+    isReply,
+    from: str(m.imDisplayName) || str(get(m.fromUser, "displayName")) || profile(fromMri).displayName || "",
+    fromMri,
+    content: str(m.content),
+    messageType,
+    mine: !!fromMri && fromMri === me,
+    deleted,
+    edited: Number(m.editTime) > 0,
+    subject: str(m.subject),
+    importance: asImportance(str(m.importance).toLowerCase()),
+    reactions,
+    files: parseFiles(m.files),
+    time,
+  };
+}
+
+// conversationId -> worker cursor for the next older page (null: start of
+// history). Set by the first CDL page, advanced by fetchOlderRemote.
+const cdlCursors = new Map<string, string | null>();
+
+// One CDL page, oldest first. null when the worker failed or holds nothing for
+// the chat (uncached: it answers an empty page), so callers fall back to REST.
+async function cdlPage(
+  conversationId: string, cursor?: string, channel = false
+): Promise<{ msgs: Message[]; older: string | null } | null> {
+  const r = await chat.listMessages(conversationId, cursor);
+  if (!r.ok) return null;
+  const msgs = r.data.messages.map((m) => normCdlMessage(m, channel)).filter((n): n is Message => !!n);
+  sortMessages(msgs, channel);
+  return { msgs, older: r.data.older };
+}
+
+// First page of an uncached chat through Teams' worker. Keeps an existing
+// cursor so a poll does not reset scroll-up paging.
+async function cdlFirstPage(conversationId: string, channel = false): Promise<Message[] | null> {
+  const p = await cdlPage(conversationId, undefined, channel);
+  if (!p || (!p.msgs.length && !p.older)) return null;
+  if (!cdlCursors.has(conversationId)) cdlCursors.set(conversationId, p.older);
+  return p.msgs;
+}
+
 // conversationId -> chatsvc backwardLink URL for the next older page (or null at
 // the start of history). Set by fetchRemoteMessages, advanced by fetchOlderRemote.
 const backwardLinks = new Map<string, string | null>();
 
-// Follow the stored backwardLink to load the next older page of a remote chat.
+// Load the next older page: through Teams' worker when the chat was paged there,
+// else by following the stored chatsvc backwardLink.
 // Returns an array of older messages (may be empty at start of history), or null
 // if there's no link yet or the request fails. Advances the link for the next call.
 export async function fetchOlderRemote(conversationId: string, channel = false): Promise<Message[] | null> {
+  // Scrolled up before the chat's priming finished: get a cursor first rather
+  // than reporting "no history".
+  if (!cdlCursors.has(conversationId) && !backwardLinks.has(conversationId)) await primeRemote(conversationId, channel);
+  if (cdlCursors.has(conversationId)) {
+    const cursor = cdlCursors.get(conversationId);
+    if (!cursor) return null;
+    const p = await cdlPage(conversationId, cursor, channel);
+    // Transient failure: keep the cursor, report "nothing yet" so a later
+    // scroll retries instead of marking the history as ended.
+    if (!p) return [];
+    cdlCursors.set(conversationId, p.older);
+    return p.msgs;
+  }
   const link = backwardLinks.get(conversationId);
   if (!link) return null;
-  const t = liveToken();
-  if (!t) return null;
-  // backwardLink is an absolute teams.microsoft.com URL; use its path so the
-  // same-origin fetch (and the page's auth plumbing) applies.
-  let path: string;
-  try { const u = new URL(link); path = u.pathname + u.search; } catch { path = link; }
-  let j: unknown;
-  try {
-    const r = await fetch(path, { headers: { authorization: "Bearer " + t.ic3 } });
-    if (!r.ok) return null;
-    j = await r.json();
-  } catch {
-    return null;
-  }
+  // backwardLink is an absolute teams.microsoft.com URL; the service layer
+  // keeps same-origin links relative and refuses any other host.
+  const r = await chatsvc.getMessagesByLink(link);
+  if (!r.ok) return null;
+  const j: unknown = r.data;
   // Advance (or clear) the link. A link that doesn't change, or no messages,
   // means we've reached the start of history.
   const next = str(get(get(j, "_metadata"), "backwardLink")) || null;
@@ -535,27 +636,31 @@ export async function fetchOlderRemote(conversationId: string, channel = false):
   return parseRemotePage(j, channel);
 }
 
-// Fetch the first remote page purely to capture its backwardLink, so scroll-up
-// pagination works even for chats whose recent messages came from the local
-// IndexedDB cache (which carries no paging cursor). Returns the parsed page so
+// Fetch the first remote page purely to capture its paging cursor (worker
+// cursor first, chatsvc backwardLink as fallback), so
+// scroll-up pagination works even for chats whose recent messages came from the
+// local IndexedDB cache (which carries no paging cursor). Returns the parsed page so
 // the caller can merge any messages the cache was missing. Skips the work when
 // a backward link is already known for this chat.
-export async function primeRemote(conversationId: string, channel = false): Promise<Message[] | null> {
-  if (backwardLinks.has(conversationId)) return null;
-  const t = liveToken();
-  if (!t) return null;
-  const reg = t.region || "de";
-  const url =
-    `/api/chatsvc/${reg}/v1/users/ME/conversations/${encodeURIComponent(conversationId)}` +
-    `/messages?view=msnp24Equivalent%7CsupportsMessageProperties&pageSize=30&startTime=1`;
-  let j: unknown;
-  try {
-    const r = await fetch(url, { headers: { authorization: "Bearer " + t.ic3 } });
-    if (!r.ok) return null;
-    j = await r.json();
-  } catch {
-    return null;
+export function primeRemote(conversationId: string, channel = false): Promise<Message[] | null> {
+  if (backwardLinks.has(conversationId) || cdlCursors.has(conversationId)) return Promise.resolve(null);
+  // One priming per chat at a time (chat open and an early scroll-up race).
+  let p = priming.get(conversationId);
+  if (!p) {
+    p = primeOnce(conversationId, channel).finally(() => priming.delete(conversationId));
+    priming.set(conversationId, p);
   }
+  return p;
+}
+
+const priming = new Map<string, Promise<Message[] | null>>();
+
+async function primeOnce(conversationId: string, channel: boolean): Promise<Message[] | null> {
+  const first = await cdlFirstPage(conversationId, channel);
+  if (first) return first;
+  const r = await chatsvc.getMessages(conversationId, 30);
+  if (!r.ok) return null;
+  const j: unknown = r.data;
   backwardLinks.set(conversationId, str(get(get(j, "_metadata"), "backwardLink")) || null);
   return parseRemotePage(j, channel);
 }
@@ -590,10 +695,20 @@ export function splitQuote(content: string): { quoteHtml: string; body: string }
 }
 
 // Random 18-digit client message id, matching Teams' own clientmessageid shape.
-function newClientMessageId(): string {
-  let s = String(1 + Math.floor(Math.random() * 9));
-  while (s.length < 18) s += Math.floor(Math.random() * 10);
-  return s;
+const NOT_READY = "Teams worker channel not ready";
+
+// properties.mentions JSON (mentions.ts) -> Teams' MentionInput list.
+function mentionInputs(json: string): chat.MentionInput[] {
+  try {
+    return arr(JSON.parse(json)).map((e) => ({
+      itemId: String(get(e, "itemid") ?? ""),
+      userId: str(get(e, "mri")),
+      mentionType: str(get(e, "mentionType")) || "person",
+      displayName: str(get(e, "displayName")),
+    }));
+  } catch {
+    return [];
+  }
 }
 
 // Send a text message through the exact chatsvc endpoint Teams itself POSTs to,
@@ -611,15 +726,24 @@ export async function sendRemote(
 ): Promise<WriteResult> {
   const body = (text || "").trim();
   if (!body) return { ok: false, reason: "empty" };
-  const t = liveToken();
-  if (!t) return { ok: false, reason: "no-token" };
-  const reg = t.region || "de";
-  const mri = myMri();
-  const now = new Date().toISOString();
   // HTML-escape the body and splice in any @mention spans (native Teams format).
   const mc = buildMentionContent(body, mentions);
   // Native quote-reply: prepend the Skype Reply blockquote (captured format).
   const content = buildQuoteHtml(quote) + "<p>" + mc.html + "</p>";
+  const clientMessageId = chat.newClientMessageId();
+  if (!isChannelId(conversationId)) {
+    const r = await chat.sendMessage({ convId: conversationId, content, clientMessageId, mentions: mentionInputs(mc.mentions) });
+    if (r.ok) {
+      remoteCache.delete(conversationId);
+      return { ok: true, via: "cdl" };
+    }
+    // Fall back only when the request never reached the worker; any later
+    // failure may already have sent, and a retry would post twice.
+    if (r.reason !== NOT_READY) return { ok: false, reason: r.reason };
+  }
+  if (!token("ic3")) return { ok: false, reason: "no-token" };
+  const mri = myMri();
+  const now = new Date().toISOString();
   const payload = {
     id: "-1",
     type: "Message",
@@ -633,7 +757,7 @@ export async function sendRemote(
     messagetype: "RichText/Html",
     contenttype: "Text",
     imdisplayname: profile(mri).displayName || "",
-    clientmessageid: newClientMessageId(),
+    clientmessageid: clientMessageId,
     callId: "",
     state: 0,
     version: "0",
@@ -652,22 +776,8 @@ export async function sendRemote(
     },
     crossPostChannels: [] as string[],
   };
-  const url =
-    `/api/chatsvc/${reg}/v1/users/ME/conversations/${encodeURIComponent(conversationId)}/messages`;
-  try {
-    const r = await fetch(url, {
-      method: "POST",
-      headers: {
-        authorization: "Bearer " + t.ic3,
-        "content-type": "application/json",
-        behavioroverride: "redirectAs404",
-      },
-      body: JSON.stringify(payload),
-    });
-    if (!r.ok) return { ok: false, reason: "http-" + r.status };
-  } catch {
-    return { ok: false, reason: "fetch-failed" };
-  }
+  const r = await chatsvc.postMessage(conversationId, payload);
+  if (!r.ok) return toWrite(r);
   // Our cached view is now stale; drop it so the next poll re-fetches.
   remoteCache.delete(conversationId);
   return { ok: true, via: "endpoint" };
@@ -678,7 +788,7 @@ export async function sendRemote(
 //
 // Teams' powerbar @-picker hits the SubstrateSearch "suggestions" endpoint on
 // substrate.office.com — a DIFFERENT origin and a DIFFERENT bearer than chatsvc
-// (aud 66a88757-… / SubstrateSearch, captured in tokenCapture.ts as __tcSubTok).
+// (aud 66a88757-… / SubstrateSearch). services/substrate.ts owns the request.
 // We replay the People EntityRequest from that same endpoint and map each hit to
 // a PeopleHit the composer can turn into a native person mention.
 // Request + field list verified against a live client (Nov 2026).
@@ -688,24 +798,6 @@ export interface PeopleHit {
   displayName: string;
   email: string;
   jobTitle: string;
-}
-
-function uuid(): string {
-  try {
-    const c = (typeof crypto !== "undefined" && crypto) || null;
-    if (c && typeof c.randomUUID === "function") return c.randomUUID();
-  } catch {
-    /* fall through */
-  }
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (ch) => {
-    const r = (Math.random() * 16) | 0;
-    return (ch === "x" ? r : (r & 0x3) | 0x8).toString(16);
-  });
-}
-
-function subToken(): string {
-  const s = (typeof window !== "undefined" && window.__tcSubTok) || null;
-  return s && s.tok ? s.tok : "";
 }
 
 // Pull the first non-empty string field (case-insensitive) off a loose object.
@@ -744,78 +836,19 @@ function collectPeople(root: unknown, out: PeopleHit[], seen: Set<string>): void
   }
 }
 
-// Search the org directory for people matching `query`. Returns [] (never throws)
-// when no substrate token has been captured yet or the request fails, so callers
-// can fall back to local chat members.
+// Search the org directory for people matching `query` (substrate REST).
+// Returns [] (never throws) when nothing answers, so callers can fall back to
+// local chat members. Teams' own chat composer only offers chat members
+// (worker op searchUsersByConversation filters the roster locally, see
+// docs/cdl-api.md); org-wide hits are an overlay extra.
 export async function searchPeople(query: string, size = 8): Promise<PeopleHit[]> {
   const q = (query || "").trim();
   if (!q) return [];
-  const tok = subToken();
-  if (!tok) return [];
-  const mri = myMri();
-  const body = {
-    EntityRequests: [
-      {
-        Query: { QueryString: q, DisplayQueryString: q, NormalizedQueryString: q },
-        EntityType: "People",
-        Size: size,
-        Fields: [
-          "Id", "MRI", "DisplayName", "EmailAddresses", "PeopleType", "PeopleSubtype",
-          "UserPrincipalName", "GivenName", "Surname", "CompanyName", "JobTitle",
-          "ImAddress", "Department",
-        ],
-        Filter: {
-          And: [
-            { Or: [{ Term: { PeopleType: "Person" } }, { Term: { PeopleType: "Other" } }] },
-            {
-              Or: [
-                { Term: { PeopleSubtype: "OrganizationUser" } },
-                { Term: { PeopleSubtype: "MTOUser" } },
-                { Term: { PeopleSubtype: "PersonalContact" } },
-                { Term: { PeopleSubtype: "Guest" } },
-              ],
-            },
-            { Or: [{ Term: { Flags: "NonHidden" } }] },
-          ],
-        },
-        Provenances: ["Mailbox", "Directory"],
-        From: 0,
-      },
-    ],
-    Scenario: {
-      Name: "powerbar",
-      Dimensions: [{ DimensionName: "QueryType", DimensionValue: "PeopleCentricSearch" }],
-    },
-    Cvid: uuid(),
-    AppName: "Microsoft Teams",
-    LogicalId: uuid(),
-    dataSource: "personScoped",
-  };
-  const url =
-    "https://substrate.office.com/search/api/v1/suggestions" +
-    "?scenario=powerbar&setflight=EnableMessageImageSearch,EnableTeamsChannelDomainPowerbar";
-  try {
-    const r = await fetch(url, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        authorization: "Bearer " + tok,
-        "content-type": "application/json",
-        ...(mri ? { "x-anchormailbox": "Oid:" + CURRENT_OID } : {}),
-        "client-request-id": uuid(),
-        "x-ms-session-id": uuid(),
-        "x-client-version": "T2.1",
-      },
-      body: JSON.stringify(body),
-    });
-    if (!r.ok) return [];
-    const data: unknown = await r.json();
-    const out: PeopleHit[] = [];
-    collectPeople(data, out, new Set<string>());
-    return out.slice(0, size);
-  } catch {
-    return [];
-  }
+  const r = await substrate.suggestPeople(q, size, CURRENT_OID);
+  if (!r.ok) return [];
+  const out: PeopleHit[] = [];
+  collectPeople(r.data, out, new Set<string>());
+  return out.slice(0, size);
 }
 
 // Local read-pointer overrides. listChats reads the horizon from Teams' IndexedDB,
@@ -836,29 +869,59 @@ function effectiveHorizon(conversationId: string, idbHorizon: number): number {
   return ov.ms;
 }
 
+// Teams' "Mark as unread" sets only the bookmark property
+// consumptionHorizonBookmark = "<msgTime-1>;<setAtMs>;<clientMsgId>" and leaves
+// the horizon alone; "Mark as read" resets it to "0;<setAtMs>;0". So a chat is
+// marked unread when field 0 is set and the bookmark is newer than the horizon
+// write (field 1 of each); a later native read moves the horizon past it.
+// Seen live on 48:notes, 2026-11-19.
+function isMarkedUnread(props: Dict): boolean {
+  const bm = String(props.consumptionHorizonBookmark ?? "").split(";");
+  if (!(Number(bm[0]) > 0)) return false;
+  const chSetAt = Number(String(props.consumptionhorizon ?? "").split(";")[1]) || 0;
+  return (Number(bm[1]) || 0) > chSetAt;
+}
+
+// Local marked-unread overrides: what we last set, plus the IDB bookmark seen
+// when first applied; dropped once IDB moves off that value (worker synced).
+const markOverride = new Map<string, { marked: boolean; base?: string }>();
+
+function effectiveMarked(conversationId: string, props: Dict): boolean {
+  const idb = isMarkedUnread(props);
+  const ov = markOverride.get(conversationId);
+  if (!ov) return idb;
+  const bm = String(props.consumptionHorizonBookmark ?? "");
+  if (ov.base === undefined) ov.base = bm;
+  else if (bm !== ov.base) {
+    markOverride.delete(conversationId);
+    return idb;
+  }
+  return ov.marked;
+}
+
+// Local hide overrides: what we last set, held until Teams' IndexedDB agrees
+// (the worker writes it a moment after the mutation answers).
+const hiddenOverride = new Map<string, boolean>();
+
+function effectiveHidden(conversationId: string, idbHidden: boolean): boolean {
+  const ov = hiddenOverride.get(conversationId);
+  if (ov === undefined) return idbHidden;
+  if (ov === idbHidden) hiddenOverride.delete(conversationId);
+  return ov;
+}
+
+/** Hide or unhide a chat in Teams (syncs to all clients). Chats only. */
+export async function setChatHidden(conversationId: string, hidden: boolean): Promise<WriteResult> {
+  if (isChannelId(conversationId)) return { ok: false, reason: "channels cannot be hidden" };
+  const r = await chat.setChatHidden(conversationId, hidden);
+  if (!r.ok) return r;
+  hiddenOverride.set(conversationId, hidden);
+  return { ok: true, via: "cdl" };
+}
+
 // PUT one conversation property through chatsvc, same ic3 bearer as send.
 async function putConversationProperty(conversationId: string, name: string, value: string): Promise<WriteResult> {
-  const t = liveToken();
-  if (!t) return { ok: false, reason: "no-token" };
-  const reg = t.region || "de";
-  const url =
-    `/api/chatsvc/${reg}/v1/users/ME/conversations/${encodeURIComponent(conversationId)}` +
-    `/properties?name=${encodeURIComponent(name)}`;
-  try {
-    const r = await fetch(url, {
-      method: "PUT",
-      headers: {
-        authorization: "Bearer " + t.ic3,
-        "content-type": "application/json",
-        behavioroverride: "redirectAs404",
-      },
-      body: JSON.stringify({ [name]: value }),
-    });
-    if (!r.ok) return { ok: false, reason: "http-" + r.status };
-  } catch {
-    return { ok: false, reason: "fetch-failed" };
-  }
-  return { ok: true };
+  return toWrite(await chatsvc.putConversationProperty(conversationId, name, value));
 }
 
 // Move a conversation's read pointer: PUT consumptionhorizon "<msgId>;<ms>;<msgId>"
@@ -881,7 +944,7 @@ const pendingHorizon = new Map<string, number>();
 
 async function setConsumptionHorizon(conversationId: string, ms: number): Promise<WriteResult> {
   const v = Math.round(ms);
-  if (!liveToken()) {
+  if (!token("ic3")) {
     pendingHorizon.set(conversationId, v);
     horizonOverride.set(conversationId, { ms: v });
     return { ok: true, via: "queued" };
@@ -893,7 +956,7 @@ async function setConsumptionHorizon(conversationId: string, ms: number): Promis
 }
 
 async function flushPendingHorizons(): Promise<void> {
-  if (!pendingHorizon.size || !liveToken()) return;
+  if (!pendingHorizon.size || !token("ic3")) return;
   for (const [id, v] of [...pendingHorizon]) {
     pendingHorizon.delete(id);
     const res = await writeHorizon(id, v);
@@ -906,15 +969,39 @@ async function flushPendingHorizons(): Promise<void> {
 }
 
 // Mark read: push the pointer just past the newest message (default: now).
-export function markRead(conversationId: string, lastMessageMs?: number): Promise<WriteResult> {
+// Through Teams' worker when the chat's newest message is known (as Teams' own
+// "Mark as read"); otherwise, or on failure, the chatsvc property PUT.
+export async function markRead(conversationId: string, lastMessageMs?: number): Promise<WriteResult> {
   const ms = lastMessageMs ? lastMessageMs + 1 : Date.now();
-  return setConsumptionHorizon(conversationId, ms);
+  const last = lastByConv.get(conversationId);
+  if (last) {
+    const r = isChannelId(conversationId) ? await chat.markChannelRead(conversationId, last) : await chat.markRead(conversationId, last);
+    if (r.ok) {
+      pendingHorizon.delete(conversationId);
+      horizonOverride.set(conversationId, { ms: Math.max(ms, last.time + 1) });
+      markOverride.set(conversationId, { marked: false });
+      return { ok: true, via: "cdl" };
+    }
+  }
+  // The REST fallback moves only the horizon, not Teams' unread bookmark.
+  const res = await setConsumptionHorizon(conversationId, ms);
+  if (res.ok) markOverride.set(conversationId, { marked: false });
+  return res;
 }
 
 // Mark unread: pull the pointer to just before the newest message so it counts
 // as unread again. Needs the last message's time; falls back to now - 1s.
-export function markUnread(conversationId: string, lastMessageMs?: number): Promise<WriteResult> {
+export async function markUnread(conversationId: string, lastMessageMs?: number): Promise<WriteResult> {
   const ms = (lastMessageMs || Date.now()) - 1000;
+  const last = lastByConv.get(conversationId);
+  if (last && !isChannelId(conversationId)) {
+    const r = await chat.markUnread(conversationId, last);
+    if (r.ok) {
+      // Teams sets only the bookmark (see isMarkedUnread); hold it until IDB syncs.
+      markOverride.set(conversationId, { marked: true });
+      return { ok: true, via: "cdl" };
+    }
+  }
   return setConsumptionHorizon(conversationId, ms);
 }
 
@@ -931,29 +1018,15 @@ export async function setReaction(
   key: string,
   add: boolean
 ): Promise<WriteResult> {
-  const t = liveToken();
-  if (!t) return { ok: false, reason: "no-token" };
-  const reg = t.region || "de";
-  const url =
-    `/api/chatsvc/${reg}/v1/users/ME/conversations/${encodeURIComponent(conversationId)}` +
-    `/messages/${encodeURIComponent(messageId)}/properties?name=emotions`;
-  const body = add
-    ? { emotions: { key, value: Date.now() } }
-    : { emotions: { key } };
-  try {
-    const r = await fetch(url, {
-      method: add ? "PUT" : "DELETE",
-      headers: {
-        authorization: "Bearer " + t.ic3,
-        "content-type": "application/json",
-        behavioroverride: "redirectAs404",
-      },
-      body: JSON.stringify(body),
-    });
-    if (!r.ok) return { ok: false, reason: "http-" + r.status };
-  } catch {
-    return { ok: false, reason: "fetch-failed" };
+  if (!isChannelId(conversationId)) {
+    const c = await chat.setEmotion(conversationId, messageId, key, add);
+    if (c.ok) {
+      remoteCache.delete(conversationId);
+      return { ok: true, via: "cdl" };
+    }
   }
+  const r = await chatsvc.putReaction(conversationId, messageId, key, add);
+  if (!r.ok) return toWrite(r);
   remoteCache.delete(conversationId);
   return { ok: true };
 }
@@ -963,25 +1036,17 @@ export async function setReaction(
 // The ?behavior=softDelete query is REQUIRED: a bare DELETE hard-removes. Soft
 // delete is reversible via undoDelete(). Real write, syncs to all devices.
 export async function deleteMessage(conversationId: string, messageId: string): Promise<WriteResult> {
-  const t = liveToken();
-  if (!t) return { ok: false, reason: "no-token" };
-  const reg = t.region || "de";
-  const url =
-    `/api/chatsvc/${reg}/v1/users/ME/conversations/${encodeURIComponent(conversationId)}` +
-    `/messages/${encodeURIComponent(messageId)}?behavior=softDelete`;
-  try {
-    const r = await fetch(url, {
-      method: "DELETE",
-      headers: {
-        authorization: "Bearer " + t.ic3,
-        "content-type": "application/json",
-        behavioroverride: "redirectAs404",
-      },
-    });
-    if (!r.ok) return { ok: false, reason: "http-" + r.status };
-  } catch {
-    return { ok: false, reason: "fetch-failed" };
+  const ref = msgRefs.get(String(messageId));
+  if (!isChannelId(conversationId)) {
+    const c = await chat.deleteMessage(conversationId, { id: String(messageId), clientMessageId: ref?.clientMessageId || "" });
+    if (c.ok) {
+      deletedHere.add(String(messageId));
+      remoteCache.delete(conversationId);
+      return { ok: true, via: "cdl" };
+    }
   }
+  const r = await chatsvc.softDeleteMessage(conversationId, messageId);
+  if (!r.ok) return toWrite(r);
   deletedHere.add(String(messageId));
   remoteCache.delete(conversationId);
   return { ok: true };
@@ -998,29 +1063,25 @@ export async function editMessage(
   text: string,
   quoteHtml = ""
 ): Promise<WriteResult> {
-  const t = liveToken();
-  if (!t) return { ok: false, reason: "no-token" };
-  const reg = t.region || "de";
-  const url =
-    `/api/chatsvc/${reg}/v1/users/ME/conversations/${encodeURIComponent(conversationId)}` +
-    `/messages/${encodeURIComponent(messageId)}`;
   const esc = String(text)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const content = (quoteHtml || "") + "<p>" + esc.replace(/\n/g, "<br>") + "</p>";
-  try {
-    const r = await fetch(url, {
-      method: "PUT",
-      headers: {
-        authorization: "Bearer " + t.ic3,
-        "content-type": "application/json",
-        behavioroverride: "redirectAs404",
-      },
-      body: JSON.stringify({ content, messagetype: "RichText/Html", contenttype: "Text" }),
+  const ref = msgRefs.get(String(messageId));
+  if (ref && !isChannelId(conversationId)) {
+    const c = await chat.sendMessage({
+      convId: conversationId,
+      content,
+      clientMessageId: ref.clientMessageId || chat.newClientMessageId(),
+      edit: { id: String(messageId), time: ref.time },
     });
-    if (!r.ok) return { ok: false, reason: "http-" + r.status };
-  } catch {
-    return { ok: false, reason: "fetch-failed" };
+    if (c.ok) {
+      remoteCache.delete(conversationId);
+      return { ok: true, via: "cdl" };
+    }
+    // An edit is idempotent, so retrying over REST is safe.
   }
+  const r = await chatsvc.putMessage(conversationId, messageId, content);
+  if (!r.ok) return toWrite(r);
   remoteCache.delete(conversationId);
   return { ok: true };
 }
@@ -1028,26 +1089,8 @@ export async function editMessage(
 // Undo a soft-delete by clearing the message's deletetime property. Captured:
 //   DELETE .../messages/<id>/properties?name=deletetime   body {"deletetime":null}
 export async function undoDelete(conversationId: string, messageId: string): Promise<WriteResult> {
-  const t = liveToken();
-  if (!t) return { ok: false, reason: "no-token" };
-  const reg = t.region || "de";
-  const url =
-    `/api/chatsvc/${reg}/v1/users/ME/conversations/${encodeURIComponent(conversationId)}` +
-    `/messages/${encodeURIComponent(messageId)}/properties?name=deletetime`;
-  try {
-    const r = await fetch(url, {
-      method: "DELETE",
-      headers: {
-        authorization: "Bearer " + t.ic3,
-        "content-type": "application/json",
-        behavioroverride: "redirectAs404",
-      },
-      body: JSON.stringify({ deletetime: null }),
-    });
-    if (!r.ok) return { ok: false, reason: "http-" + r.status };
-  } catch {
-    return { ok: false, reason: "fetch-failed" };
-  }
+  const r = await chatsvc.undoSoftDelete(conversationId, messageId);
+  if (!r.ok) return toWrite(r);
   remoteCache.delete(conversationId);
   return { ok: true };
 }

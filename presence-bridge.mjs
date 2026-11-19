@@ -79,10 +79,88 @@ async function findTrouterWorker() {
       expression: `performance.getEntriesByType("resource").some(x=>/trouter/i.test(x.name))`,
       returnByValue: true,
     });
-    if (r.result && r.result.value === true) return c;
+    if (r.result && r.result.value === true) { c.targetId = w.id; return c; }
     c.ws.close();
   }
   return null;
+}
+
+// Forward a worker's own outgoing Authorization headers into the page vault.
+//
+// Teams mints several backend bearers (mt = api.spaces.skype.com, chatsvcagg,
+// presence) only inside its web worker; those requests never cross the page's
+// fetch/XHR, so the in-page capture cannot see them. Over CDP we can: enable
+// Network on the worker target and read the Authorization header off its OWN
+// requests — passively, nothing is blocked, altered or re-sent — then hand each
+// bearer to the page via self.__tcAuthIngest(header, url), exactly the forwarder
+// auth.ts exposes. The page vault files it by JWT aud like any in-page capture.
+// A header may arrive on requestWillBeSent (headers inline) or, when the browser
+// adds it later, on requestWillBeSentExtraInfo; we handle both and de-dupe so the
+// same bearer isn't shipped twice. Dev/CDP only; never runs against prod.
+function tapWorkerAuth(worker, page, logFn) {
+  const seen = new Set(); // request ids we've already forwarded a header for
+  const urls = new Map(); // requestId -> url (extraInfo carries no url)
+  let forwarded = 0;
+
+  const authOf = (headers) => {
+    if (!headers) return "";
+    for (const k of Object.keys(headers)) {
+      if (/^authorization$/i.test(k)) return headers[k] || "";
+    }
+    return "";
+  };
+
+  const forward = (requestId, header, url) => {
+    if (!header || !/^Bearer /i.test(header) || seen.has(requestId)) return;
+    seen.add(requestId);
+    if (seen.size > 2000) seen.clear(); // bound memory on a long-lived session
+    page
+      .call("Runtime.evaluate", {
+        expression: `self.__tcAuthIngest && self.__tcAuthIngest(${JSON.stringify(header)},${JSON.stringify(url || "")})`,
+      })
+      .then(() => {
+        forwarded++;
+        if (forwarded % 10 === 1) logFn(`auth: forwarded ${forwarded} worker bearer(s)`);
+      })
+      .catch(() => {});
+  };
+
+  worker.ws.addEventListener("message", (e) => {
+    let j;
+    try { j = JSON.parse(e.data); } catch { return; }
+    if (j.method === "Network.requestWillBeSent") {
+      const p = j.params || {};
+      const url = (p.request && p.request.url) || "";
+      if (p.requestId) urls.set(p.requestId, url);
+      if (urls.size > 2000) urls.clear();
+      const h = authOf(p.request && p.request.headers);
+      if (h) forward(p.requestId, h, url);
+    } else if (j.method === "Network.requestWillBeSentExtraInfo") {
+      const p = j.params || {};
+      const h = authOf(p.headers);
+      if (h) forward(p.requestId, h, urls.get(p.requestId) || "");
+    }
+  });
+
+  return worker.call("Network.enable");
+}
+
+// Auth-tap every worker target (Teams runs several). Reuses an already-open
+// connection for a known target id; opens one for the rest. Returns the extra
+// connections so stop() can close them. Re-run to pick up workers spawned later.
+async function tapAllWorkersAuth(page, known, logFn) {
+  let list;
+  try { list = await (await fetch(`http://localhost:${PORT}/json`)).json(); }
+  catch { return; }
+  for (const w of list.filter((x) => x.type === "worker" && x.webSocketDebuggerUrl)) {
+    if (known.has(w.id)) continue;
+    let c;
+    try { c = await Promise.race([connect(w.webSocketDebuggerUrl), new Promise((_, x) => setTimeout(x, 3000))]); }
+    catch { continue; }
+    known.set(w.id, c);
+    c.ws.addEventListener("close", () => known.delete(w.id));
+    await tapWorkerAuth(c, page, logFn);
+  }
 }
 
 async function findPage() {
@@ -122,6 +200,13 @@ export async function startPresenceBridge(logFn = () => {}, onStop = () => {}) {
   const tapped = await retap(worker);
   logFn(`presence: tapped ${tapped} trouter socket(s)`);
 
+  // Worker bearers -> page vault (see tapWorkerAuth). The trouter worker is
+  // tapped on its existing connection; other workers get their own.
+  const authConns = new Map(); // targetId -> connection
+  if (worker.targetId) authConns.set(worker.targetId, worker);
+  await tapWorkerAuth(worker, page, logFn);
+  await tapAllWorkersAuth(page, authConns, logFn);
+
   let stopped = false;
   // Drain worker queue -> page. Also re-tap periodically to catch reconnects.
   const drainTimer = setInterval(async () => {
@@ -145,6 +230,7 @@ export async function startPresenceBridge(logFn = () => {}, onStop = () => {}) {
   const retapTimer = setInterval(async () => {
     if (stopped) return;
     try { await retap(worker); } catch { /* ignore */ }
+    try { await tapAllWorkersAuth(page, authConns, logFn); } catch { /* ignore */ }
   }, 5000);
 
   const stop = () => {
@@ -152,6 +238,7 @@ export async function startPresenceBridge(logFn = () => {}, onStop = () => {}) {
     stopped = true;
     clearInterval(drainTimer); clearInterval(retapTimer);
     try { worker.ws.close(); } catch {}
+    for (const c of authConns.values()) { try { c.ws.close(); } catch {} }
     try { page.ws.close(); } catch {}
     try { onStop(); } catch {}
   };

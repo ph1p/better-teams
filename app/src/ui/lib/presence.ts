@@ -1,15 +1,18 @@
-// Presence: Teams renders each person's status as a Fluent PresenceBadge in its
-// own DOM (outside #tc-root). There is no stable REST/WS channel we can hook, so
-// we read the badges the native UI already paints. Each badge carries the MRI in
-// its element id ("presence-pill-8:orgid:<guid>") and the status in a LOCALISED
-// aria-label. We map EN+DE labels; anything unknown resolves to "Unknown".
+// Presence: primary source is Teams' own worker subscription
+// (services/presence.ts watchPresence, the same batch subscription Teams'
+// avatars use), so every MRI the overlay asks about gets a live status, in prod
+// too. statusOf() registers the MRI; new ones are subscribed in debounced
+// batches and stay subscribed for the session.
 //
-// Badges only exist for people Teams currently shows (visible chat rows, open
-// profile). That's exactly the set the overlay also shows, so coverage matches.
+// Fallbacks: the presence badges Teams paints in its own DOM (outside #tc-root;
+// element id "presence-pill-8:orgid:<guid>", status in a LOCALISED aria-label,
+// EN+DE mapped) and the dev-only CDP trouter sink (window.__tcPresence). They
+// fill in only for MRIs the worker has not reported yet.
 
 import { useEffect, useState } from "react";
 import { onTeamsChange } from "./live";
 import { myMri } from "../../teamsData";
+import { watchPresence, type PresenceEvent } from "../../services/presence";
 
 export type Status =
   | "Available"
@@ -114,6 +117,8 @@ function readSelf(): Status {
 // and only overwrite it when a fresh badge reports a (different) one. This stops
 // the ring flickering on/off as Teams re-renders its own lists.
 const cache = new Map<string, Status>();
+// MRIs the worker has reported: DOM scrape and dev sink no longer override them.
+const live = new Set<string>();
 let selfStatus: Status = "Unknown";
 const subs = new Set<() => void>();
 let unsub: (() => void) | null = null;
@@ -123,6 +128,7 @@ let poll: ReturnType<typeof setInterval> | 0 = 0;
 function refresh(): void {
   let changed = false;
   for (const [mri, st] of scrape()) {
+    if (live.has(mri)) continue;
     if (cache.get(mri) !== st) { cache.set(mri, st); changed = true; }
   }
   const self = readSelf();
@@ -145,6 +151,7 @@ export function onPresence(cb: () => void): () => void {
     if (!subs.size && unsub) {
       unsub(); unsub = null;
       if (poll) { clearInterval(poll); poll = 0; }
+      stopStreams();
     }
   };
 }
@@ -180,6 +187,7 @@ declare global {
       const st = WS_STATUS[availability];
       if (!st || !mri) return;
       sink.map[mri] = st;
+      if (live.has(mri)) return;
       if (cache.get(mri) !== st) { cache.set(mri, st); for (const f of subs) f(); }
     },
   };
@@ -192,9 +200,69 @@ declare global {
   window.__tcPresence = sink;
 })();
 
+// Worker availability -> Status. Idle variants follow Teams' me-control map
+// (AvailableIdle and BusyIdle render as away). OutOfOffice has no own colour
+// here; it shows as Away.
+const CDL_STATUS: Record<string, Status> = {
+  Available: "Available",
+  AvailableIdle: "Away",
+  Away: "Away",
+  BeRightBack: "BeRightBack",
+  Busy: "Busy",
+  BusyIdle: "Away",
+  DoNotDisturb: "DoNotDisturb",
+  Offline: "Offline",
+  OutOfOffice: "Away",
+  PresenceUnknown: "Unknown",
+};
+
+// MRIs already subscribed (or queued); each is subscribed once per session.
+const wanted = new Set<string>();
+let queue: string[] = [];
+let flushTimer: ReturnType<typeof setTimeout> | 0 = 0;
+// Open worker subscriptions. Stopped when the last consumer unmounts (overlay
+// destroyed or replaced by a new build), so streams never outlive the UI.
+const streams: (() => void)[] = [];
+const BATCH = 50;
+const FLUSH_MS = 300;
+
+function onBatch(batch: PresenceEvent[]): void {
+  let changed = false;
+  for (const e of batch) {
+    const st = CDL_STATUS[e.availability];
+    if (!st) continue;
+    live.add(e.id);
+    if (cache.get(e.id) !== st) { cache.set(e.id, st); changed = true; }
+  }
+  if (changed) for (const f of subs) f();
+}
+
+function flush(): void {
+  flushTimer = 0;
+  const ids = queue;
+  queue = [];
+  for (let i = 0; i < ids.length; i += BATCH) streams.push(watchPresence(ids.slice(i, i + BATCH), onBatch));
+}
+
+function want(mri: string): void {
+  if (wanted.has(mri) || !mri.startsWith("8:")) return;
+  wanted.add(mri);
+  queue.push(mri);
+  if (!flushTimer) flushTimer = setTimeout(flush, FLUSH_MS);
+}
+
+function stopStreams(): void {
+  if (flushTimer) { clearTimeout(flushTimer); flushTimer = 0; }
+  for (const stop of streams.splice(0)) stop();
+  queue = [];
+  wanted.clear();
+  live.clear();
+}
+
 // Current status for an MRI (or self when mri omitted / matches self).
 export function statusOf(mri: string | undefined): Status {
   if (!mri) return "Unknown";
+  want(mri);
   // Own MRI: the me-control badge (selfStatus) is the freshest source.
   if (mri === myMri() && selfStatus !== "Unknown") return selfStatus;
   return cache.get(mri) || "Unknown";
@@ -231,4 +299,15 @@ export const STATUS_COLOR: Record<Status, string> = {
   DoNotDisturb: "#c4314b",
   Offline: "#b0aeac",
   Unknown: "transparent",
+};
+
+// Human-readable status names (sidebar footer, chat header).
+export const STATUS_LABEL: Record<Status, string> = {
+  Available: "Available",
+  Busy: "Busy",
+  DoNotDisturb: "Do not disturb",
+  BeRightBack: "Be right back",
+  Away: "Away",
+  Offline: "Offline",
+  Unknown: "Status unknown",
 };

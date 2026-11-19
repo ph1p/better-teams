@@ -130,20 +130,27 @@
 #tc-root .tc-main-head { @apply flex items-center gap-2.5; height: 52px; flex: 0 0 auto;
   border-bottom: 1px solid var(--tc-line); padding: 0 18px; }
 #tc-root .tc-main-head .tc-name { font-size: 15px; }
-#tc-root .tc-msgs { @apply flex-1 overflow-y-auto; padding: 16px 18px 8px; }
-/* Uniform vertical rhythm: every message row has the same gap above it,
-   group-start or continuation. Grouping shows via avatar + name, not extra space. */
+/* Message column + composer centre at ~820px on wide windows (line length). */
+#tc-root .tc-msgs { @apply flex-1 overflow-y-auto; padding: 16px max(18px, calc((100% - 820px) / 2)) 8px; }
+/* Vertical rhythm: continuations sit tight (3px); a new sender group gets a
+   little air above it, so conversations read as turns. */
 #tc-root .tc-msg { @apply flex gap-2.5 relative; padding: 3px 0; }
 #tc-root .tc-msg:hover { background: color-mix(in srgb, var(--tc-hover) 55%, transparent); border-radius: 8px; }
 #tc-root .tc-msg + .tc-msg { margin-top: 0; }
-#tc-root .tc-msg.first { margin-top: 0; }
+#tc-root .tc-msg.first { margin-top: 8px; }
+#tc-root .tc-day + .tc-msg.first, #tc-root .tc-thread-sep + .tc-msg.first { margin-top: 0; }
 #tc-root .tc-msg.tc-flash { animation: tc-flash 1.4s ease; }
 @keyframes tc-flash {
   0% { background: color-mix(in srgb, var(--tc-accent) 32%, transparent); }
   100% { background: transparent; }
 }
-#tc-root .tc-msg .tc-av { @apply invisible; width: 36px; height: 36px; }
-#tc-root .tc-msg.first .tc-av { @apply visible; }
+#tc-root .tc-msg .tc-av { width: 36px; height: 36px; }
+/* Continuation rows: the avatar column holds the clock time, shown on hover. */
+#tc-root .tc-msg-gutter { flex: 0 0 auto; width: 36px; text-align: right; padding-top: 3px;
+  font-size: 10px; line-height: 1.5; color: var(--tc-fg2); opacity: 0; white-space: nowrap;
+  font-variant-numeric: tabular-nums; }
+#tc-root .tc-msg-gutter.sm { width: 24px; font-size: 9px; }
+#tc-root .tc-msg:hover .tc-msg-gutter { opacity: 1; }
 #tc-root .tc-msg-body { @apply flex-1; min-width: 0; }
 #tc-root .tc-msg-meta { @apply flex gap-2 items-baseline; }
 #tc-root .tc-msg-meta .who { font-weight: 600; font-size: 13.5px; }
@@ -157,22 +164,41 @@
 #tc-root .tc-msg-content p:last-child { margin-bottom: 0; }
 #tc-root .tc-msg-content p + p { margin-top: 6px; }
 #tc-root .tc-msg-content br + br { display: none; }
-/* A quoted-reply blockquote is a jump affordance (injected HTML, not JSX). */
-#tc-root .tc-msg-content blockquote[itemtype="http://schema.skype.com/Reply"] {
+/* Rich (HTML) messages: normal HTML whitespace. Teams puts "\n" between its
+   tags; pre-wrap turned each into an empty line. Code blocks keep their own
+   white-space: pre. */
+#tc-root .tc-msg-content.rich { white-space: normal; }
+#tc-root .tc-msg-content.rich > :first-child { margin-top: 0; }
+#tc-root .tc-msg-content.rich > :last-child { margin-bottom: 0; }
+#tc-root .tc-msg-content ol, #tc-root .tc-msg-content ul { margin: 6px 0; padding-left: 22px; }
+#tc-root .tc-msg-content ol { list-style: decimal; }
+#tc-root .tc-msg-content ul { list-style: disc; }
+#tc-root .tc-msg-content ul ul { list-style: circle; }
+#tc-root .tc-msg-content li { margin: 0; padding-left: 2px; }
+#tc-root .tc-msg-content li + li { margin-top: 4px; }
+#tc-root .tc-msg-content li > p { margin: 0; }
+#tc-root .tc-msg-content li::marker { color: var(--tc-fg2); }
+#tc-root .tc-msg-content p + ol, #tc-root .tc-msg-content p + ul { margin-top: 4px; }
+#tc-root .tc-msg-content table { border-collapse: collapse; margin: 6px 0; font-size: 13px; }
+#tc-root .tc-msg-content td, #tc-root .tc-msg-content th { border: 1px solid var(--tc-line);
+  padding: 4px 8px; text-align: left; vertical-align: top; }
+#tc-root .tc-msg-content hr { border: 0; border-top: 1px solid var(--tc-line); margin: 8px 0; }
+/* A quoted reply (richText marks it .tc-reply) is a jump affordance. */
+#tc-root .tc-msg-content blockquote.tc-reply {
   margin: 0 0 4px; padding: 4px 10px; border-left: 3px solid var(--tc-accent);
   background: color-mix(in srgb, var(--tc-accent) 8%, transparent);
   border-radius: 4px; cursor: pointer; font-size: 13px; color: var(--tc-fg2); }
-#tc-root .tc-msg-content blockquote[itemtype="http://schema.skype.com/Reply"]:hover {
+#tc-root .tc-msg-content blockquote.tc-reply:hover {
   background: color-mix(in srgb, var(--tc-accent) 15%, transparent); }
-#tc-root .tc-msg-content blockquote[itemtype="http://schema.skype.com/Reply"] p { margin: 0; }
-#tc-root .tc-msg-content blockquote[itemtype="http://schema.skype.com/Reply"] strong { color: var(--tc-fg); font-weight: 600; }
+#tc-root .tc-msg-content blockquote.tc-reply p { margin: 0; }
+#tc-root .tc-msg-content blockquote.tc-reply strong { color: var(--tc-fg); font-weight: 600; }
 #tc-root .tc-msg-content img { max-width: 360px; max-height: 260px; border-radius: 6px; }
 #tc-root .tc-msg-content a { color: var(--tc-accent); }
 #tc-root .tc-deleted { color: var(--tc-fg2); font-style: italic; }
 
 /* Composer */
-#tc-root .tc-composer { @apply relative; flex: 0 0 auto; border-top: 1px solid var(--tc-line);
-  padding: 10px 18px 14px; background: var(--tc-bg2); }
+#tc-root .tc-composer { @apply relative; flex: 0 0 auto;
+  padding: 6px max(18px, calc((100% - 820px) / 2)) 16px; background: var(--tc-bg); }
 #tc-root .tc-composer-box { @apply flex gap-2 items-end; border: 1px solid var(--tc-line);
   border-radius: 14px; background: var(--tc-bg); padding: 7px 7px 7px 14px;
   box-shadow: 0 1px 2px rgba(0,0,0,.04); transition: border-color .15s, box-shadow .15s; }
@@ -190,7 +216,10 @@
 #tc-root .tc-send:disabled { opacity: .4; cursor: default; }
 #tc-root .tc-composer-hint { @apply flex justify-between gap-3; margin: 6px 4px 0;
   font-size: 11px; color: var(--tc-fg2); }
-#tc-root .tc-composer-hint .tc-kb { @apply whitespace-nowrap; opacity: .8; }
+/* Typing indicator floats just above the composer box: no layout shift. */
+#tc-root .tc-composer > .tc-typing { @apply absolute truncate pointer-events-none; bottom: 100%;
+  left: max(18px, calc((100% - 820px) / 2)); right: 60px; padding: 0 4px 2px;
+  font-size: 11.5px; font-style: italic; color: var(--tc-fg2); }
 
 /* Emoji toggle button in the composer */
 #tc-root .tc-emoji-btn { @apply grid place-items-center cursor-pointer self-center; flex: 0 0 auto;
@@ -209,6 +238,46 @@
   padding: 6px 8px; border-radius: 8px; }
 #tc-root .tc-at-opt:hover { background: var(--tc-hover); }
 #tc-root .tc-at-name { @apply truncate; }
+
+/* Sidebar header icon button (New chat) */
+#tc-root .tc-side-btn { @apply grid place-items-center cursor-pointer; border: 0; flex: 0 0 auto;
+  background: transparent; color: var(--tc-fg2); width: 28px; height: 28px; border-radius: 7px; }
+#tc-root .tc-side-btn:hover { background: var(--tc-hover); color: var(--tc-accent); }
+
+/* New chat dialog: centered card over a dim scrim */
+#tc-root .tc-scrim { @apply fixed grid; inset: 0; z-index: 20; place-items: start center;
+  padding-top: 12vh; background: rgba(0,0,0,.28); }
+#tc-root .tc-newchat { @apply flex flex-col; width: min(520px, calc(100vw - 32px)); max-height: 76vh;
+  background: var(--tc-bg); border: 1px solid var(--tc-line); border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.28); padding: 10px 14px 14px; animation: tc-slide-in .16s ease; }
+#tc-root .tc-newchat-head { @apply flex items-center justify-between; font-size: 15px; font-weight: 700;
+  padding: 2px 0 8px; }
+#tc-root .tc-newchat-to { @apply flex flex-wrap items-center gap-1.5; border: 1px solid var(--tc-line);
+  border-radius: 10px; padding: 6px 8px; cursor: text; }
+#tc-root .tc-newchat-to:focus-within { border-color: var(--tc-accent); }
+#tc-root .tc-newchat-label { color: var(--tc-fg2); font-size: 13px; padding-right: 2px; }
+#tc-root .tc-newchat-to input { @apply flex-1 outline-none; min-width: 140px; border: 0; background: transparent;
+  color: var(--tc-fg); font-family: var(--tc-font); font-size: 13.5px; padding: 4px 2px; }
+#tc-root .tc-chip { @apply inline-flex items-center gap-1.5; background: var(--tc-accent-soft); color: var(--tc-fg);
+  border-radius: 999px; padding: 2px 4px 2px 2px; font-size: 12.5px; max-width: 220px; }
+#tc-root .tc-chip-name { @apply truncate; }
+#tc-root .tc-chip button { @apply grid place-items-center cursor-pointer; border: 0; background: transparent;
+  color: var(--tc-fg2); width: 18px; height: 18px; border-radius: 999px; }
+#tc-root .tc-chip button:hover { background: var(--tc-hover); color: var(--tc-fg); }
+#tc-root .tc-newchat-hits { @apply flex flex-col overflow-y-auto; margin-top: 6px; max-height: 260px; }
+#tc-root .tc-newchat-hits .tc-at-opt.on { background: var(--tc-hover); }
+#tc-root .tc-newchat-hit { @apply flex flex-col min-w-0; }
+#tc-root .tc-newchat-hit small { @apply truncate; color: var(--tc-fg2); font-size: 11.5px; }
+#tc-root .tc-newchat-msg { @apply w-full outline-none; resize: vertical; margin-top: 10px; border: 1px solid var(--tc-line);
+  border-radius: 10px; background: var(--tc-bg); color: var(--tc-fg); font-family: var(--tc-font);
+  font-size: 13.5px; padding: 8px 10px; }
+#tc-root .tc-newchat-msg:focus { border-color: var(--tc-accent); }
+#tc-root .tc-newchat-note { color: var(--tc-fg2); font-size: 12.5px; margin-top: 8px; }
+#tc-root .tc-newchat-foot { @apply flex items-center justify-between; margin-top: 10px; }
+#tc-root .tc-newchat-foot small { color: var(--tc-fg2); font-size: 12px; }
+#tc-root .tc-newchat-go { @apply cursor-pointer; border: 0; border-radius: 8px; padding: 7px 14px;
+  background: var(--tc-accent); color: #fff; font-family: var(--tc-font); font-size: 13px; font-weight: 600; }
+#tc-root .tc-newchat-go:disabled { opacity: .45; cursor: default; }
 
 /* Emoji picker popover, anchored above the composer box */
 #tc-root .tc-emoji-pop { @apply absolute; left: 18px; bottom: 100%; margin-bottom: 6px; z-index: 12; }
@@ -263,9 +332,12 @@
   transition: background .12s ease, border-color .12s ease, color .12s ease; }
 #tc-root .tc-ghost:hover { background: var(--tc-hover); }
 #tc-root .tc-ghost.tc-icon-only { padding: 6px; }
+#tc-root .tc-main-head .tc-ghost { border-color: transparent; background: transparent; color: var(--tc-fg2); }
+#tc-root .tc-main-head .tc-ghost:hover { background: var(--tc-hover); color: var(--tc-fg); }
 #tc-root .tc-ghost.tc-icon-only.on { background: var(--tc-accent-soft); color: var(--tc-accent); }
-#tc-root .tc-day { @apply flex items-center gap-2.5; margin: 18px 0 4px;
-  font-size: 11.5px; font-weight: 600; color: var(--tc-fg2); }
+#tc-root .tc-day { @apply flex items-center gap-2.5; margin: 22px 0 6px;
+  font-size: 11px; font-weight: 600; color: var(--tc-fg2); }
+#tc-root .tc-day::before, #tc-root .tc-day::after { opacity: .6; }
 #tc-root .tc-day::before, #tc-root .tc-day::after { content:""; flex:1; height:1px; background: var(--tc-line); }
 
 /* Scroll wrapper + the day label pinned at the top while reading within a day. */
@@ -350,7 +422,7 @@
   border-radius: 8px; padding: 10px 12px; margin: 6px 0; overflow-x: auto; }
 #tc-root .tc-pre .tc-code { background: none; padding: 0; }
 #tc-root .tc-ul, #tc-root .tc-ol { margin: 4px 0; padding-left: 22px; }
-#tc-root .tc-h { font-weight: 700; margin: 4px 0; }
+#tc-root .tc-h { font-weight: 700; font-size: 15px; line-height: 1.3; margin: 8px 0 2px; }
 
 /* Shiki code blocks (injected HTML) */
 #tc-root .tc-pre.tc-shiki { background: #0d1117; border-color: #222a35; }
@@ -366,19 +438,21 @@
 
 /* Sidebar: section header + show-more */
 #tc-root .tc-sec { @apply flex items-center gap-1 cursor-pointer select-none;
-  font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
-  color: var(--tc-fg2); padding: 12px 8px 4px; }
+  font-size: 12px; font-weight: 600; color: var(--tc-fg2); padding: 10px 6px 4px;
+  width: 100%; border: 0; background: transparent; font-family: var(--tc-font); text-align: left; }
 #tc-root .tc-sec:hover { color: var(--tc-fg); }
-#tc-root .tc-sec .tc-caret { flex: 0 0 auto; opacity: .7; }
+#tc-root .tc-sec .tc-caret { flex: 0 0 auto; opacity: .55; }
+#tc-root .tc-sec:focus { outline: none; }
+#tc-root .tc-sec:focus-visible { outline: 2px solid var(--tc-accent); outline-offset: -2px; border-radius: 6px; }
 #tc-root .tc-sec-title { @apply flex-1; }
 #tc-root .tc-sec-n { font-weight: 600; opacity: .55; letter-spacing: 0; text-transform: none; }
 #tc-root .tc-sec-count { @apply grid place-items-center; background: var(--tc-accent); color: #fff;
   border-radius: 9px; padding: 0 6px; font-size: 10px; line-height: 16px; }
 #tc-root .tc-more { @apply cursor-pointer text-left; width: calc(100% - 8px);
-  margin: 2px 4px 6px; border: 0; background: transparent; color: var(--tc-accent);
-  font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: 6px;
+  margin: 0 4px 4px; border: 0; background: transparent; color: var(--tc-fg2);
+  font-size: 12px; font-weight: 500; padding: 4px 8px; border-radius: 6px;
   font-family: var(--tc-font); }
-#tc-root .tc-more:hover { background: var(--tc-hover); }
+#tc-root .tc-more:hover { background: var(--tc-hover); color: var(--tc-fg); }
 
 /* Profile drawer (right) */
 #tc-root .tc-profile { @apply fixed flex flex-col; top: 0; right: 0; bottom: 0; width: 320px;
@@ -466,19 +540,57 @@
 #tc-root .tc-menu-item svg { color: var(--tc-fg2); flex: 0 0 auto; }
 
 /* Keep the sidebar title clear of the macOS traffic-light buttons (top-left). */
-#tc-root .tc-side-head { padding-top: 14px; padding-bottom: 8px; padding-left: 82px; }
-#tc-root .tc-side-head h1 { font-size: 15px; line-height: 1.4; }
+#tc-root .tc-side-head { height: 40px; padding: 0 16px 0 94px; margin-bottom: 6px; }
+#tc-root .tc-side-head h1 { font-size: 15px; line-height: 1.4; white-space: nowrap; }
 
-/* Slack-style unread link: a full-width row under the title, count on the right. */
-#tc-root .tc-unread-link { @apply flex items-center cursor-pointer text-left;
-  width: calc(100% - 24px); margin: 2px 12px 8px; padding: 6px 10px; border: 0;
-  border-radius: 8px; background: transparent; color: var(--tc-accent);
-  font: inherit; font-size: 13px; font-weight: 600; }
-#tc-root .tc-unread-link:hover { background: var(--tc-accent-soft); }
-#tc-root .tc-unread-link-label { @apply flex-1; }
-#tc-root .tc-unread-link-n { @apply grid place-items-center; flex: 0 0 auto; min-width: 18px;
-  height: 18px; padding: 0 5px; border-radius: 9px; background: var(--tc-accent);
-  color: #fff; font-size: 11px; font-weight: 700; }
+/* Frameless window: the sidebar title bar and the chat header move the window.
+   Anything clickable inside them opts out again. */
+#tc-root .tc-side-head, #tc-root .tc-main-head, #tc-root .tc-drag {
+  -webkit-app-region: drag; user-select: none; }
+#tc-root .tc-main-head button, #tc-root .tc-main-head input, #tc-root .tc-main-head a,
+#tc-root .tc-main-head .tc-av, #tc-root .tc-side-head button {
+  -webkit-app-region: no-drag; }
+#tc-root .tc-main-head .tc-name { user-select: text; }
+#tc-root .tc-main-head .tc-av-ring { -webkit-app-region: no-drag; }
+#tc-root .tc-main-drag { height: 52px; flex: 0 0 auto; }
+
+/* Unread filter, nothing left. */
+#tc-root .tc-caught-up { @apply flex flex-col items-center; gap: 4px; padding-top: 12px; }
+#tc-root .tc-caught-up strong { color: var(--tc-fg); font-size: 14px; }
+#tc-root .tc-caught-up-icon { color: var(--tc-accent); margin-bottom: 6px; }
+#tc-root .tc-caught-up .tc-more { width: auto; margin-top: 8px; }
+
+/* Sidebar tools row: search field + "Unread" toggle pill side by side. */
+#tc-root .tc-side-tools { @apply flex items-center gap-1.5; margin: 0 12px 6px; }
+#tc-root .tc-side-tools .tc-search { @apply flex-1; margin: 0; min-width: 0; }
+#tc-root .tc-unread-pill { @apply inline-flex items-center cursor-pointer; flex: 0 0 auto; gap: 5px;
+  border: 1px solid var(--tc-line); border-radius: 8px; padding: 0 8px; height: 32px;
+  background: var(--tc-bg); color: var(--tc-fg2); font: inherit; font-size: 12px; font-weight: 600; }
+#tc-root .tc-unread-pill:hover { color: var(--tc-fg); }
+#tc-root .tc-unread-pill:focus { outline: none; }
+#tc-root .tc-unread-pill:focus-visible { outline: 2px solid var(--tc-accent); outline-offset: 1px; }
+#tc-root .tc-unread-pill.on { background: var(--tc-accent-soft); border-color: transparent; color: var(--tc-accent); }
+#tc-root .tc-unread-n { @apply grid place-items-center; min-width: 17px; height: 17px;
+  padding: 0 5px; border-radius: 9px; background: var(--tc-accent); color: #fff;
+  font-size: 10.5px; font-weight: 700; }
+
+/* Compact rows: one line, small avatar; time only on hover (or when unread).
+   The last message is in the row's tooltip. */
+#tc-root .tc-row.compact { padding: 5px 8px; gap: 9px; min-height: 32px; }
+#tc-root .tc-row.compact .tc-av { width: 22px; height: 22px; font-size: 9.5px; }
+#tc-root .tc-row.compact .tc-hash { border-radius: 6px; }
+#tc-root .tc-row.compact .tc-name { font-weight: 450; color: var(--tc-fg); }
+#tc-root .tc-row.compact.unread .tc-name { font-weight: 650; }
+#tc-root .tc-row.compact .tc-time { opacity: 0; transition: opacity .12s; }
+#tc-root .tc-row.compact:hover .tc-time { opacity: 1; }
+#tc-root .tc-row.compact.sel::before { top: 6px; bottom: 6px; }
+/* Detailed rows: read rows name in regular weight so unread ones stand out. */
+#tc-root .tc-row:not(.compact):not(.unread) .tc-name { font-weight: 500; }
+#tc-root .tc-row.unread .tc-prev { color: var(--tc-fg); }
+/* Team label inside the Channels section. */
+#tc-root .tc-team-label { @apply truncate; font-size: 11px; font-weight: 600; color: var(--tc-fg2);
+  padding: 8px 8px 2px 10px; opacity: .8; }
+#tc-root .tc-section + .tc-section { margin-top: 4px; }
 
 /* Scrollbars: thin, themed. */
 #tc-root .tc-list, #tc-root .tc-msgs, #tc-root .tc-profile-chats,
@@ -512,3 +624,16 @@
 #tc-root .tc-me-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto;
   background: var(--tc-ring); }
 #tc-root .tc-me-dot.is-offline { background: transparent; box-shadow: inset 0 0 0 2px var(--tc-ring); }
+#tc-root .tc-me-note { @apply flex flex-col gap-2; padding: 6px 8px; font-size: 12.5px; }
+#tc-root .tc-me-note-input { width: 100%; padding: 6px 8px; font-size: 13px; color: inherit;
+  background: var(--tc-hover); border: 1px solid var(--tc-line); border-radius: 6px; outline: none; }
+#tc-root .tc-me-note-input:focus { border-color: var(--tc-accent); }
+#tc-root .tc-me-note-row { @apply flex items-center gap-2; color: var(--tc-fg2); cursor: pointer; }
+#tc-root .tc-me-note-row select { margin-left: auto; padding: 2px 4px; font-size: 12.5px; color: inherit;
+  background: var(--tc-bg); border: 1px solid var(--tc-line); border-radius: 5px; }
+#tc-root .tc-me-note-actions { @apply flex justify-end gap-2; }
+#tc-root .tc-me-note-actions button { padding: 4px 12px; font-size: 12.5px; font-weight: 600;
+  border-radius: 6px; cursor: pointer; }
+#tc-root .tc-me-note-clear { color: inherit; background: transparent; border: 1px solid var(--tc-line); }
+#tc-root .tc-me-note-save { color: #fff; background: var(--tc-accent); border: 0; }
+#tc-root .tc-me-note-save:disabled { opacity: .5; cursor: default; }

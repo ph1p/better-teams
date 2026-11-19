@@ -1,5 +1,5 @@
 import type { JSX, MouseEvent } from "react";
-import { Hash } from "lucide-react";
+import { Hash, CalendarDays, NotebookPen } from "lucide-react";
 import { Avatar } from "../shared/Avatar";
 import { avatarUri, fmtTime, oneLine } from "../lib/format";
 import { usePresence } from "../lib/presence";
@@ -8,40 +8,57 @@ import type { Chat } from "../../types";
 interface RowProps {
   chat: Chat;
   selected: boolean;
+  // Single line (name only) instead of name + last-message preview.
+  compact: boolean;
+  // Prefix channel previews with the team (off when the section groups by team).
+  showTeam?: boolean;
   onClick: () => void;
   onOpenProfile: (mri: string) => void;
   onMenu?: (e: MouseEvent, chat: Chat) => void;
 }
 
-// One conversation row in the sidebar: avatar/hash, title, time, and a one-line
-// preview of the last message (sender prefix for groups/channels).
-export function Row({ chat, selected, onClick, onOpenProfile, onMenu }: RowProps): JSX.Element {
+const preview = (chat: Chat): string => {
+  const text = /Media_Card/i.test(chat.last.type) ? "[Card]" : oneLine(chat.last.content);
+  return (chat.last.from ? chat.last.from + ": " : "") + (text.slice(0, 120) || "…");
+};
+
+// One conversation row in the sidebar. Compact: icon/avatar + name, the time
+// only on hover, the last message as a tooltip. Detailed: adds a preview line.
+export function Row({ chat, selected, compact, showTeam = true, onClick, onOpenProfile, onMenu }: RowProps): JSX.Element {
   const { statusOf } = usePresence();
-  const preview = /Media_Card/i.test(chat.last.type) ? "[Card]" : oneLine(chat.last.content);
+  const prev = preview(chat);
+  const icon = chat.isChannel ? (
+    <div className="tc-av tc-hash"><Hash size={compact ? 13 : 16} /></div>
+  ) : chat.kind === "meeting" ? (
+    <div className="tc-av tc-hash"><CalendarDays size={compact ? 13 : 16} /></div>
+  ) : chat.kind === "notes" ? (
+    <div className="tc-av tc-hash"><NotebookPen size={compact ? 13 : 16} /></div>
+  ) : (
+    <Avatar name={chat.title} uri={avatarUri(chat.avatarMri)} mri={chat.avatarMri} small={compact}
+      status={statusOf(chat.avatarMri)} onOpen={onOpenProfile} />
+  );
   return (
     <div
-      className={"tc-row" + (selected ? " sel" : "") + (chat.unread ? " unread" : "")}
+      className={"tc-row" + (compact ? " compact" : "") + (selected ? " sel" : "") + (chat.unread ? " unread" : "")}
       onClick={onClick}
       onContextMenu={onMenu ? (e) => onMenu(e, chat) : undefined}
+      title={compact ? chat.title + "\n" + prev : undefined}
       data-id={chat.id}
     >
-      {chat.isChannel ? (
-        <div className="tc-av tc-hash"><Hash size={16} /></div>
-      ) : (
-        <Avatar name={chat.title} uri={avatarUri(chat.avatarMri)} mri={chat.avatarMri} status={statusOf(chat.avatarMri)} onOpen={onOpenProfile} />
-      )}
+      {icon}
       <div className="tc-row-body">
         <div className="tc-row-top">
           <span className="tc-name">{chat.title}</span>
           <span className="tc-time">{fmtTime(chat.time)}</span>
         </div>
-        <div className="tc-prev">
-          {chat.isChannel && chat.team ? <span className="tc-team">{chat.team} · </span> : null}
-          {chat.last.from ? chat.last.from + ": " : ""}
-          {preview.slice(0, 80) || "…"}
-        </div>
+        {compact ? null : (
+          <div className="tc-prev">
+            {showTeam && chat.isChannel && chat.team ? <span className="tc-team">{chat.team} · </span> : null}
+            {prev}
+          </div>
+        )}
       </div>
-      {chat.unread ? <span className="tc-unread" /> : null}
+      {chat.unread ? <span className="tc-unread" aria-label="Unread" /> : null}
     </div>
   );
 }

@@ -1,25 +1,39 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX, type MouseEvent } from "react";
 import {
   deleteMessage, editMessage, fetchOlderRemote, listChats, listMessages, loadProfiles,
-  markRead, markUnread, myMri, primeRemote, profile, searchPeople, sendRemote, setReaction, splitQuote, undoDelete,
+  markRead, markUnread, myMri, setChatHidden, primeRemote, profile, searchPeople, sendRemote, setReaction, splitQuote, undoDelete,
+  type PeopleHit,
 } from "../teamsData";
-import { openNativeChat, sendMessage } from "../send";
+import { openNativeChat, openNativeNewChat, sendMessage, sendNativeDraft, startNativeCall, type PickPerson } from "../send";
+import { chat as chatSvc, typing } from "../services";
 import {
   Send, Search, Hash, MailOpen, Mail, ExternalLink, X, Reply, Phone, Video, RotateCw,
-  ArrowDown, Smile,
+  ArrowDown, Smile, Eye, EyeOff, CheckCheck, SquarePen, Rows2, Rows3,
 } from "lucide-react";
 import { EmojiPicker } from "./shared/EmojiPicker";
 import { Avatar } from "./shared/Avatar";
 import { Section } from "./sidebar/Section";
 import { MeBar } from "./sidebar/MeBar";
+import { NewChat, type NewChatOutcome } from "./sidebar/NewChat";
 import { Message } from "./chat/Message";
 import { ProfilePanel } from "./profile/ProfilePanel";
 import { avatarUri, fmtDay, htmlToText, messageText, oneLine } from "./lib/format";
 import { isIdle, onTeamsChange } from "./lib/live";
-import { usePresence } from "./lib/presence";
-import { GROUP_GAP_MS, INITIAL_REMOTE, POLL_MS } from "./lib/constants";
+import { STATUS_LABEL, usePresence } from "./lib/presence";
+import { usePref } from "./lib/prefs";
+import { GROUP_GAP_MS, INITIAL_REMOTE, MAX_CALL, POLL_MS } from "./lib/constants";
 import type { Chat, Message as Msg, Quote } from "../types";
 import type { MentionPick } from "../mentions";
+
+// One sidebar group as built by App; rendered by <Section>.
+interface SideSection {
+  id: string;
+  title: string;
+  rows: Chat[];
+  capped?: boolean;
+  groupByTeam?: boolean;
+  defaultCollapsed?: boolean;
+}
 
 // An optimistic message shown immediately after sending, before Teams syncs the
 // real one back.
@@ -33,7 +47,7 @@ interface OldBucket { id: string | null; list: Msg[]; }
 // Cheap change signature so polling doesn't re-render (and jump) when idle.
 const sig = (list: Msg[]): string =>
   list.map((m) => `${m.id}:${m.time}:${m.edited}:${m.deleted}:${m.reactions.map((r) => r.key + r.count + (r.mine ? "*" : "")).join()}`).join("|");
-const chatSig = (list: Chat[]): string => list.map((c) => `${c.id}:${c.time}:${c.unread}:${c.title}`).join("|");
+const chatSig = (list: Chat[]): string => list.map((c) => `${c.id}:${c.time}:${c.unread}:${c.hidden}:${c.title}`).join("|");
 
 export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   const { statusOf } = usePresence();
@@ -42,9 +56,17 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   const [sel, setSel] = useState<string | null>(null);
   const [msgs, setMsgs] = useState<MsgBucket>({ id: null, list: [], loaded: false });
   const [older, setOlder] = useState<OldBucket>({ id: null, list: [] });
+  // Ids currently rendered, so loadOlder can tell a page that adds nothing.
+  const shownIds = useRef<Set<string>>(new Set());
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [pending, setPending] = useState<Pending[]>([]);
   const [query, setQuery] = useState("");
+  // Sidebar "Unread" filter. Chats opened while it is on stay listed (keep) so
+  // they don't vanish the moment they are read; leaving the filter drops them.
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  // Sidebar density: compact one-line rows (default) or name + preview.
+  const [compact, setCompact] = usePref<boolean>("compact", true);
+  const [keep, setKeep] = useState<Set<string>>(() => new Set());
   const [toast, setToast] = useState("");
   const [profileMri, setProfileMri] = useState<string | null>(null);
   // Right-click chat menu: {x, y, chat} or null.
@@ -73,6 +95,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   const lastChatSig = useRef("");
   const lastMsgSig = useRef("");
   const nullTicks = useRef(0); // consecutive unreachable ticks for the open chat
+  const hydrated = useRef(false); // tried native-open to populate IDB for this chat
 
   const flashTimer = useRef<ReturnType<typeof setTimeout> | 0>(0);
   const flash = useCallback((t: string, ms = 2500): void => {
@@ -115,14 +138,28 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   }, []);
 
   const selChat = chats.find((c) => c.id === sel);
+  // Calls: 1:1 and group chats ring their members (Teams rings at most 20 in a
+  // group call). Channels, meetings and Notes have no callee list here.
+  const callable = !!selChat && selChat.kind === "chat" && selChat.members.length > 0 && selChat.members.length <= MAX_CALL;
+  const callLabel = (what: string): string =>
+    !selChat || selChat.members.length <= 1 ? what : `Group ${what.toLowerCase()} (${selChat.members.length} people)`;
   const selIsChannel = !!selChat?.isChannel;
+  // Header subtitle: what is useful to know about the other side right now.
+  const headSub = !selChat ? "" :
+    selChat.isChannel ? selChat.team :
+    selChat.kind === "meeting" ? "Meeting chat" :
+    selChat.kind === "notes" ? "Only you" :
+    selChat.members.length > 1 ? `${selChat.members.length + 1} people` :
+    selChat.avatarMri ? [statusOf(selChat.avatarMri) === "Unknown" ? "" : STATUS_LABEL[statusOf(selChat.avatarMri)], profile(selChat.avatarMri).jobTitle].filter(Boolean).join(" · ") :
+    selChat.team;
 
-  // Messages for the selected chat, polled.
+  // Messages for the selected chat: polled, plus live events for chats.
   useEffect(() => {
     if (!sel) return;
     let alive = true;
     lastMsgSig.current = "";
     nullTicks.current = 0;
+    hydrated.current = false;
     stick.current = true;
     paging.current = false;
     noMore.current = false;
@@ -153,6 +190,14 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
         // the token never arrives or this chat's remote fetch always errors.
         if (list === null) {
           nullTicks.current += 1;
+          // No local replychain and no token to fetch remotely: this chat was
+          // never opened in native Teams, so nothing is cached. Drive native
+          // Teams to open it once; its worker then fetches the thread and
+          // persists the replychain to IndexedDB, which the next poll reads.
+          if (!hydrated.current) {
+            hydrated.current = true;
+            void openNativeChat(sel, selChat?.title);
+          }
           if (nullTicks.current >= 5) setMsgs({ id: sel, list: [], loaded: true, failed: true });
           return;
         }
@@ -169,10 +214,24 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     tick(true);
     const t = setInterval(tick, POLL_MS);
     const offLive = onTeamsChange(() => tick());
+    // Push: Teams' chat-pane event subscription. Re-read on each message event,
+    // once now and once shortly after, since the worker may still be writing
+    // the message to IndexedDB. Polling stays as the fallback.
+    let late: ReturnType<typeof setTimeout> | undefined;
+    const offEvents = selIsChannel
+      ? () => {}
+      : chatSvc.watchChatEvents(sel, (evs) => {
+          if (!evs.some((e) => e.convId === sel && /Message/.test(e.type))) return;
+          void tick();
+          clearTimeout(late);
+          late = setTimeout(() => void tick(), 600);
+        });
     return () => {
       alive = false;
       clearInterval(t);
+      clearTimeout(late);
       offLive();
+      offEvents();
     };
   }, [sel, selIsChannel]);
 
@@ -196,9 +255,15 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     const prevH = el ? el.scrollHeight : 0;
     const prevTop = el ? el.scrollTop : 0;
     try {
-      const page = await fetchOlderRemote(cid!, selIsChannel);
-      if (cid !== sel) return; // switched chat mid-fetch
-      if (!page) { noMore.current = true; return; }
+      // Older pages can overlap what the local cache already shows; keep paging
+      // (bounded) until one brings something new, or the view stays stuck at top.
+      let page: Msg[] | null;
+      let hops = 0;
+      do {
+        page = await fetchOlderRemote(cid!, selIsChannel);
+        if (cid !== sel) return; // switched chat mid-fetch
+        if (!page) { noMore.current = true; return; }
+      } while (page.length && page.every((m) => shownIds.current.has(m.id)) && ++hops < 10);
       if (!page.length) return;
       setOlder((o) => {
         const base = o.id === cid ? o.list : [];
@@ -240,42 +305,86 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     setStickyDay(label);
   };
 
-  const sections = useMemo<Array<[string, Chat[]]>>(() => {
+  // Unread filter: chats opened during this filter session stay listed (keep)
+  // even once read, so the open chat never vanishes; leaving the filter drops them.
+  const sections = useMemo<SideSection[]>(() => {
     const q = query.toLowerCase().trim();
-    const list = q
-      ? chats.filter((c) => (c.title + " " + c.team).toLowerCase().includes(q))
-      : chats;
+    if (q) {
+      // Search: one flat result list, best matches first (title before team /
+      // member names). Hidden chats are found too.
+      const hay = (c: Chat): string =>
+        (c.team + " " + c.members.map((m) => profile(m).displayName).join(" ")).toLowerCase();
+      const byTitle = chats.filter((c) => c.title.toLowerCase().includes(q));
+      const byOther = chats.filter((c) => !c.title.toLowerCase().includes(q) && hay(c).includes(q));
+      const list = [...byTitle, ...byOther];
+      return list.length ? [{ id: "search", title: "", rows: list, capped: false }] : [];
+    }
+    // Hidden chats leave the list, as in Teams; search still finds them.
+    const list = chats.filter((c) => !c.hidden && (!unreadOnly || c.unread || keep.has(c.id)));
+    if (unreadOnly) {
+      // Unread filter: one flat inbox, newest first; headers would only repeat
+      // the filter's own count.
+      return list.length ? [{ id: "unread", title: "", rows: list, capped: false }] : [];
+    }
     const pinned = (c: Chat): boolean => c.favorite || c.pinned;
+    const rest = list.filter((c) => !pinned(c));
+    // Channels grouped by team; teams ordered by their latest activity, so the
+    // busy team sits on top. Within a team, newest first (list order).
+    const channels = rest.filter((c) => c.kind === "channel");
+    const teamRank = new Map<string, number>();
+    channels.forEach((c, i) => { if (!teamRank.has(c.team)) teamRank.set(c.team, i); });
+    channels.sort((a, b) => teamRank.get(a.team)! - teamRank.get(b.team)!);
     return ([
-      ["Favorites", list.filter(pinned)],
-      ["Chats", list.filter((c) => !pinned(c) && (c.kind === "chat" || c.kind === "notes"))],
-      ["Channels", list.filter((c) => !pinned(c) && c.kind === "channel")],
-      ["Meetings", list.filter((c) => !pinned(c) && c.kind === "meeting")],
-    ] as Array<[string, Chat[]]>).filter(([, rows]) => rows.length);
-  }, [chats, query]);
-  const flat = useMemo(() => sections.flatMap(([, rows]) => rows), [sections]);
-  const unreadCount = useMemo(() => chats.filter((c) => c.unread).length, [chats]);
+      { id: "fav", title: "Favorites", rows: list.filter(pinned) },
+      { id: "dms", title: "Direct messages", rows: rest.filter((c) => c.kind === "notes" || (c.kind === "chat" && c.members.length <= 1)) },
+      { id: "groups", title: "Groups", rows: rest.filter((c) => c.kind === "chat" && c.members.length > 1) },
+      { id: "channels", title: "Channels", rows: channels, groupByTeam: true },
+      { id: "meetings", title: "Meetings", rows: rest.filter((c) => c.kind === "meeting"), defaultCollapsed: true },
+    ] as SideSection[]).filter((s) => s.rows.length);
+  }, [chats, query, unreadOnly, keep]);
+  const flat = useMemo(() => sections.flatMap((s) => s.rows), [sections]);
+  const unreadCount = useMemo(() => chats.filter((c) => c.unread && !c.hidden).length, [chats]);
 
   const chatsRef = useRef<Chat[]>([]);
   useEffect(() => { chatsRef.current = chats; }, [chats]);
 
   const pick = useCallback((id: string): void => {
     setSel(id);
+    if (unreadOnly) setKeep((k) => (k.has(id) ? k : new Set(k).add(id)));
     // Opening a chat marks it read in Teams, same as the native client. Fire the
-    // write and flip our flag only when the chat was actually unread.
+    // write and flip our flag only when the chat was actually unread; put the
+    // flag back when the write fails, so the list doesn't lie until next poll.
     const hit = chatsRef.current.find((c) => c.id === id);
     if (hit && hit.unread) {
       setChats((cs) => cs.map((c) => (c.id === id ? { ...c, unread: false } : c)));
       markRead(id, hit.time).then((res) => {
-        if (!res.ok) flash("Couldn't mark as read (" + res.reason + ")");
+        if (res.ok) return;
+        setChats((cs) => cs.map((c) => (c.id === id ? { ...c, unread: true } : c)));
+        flash("Couldn't mark as read (" + res.reason + ")");
       });
     }
     requestAnimationFrame(() => {
       document.querySelector(`#tc-root .tc-row[data-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest" });
     });
-  }, [flash]);
+  }, [flash, unreadOnly]);
 
-  // Keyboard: ⌘K search, ⌥↑/⌥↓ previous/next chat, Esc leaves search.
+  // Turn the Unread filter on/off. Turning it on opens the newest unread chat
+  // unless the open one is unread itself; an already-read open chat is not
+  // carried into the filter.
+  const setUnreadFilter = useCallback((on: boolean): void => {
+    setUnreadOnly(on);
+    const cur = chatsRef.current.find((c) => c.id === sel);
+    setKeep(new Set(on && cur && cur.unread ? [cur.id] : []));
+    if (!on || (cur && cur.unread)) return;
+    const u = chatsRef.current.find((c) => c.unread && !c.hidden);
+    if (u) {
+      setKeep(new Set([u.id]));
+      pick(u.id);
+    }
+  }, [sel, pick]);
+
+  // Keyboard: ⌘K search, ⌥↑/⌥↓ previous/next chat, ⌥⇧↑/⌥⇧↓ previous/next
+  // unread chat, ⌥U Unread filter, Esc leaves search.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (isIdle()) return;
@@ -292,6 +401,21 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
       } else if (e.key === "Escape" && msgSearchOpen) {
         setMsgSearch("");
         setMsgSearchOpen(false);
+      } else if (e.altKey && !e.metaKey && e.code === "KeyU") {
+        e.preventDefault();
+        e.stopPropagation();
+        setUnreadFilter(!unreadOnly);
+      } else if (e.altKey && !e.metaKey && e.shiftKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+        e.preventDefault();
+        e.stopPropagation();
+        // Next unread below (or above) the open chat, wrapping around.
+        const up = e.key === "ArrowUp";
+        const i = flat.findIndex((c) => c.id === sel);
+        const n = flat.length;
+        for (let k = 1; k <= n; k++) {
+          const c = flat[(((i < 0 ? (up ? 0 : -1) : i) + (up ? -k : k)) % n + n) % n];
+          if (c && c.unread && c.id !== sel) { pick(c.id); break; }
+        }
       } else if (e.altKey && !e.metaKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
         e.preventDefault();
         e.stopPropagation();
@@ -302,7 +426,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [flat, sel, pick, msgSearchOpen]);
+  }, [flat, sel, pick, msgSearchOpen, unreadOnly, setUnreadFilter]);
 
   const draft = (sel && drafts[sel]) || "";
   const setDraft = (v: string): void => setDrafts((d) => ({ ...d, [sel!]: v }));
@@ -353,6 +477,8 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   // and track the query. Any other edit closes it.
   const onDraftChange = (v: string): void => {
     setDraft(v);
+    // Teams signals typing on every non-empty editor change (throttled per chat).
+    if (v.trim() && selChat) typing.notifyTyping({ convId: selChat.id, isChannel: selChat.isChannel, members: selChat.members });
     const el = composer.current;
     const caret = el?.selectionStart ?? v.length;
     // Match "@" preceded by start/space, up to the caret, name chars only.
@@ -428,6 +554,16 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     setAtBottom(true);
   };
 
+  // Who is typing in the open chat (worker subscription; chats only, like send).
+  const [typingLabel, setTypingLabel] = useState("");
+  useEffect(() => {
+    setTypingLabel("");
+    if (!sel || selIsChannel) return;
+    return typing.watchTyping(sel, (users) => {
+      setTypingLabel(users.length ? users[0].typingUsersLabel || "Someone is typing" : "");
+    });
+  }, [sel, selIsChannel]);
+
   // Close the emoji picker when the open chat changes.
   useEffect(() => { setEmojiOpen(false); }, [sel]);
 
@@ -447,6 +583,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     const picks = mentionPicks[chat.id] || [];
     const key = Date.now() + Math.random();
     setDrafts((d) => ({ ...d, [chat.id]: "" }));
+    typing.resetTyping(chat.id);
     setQuote(null);
     setMentionPicks((mp) => ({ ...mp, [chat.id]: [] }));
     setAtOpen(false);
@@ -508,7 +645,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     setMsgs((s) => ({ ...s, list: s.list.map(apply) }));
     setOlder((s) => ({ ...s, list: s.list.map(apply) }));
   }
-  const refetchMsgs = (): void => { setMsgs((s) => ({ ...s, loaded: false, failed: false })); lastMsgSig.current = ""; nullTicks.current = 0; };
+  const refetchMsgs = (): void => { setMsgs((s) => ({ ...s, loaded: false, failed: false })); lastMsgSig.current = ""; nullTicks.current = 0; hydrated.current = false; };
 
   // Soft-delete my message (reversible via Undo). Optimistic; refetch on failure.
   async function deleteMsg(cid: string, messageId: string): Promise<void> {
@@ -550,23 +687,126 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     return p.email || (String(mri || "").match(/[^:]+@[^:]+/) || [""])[0];
   }, []);
 
-  // Start (or open) a 1:1 chat with a person when no shared DM exists yet. Hands
-  // off to the native Teams client via its chat deep link, keyed by email.
-  const startDirect = useCallback((mri: string): void => {
-    const upn = upnOf(mri);
-    if (!upn) { flash("No email on file for this person — open them in Teams to start a chat."); return; }
-    onHide?.();
-    location.href = "https://teams.microsoft.com/l/chat/0/0?users=" + encodeURIComponent(upn);
-  }, [flash, onHide, upnOf]);
+  // New chat dialog: null = closed. `draft` = Teams already shows an empty new
+  // chat with exactly `people` (so the dialog asks for the first message).
+  const [newChat, setNewChat] = useState<null | { people: PeopleHit[]; draft: boolean }>(null);
 
-  // Place an audio/video call via the native Teams call deep link.
-  const startCall = useCallback((mri: string, kind: "audio" | "video"): void => {
-    const upn = upnOf(mri);
-    if (!upn) { flash("No email on file for this person — can't start a call."); return; }
-    onHide?.();
-    const base = "https://teams.microsoft.com/l/call/0/0?users=" + encodeURIComponent(upn);
-    location.href = kind === "video" ? base + "&withVideo=true" : base;
-  }, [flash, onHide, upnOf]);
+  const toPick = useCallback((p: PeopleHit): PickPerson => ({
+    upn: p.email || upnOf(p.mri),
+    oid: (String(p.mri || "").match(/^8:orgid:([0-9a-f-]{36})$/i) || ["", ""])[1],
+  }), [upnOf]);
+
+  // Select a chat once our list knows it. A chat Teams just created only shows
+  // up after the next poll picks it out of Teams' local store.
+  const pickWhenListed = useCallback(async (id: string, ms = 12000): Promise<boolean> => {
+    for (let t = 0; t <= ms; t += 300) {
+      if (chatsRef.current.some((c) => c.id === id)) { pick(id); return true; }
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    return false;
+  }, [pick]);
+
+  // Everyone in our chats with a cached profile, for the New chat dialog's
+  // instant local matches (the directory search needs a captured token).
+  const knownPeople = useCallback((): PeopleHit[] => {
+    const me = myMri();
+    const seen = new Set<string>();
+    const out: PeopleHit[] = [];
+    for (const c of chatsRef.current) {
+      if (c.kind !== "chat") continue;
+      for (const mri of c.members) {
+        if (mri === me || seen.has(mri) || !/^8:orgid:/.test(mri)) continue;
+        seen.add(mri);
+        const p = profile(mri);
+        if (p.displayName) out.push({ mri, displayName: p.displayName, email: p.email || "", jobTitle: p.jobTitle || "" });
+      }
+    }
+    return out;
+  }, []);
+
+  // Send `text` into an existing chat: chatsvc first, Teams' composer as fallback.
+  const sendInto = useCallback(async (id: string, title: string, text: string): Promise<boolean> => {
+    let r = await sendRemote(id, text, null, []);
+    if (!r.ok && r.reason === "no-token") r = await sendMessage(id, title, text);
+    if (!r.ok) flash("Opened the chat, but the message wasn't sent (" + r.reason + ")", 5000);
+    return r.ok;
+  }, [flash]);
+
+  // Start or open a chat with one or more people the way the stock UI does:
+  // Teams' own New message + people picker (send.ts openNativeNewChat). Teams
+  // decides whether a chat with exactly these people exists; if not, it shows
+  // an empty draft that its first send creates (send.ts sendNativeDraft). The
+  // overlay stays up and selects the chat once it is in our list.
+  const startNewChat = useCallback(async (people: PeopleHit[], text: string): Promise<NewChatOutcome> => {
+    const ppl = people.map(toPick);
+    const missing = people.find((_, i) => !ppl[i].upn && !ppl[i].oid);
+    if (missing) return { kind: "error", message: "No email on file for " + (missing.displayName || "this person") + "." };
+    const opened = async (id: string): Promise<NewChatOutcome> => {
+      setNewChat(null);
+      const known = chatsRef.current.find((c) => c.id === id);
+      if (known) pick(id);
+      if (text) await sendInto(id, known?.title || "", text);
+      if (!known && !(await pickWhenListed(id))) flash("Chat opened in Teams. It shows up here shortly.", 4000);
+      return { kind: "done" };
+    };
+    // A chat we list whose members aren't exactly these people (e.g. the 1:1
+    // Teams shows mid-pick) is not the one asked for.
+    const want = new Set(people.map((p) => p.mri));
+    const wrongChat = (id: string): boolean => {
+      const c = chatsRef.current.find((x) => x.id === id);
+      if (!c || c.kind !== "chat") return false;
+      const got = c.members.filter((m) => m !== myMri());
+      return got.length !== want.size || got.some((m) => !want.has(m));
+    };
+    // A 1:1 we already list needs no trip through Teams.
+    if (people.length === 1) {
+      const dm = chatsRef.current.find((c) => c.kind === "chat" && c.members.length === 1 && c.members[0] === people[0].mri);
+      if (dm) return opened(dm.id);
+    }
+    if (text) {
+      // Teams may already show the draft for these people (dialog's 2nd step).
+      let r = await sendNativeDraft(ppl, text);
+      if (!r.ok && r.reason === "draft-changed") {
+        const o = await openNativeNewChat(ppl);
+        if (!o.ok) return { kind: "error", message: "Couldn't open the chat in Teams (" + o.reason + ")" };
+        if (o.id && !wrongChat(o.id)) return opened(o.id);
+        r = await sendNativeDraft(ppl, text);
+      }
+      if (!r.ok) return { kind: "error", message: "Not sent (" + r.reason + ")" };
+      setNewChat(null);
+      if (!r.id || !(await pickWhenListed(r.id))) flash("Chat created in Teams. It shows up here shortly.", 4000);
+      return { kind: "done" };
+    }
+    const o = await openNativeNewChat(ppl);
+    if (!o.ok) return { kind: "error", message: "Couldn't open the chat in Teams (" + o.reason + ")" };
+    if (o.id && !wrongChat(o.id)) return opened(o.id);
+    return { kind: "draft" };
+  }, [toPick, pick, sendInto, pickWhenListed, flash]);
+
+  // "Message" on a profile: open the 1:1 (see startNewChat). A brand-new one
+  // opens the New chat dialog on Teams' draft to take the first message.
+  const startDirect = useCallback(async (mri: string): Promise<void> => {
+    const p = profile(mri);
+    const hit: PeopleHit = { mri, displayName: p.displayName || "", email: upnOf(mri), jobTitle: p.jobTitle || "" };
+    const r = await startNewChat([hit], "");
+    if (r.kind === "draft") setNewChat({ people: [hit], draft: true });
+    else if (r.kind === "error") flash(r.message, 4000);
+  }, [startNewChat, upnOf, flash]);
+
+  // Place an audio/video call the way the stock UI does: open the chat in Teams
+  // and press its own header call button (send.ts startNativeCall). A person is
+  // called through their 1:1 chat. No deep-link fallback: navigating to a
+  // teams.microsoft.com/l/ link replaces the Teams page with the web launcher.
+  const startCall = useCallback(async (mris: string[], kind: "audio" | "video", chat?: Chat): Promise<void> => {
+    const target = chat || (mris.length === 1
+      ? chatsRef.current.find((c) => c.kind === "chat" && c.members.length === 1 && c.members[0] === mris[0])
+      : undefined);
+    if (!target) { flash("No 1:1 chat with this person yet — start one to call them.", 4000); return; }
+    // The overlay stays up: Teams' buttons are clicked underneath it, and the
+    // call-window guard (mount.tsx) hides the overlay wherever the call shows.
+    const res = await startNativeCall(target.id, target.title, kind);
+    if (!res.ok) flash("Couldn't start the call (" + res.reason + ")", 4000);
+  }, [flash]);
 
   // Start a quote-reply: remember the target message and focus the composer.
   const onQuote = useCallback((m: Msg): void => {
@@ -609,6 +849,17 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     }
   }, [flash]);
 
+  // Hide or unhide a chat (right-click menu). Optimistic; reverts on failure.
+  const setHidden = useCallback(async (chat: Chat, hidden: boolean): Promise<void> => {
+    const id = chat.id;
+    setChats((cs) => cs.map((c) => (c.id === id ? { ...c, hidden } : c)));
+    const res = await setChatHidden(id, hidden);
+    if (!res.ok) {
+      setChats((cs) => cs.map((c) => (c.id === id ? { ...c, hidden: !hidden } : c)));
+      flash("Couldn't " + (hidden ? "hide" : "unhide") + " chat (" + res.reason + ")");
+    } else if (hidden) flash("Chat hidden. Search finds it; a new message brings it back.", 4000);
+  }, [flash]);
+
   // Open the right-click menu for a chat row.
   const openMenu = useCallback((e: MouseEvent, chat: Chat): void => {
     e.preventDefault();
@@ -617,7 +868,12 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   // Close the menu on any click, scroll, Escape, or resize.
   useEffect(() => {
     if (!menu) return;
-    const close = (): void => setMenu(null);
+    // Capture phase runs before the menu's own handlers, so ignore events that
+    // start inside it; otherwise mousedown unmounts the item before its click.
+    const close = (e: Event): void => {
+      if (e.target instanceof Element && e.target.closest("#tc-root .tc-menu")) return;
+      setMenu(null);
+    };
     const onKey = (e: KeyboardEvent): void => { if (e.key === "Escape") setMenu(null); };
     document.addEventListener("mousedown", close, true);
     document.addEventListener("scroll", close, true);
@@ -632,11 +888,14 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   }, [menu]);
 
   // Close the emoji picker on any outside click, scroll, Escape, or resize. The
-  // picker and its toggle button stop mousedown propagation, so clicks inside
-  // them don't reach this capture-phase handler.
+  // capture-phase handler runs before React's handlers, so it skips events that
+  // start inside the picker or its toggle button itself.
   useEffect(() => {
     if (!emojiOpen) return;
-    const close = (): void => setEmojiOpen(false);
+    const close = (e: Event): void => {
+      if (e.target instanceof Element && e.target.closest("#tc-root .tc-emoji-pop, #tc-root .tc-emoji-btn")) return;
+      setEmojiOpen(false);
+    };
     const onKey = (e: KeyboardEvent): void => { if (e.key === "Escape") setEmojiOpen(false); };
     document.addEventListener("mousedown", close, true);
     document.addEventListener("scroll", close, true);
@@ -670,6 +929,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
       : (a, b) => a.time - b.time);
     return all;
   }, [msgs, older, sel, selIsChannel]);
+  shownIds.current = useMemo(() => new Set(shown.map((m) => m.id)), [shown]);
   const myPending = pending.filter((p) => p.chatId === sel);
 
   // In-conversation search: filter the rendered messages to those whose text
@@ -707,35 +967,42 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
       <aside className="tc-side">
         <div className="tc-side-head">
           <h1>Teams Calm</h1>
-        </div>
-        {unreadCount ? (
-          <button
-            className="tc-unread-link"
-            title="Jump to the newest unread conversation"
-            onClick={() => { const u = flat.find((c) => c.unread); if (u) pick(u.id); }}
-          >
-            <span className="tc-unread-link-label">Unread</span>
-            <span className="tc-unread-link-n">{unreadCount}</span>
+          <button className="tc-side-btn" onClick={() => setCompact((c) => !c)}
+            title={compact ? "Show message previews" : "Compact list"} aria-label={compact ? "Show message previews" : "Compact list"}>
+            {compact ? <Rows2 size={16} /> : <Rows3 size={16} />}
           </button>
-        ) : null}
-        <div className="tc-search">
-          <Search size={15} className="tc-search-icon" />
-          <input
-            ref={search}
-            placeholder="Search chats  ⌘K"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                setQuery("");
-                e.currentTarget.blur();
-              } else if (e.key === "Enter" && flat[0]) {
-                pick(flat[0].id);
-                setQuery("");
-                composer.current?.focus();
-              }
-            }}
-          />
+          <button className="tc-side-btn" onClick={() => setNewChat({ people: [], draft: false })} title="New chat" aria-label="New chat">
+            <SquarePen size={16} />
+          </button>
+        </div>
+        <div className="tc-side-tools">
+          <div className="tc-search">
+            <Search size={15} className="tc-search-icon" />
+            <input
+              ref={search}
+              placeholder="Search  ⌘K"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setQuery("");
+                  e.currentTarget.blur();
+                } else if (e.key === "Enter" && flat[0]) {
+                  pick(flat[0].id);
+                  setQuery("");
+                  composer.current?.focus();
+                }
+              }}
+            />
+          </div>
+          <button
+            className={"tc-unread-pill" + (unreadOnly ? " on" : "")}
+            aria-pressed={unreadOnly}
+            onClick={() => setUnreadFilter(!unreadOnly)}
+            title="Only unread conversations  ⌥U · next unread ⌥⇧↓"
+          >
+            Unread{unreadCount ? <span className="tc-unread-n">{unreadCount}</span> : null}
+          </button>
         </div>
         <div className="tc-list">
           {error ? (
@@ -745,12 +1012,21 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
               <small>{error}</small>
             </div>
           ) : null}
-          {sections.map(([title, rows]) => (
-            <Section key={title} title={title} rows={rows} sel={sel} onPick={pick} onOpenProfile={openProfile} onMenu={openMenu} />
+          {sections.map((s) => (
+            <Section key={s.id} id={s.id} title={s.title} rows={s.rows} sel={sel} compact={compact}
+              capped={s.capped} groupByTeam={s.groupByTeam} defaultCollapsed={s.defaultCollapsed}
+              onPick={pick} onOpenProfile={openProfile} onMenu={openMenu} />
           ))}
           {!error && !sections.length ? (
             <div className="tc-list-empty">
-              {query ? <>No chats match “{query}”.</> : "No conversations yet."}
+              {query ? <>No chats match “{query}”.</> : unreadOnly ? (
+                <div className="tc-caught-up">
+                  <CheckCheck size={28} className="tc-caught-up-icon" />
+                  <strong>All caught up</strong>
+                  <span>No unread conversations.</span>
+                  <button className="tc-more" onClick={() => setUnreadFilter(false)}>Show all conversations</button>
+                </div>
+              ) : "No conversations yet."}
             </div>
           ) : null}
         </div>
@@ -768,7 +1044,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
               )}
               <div className="tc-head-text">
                 <span className="tc-name">{selChat.title}</span>
-                {selChat.team ? <span className="tc-sub">{selChat.team}</span> : null}
+                {headSub ? <span className="tc-sub">{headSub}</span> : null}
               </div>
               <button
                 className={"tc-ghost tc-icon-only" + (msgSearchOpen ? " on" : "")}
@@ -778,12 +1054,12 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
               >
                 <Search size={15} />
               </button>
-              {selChat.avatarMri ? (
+              {callable ? (
                 <>
-                  <button className="tc-ghost tc-icon-only" onClick={() => startCall(selChat.avatarMri, "audio")} title="Audio call" aria-label="Audio call">
+                  <button className="tc-ghost tc-icon-only" onClick={() => void startCall(selChat.members, "audio", selChat)} title={callLabel("Audio call")} aria-label={callLabel("Audio call")}>
                     <Phone size={15} />
                   </button>
-                  <button className="tc-ghost tc-icon-only" onClick={() => startCall(selChat.avatarMri, "video")} title="Video call" aria-label="Video call">
+                  <button className="tc-ghost tc-icon-only" onClick={() => void startCall(selChat.members, "video", selChat)} title={callLabel("Video call")} aria-label={callLabel("Video call")}>
                     <Video size={15} />
                   </button>
                 </>
@@ -849,6 +1125,8 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
               </div>
             </div>
             <div className="tc-composer">
+              {/* Floats above the box so typing never shifts the layout. */}
+              {typingLabel ? <div className="tc-typing" aria-live="polite">{typingLabel}…</div> : null}
               {!atBottom ? (
                 <button className="tc-scroll-newest" onClick={scrollToBottom} title="Jump to newest" aria-label="Jump to newest">
                   <ArrowDown size={16} />
@@ -925,16 +1203,25 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                   <Send size={16} />
                 </button>
               </div>
-              <div className="tc-composer-hint">
-                <span>Enter to send · Shift+Enter newline</span>
-                <span className="tc-kb">⌥⌘T Teams · ⌘K search · ⌥↑↓ switch</span>
-              </div>
             </div>
           </>
         ) : (
-          <div className="tc-empty">{error ? "No Teams data here." : "Select a chat"}</div>
+          <>
+            <div className="tc-drag tc-main-drag" />
+            <div className="tc-empty">{error ? "No Teams data here." : "Select a chat"}</div>
+          </>
         )}
       </main>
+
+      {newChat ? (
+        <NewChat
+          initial={newChat.people}
+          initialDraft={newChat.draft}
+          known={knownPeople}
+          onStart={startNewChat}
+          onClose={() => setNewChat(null)}
+        />
+      ) : null}
 
       {profileMri ? (
         <ProfilePanel
@@ -943,24 +1230,36 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
           sel={sel}
           onPick={(id) => { pick(id); setProfileMri(null); }}
           onClose={() => setProfileMri(null)}
-          onMessage={() => { startDirect(profileMri); setProfileMri(null); }}
-          onCall={(kind) => { startCall(profileMri, kind); setProfileMri(null); }}
+          onMessage={() => { void startDirect(profileMri); setProfileMri(null); }}
+          onCall={(kind) => { void startCall([profileMri], kind); setProfileMri(null); }}
         />
       ) : null}
 
       {menu ? (
         <div
           className="tc-menu"
-          style={{ left: Math.min(menu.x, window.innerWidth - 200), top: Math.min(menu.y, window.innerHeight - 100) }}
+          style={{ left: Math.min(menu.x, window.innerWidth - 200), top: Math.min(menu.y, window.innerHeight - 130) }}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <button
-            className="tc-menu-item"
-            onClick={() => { setChatUnread(menu.chat, !menu.chat.unread); setMenu(null); }}
-          >
-            {menu.chat.unread ? <MailOpen size={14} /> : <Mail size={14} />}
-            {menu.chat.unread ? "Mark as read" : "Mark as unread"}
-          </button>
+          {/* Channels: Teams' unread bookmark op is only known for chats. */}
+          {menu.chat.isChannel && !menu.chat.unread ? null : (
+            <button
+              className="tc-menu-item"
+              onClick={() => { setChatUnread(menu.chat, !menu.chat.unread); setMenu(null); }}
+            >
+              {menu.chat.unread ? <MailOpen size={14} /> : <Mail size={14} />}
+              {menu.chat.unread ? "Mark as read" : "Mark as unread"}
+            </button>
+          )}
+          {menu.chat.isChannel ? null : (
+            <button
+              className="tc-menu-item"
+              onClick={() => { setHidden(menu.chat, !menu.chat.hidden); setMenu(null); }}
+            >
+              {menu.chat.hidden ? <Eye size={14} /> : <EyeOff size={14} />}
+              {menu.chat.hidden ? "Unhide" : "Hide"}
+            </button>
+          )}
         </div>
       ) : null}
 

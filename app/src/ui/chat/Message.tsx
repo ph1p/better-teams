@@ -75,7 +75,12 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onE
   };
   return (
     <div ref={root} data-mid={m.id} className={"tc-msg" + (first ? " first" : "") + (m.isReply && channel ? " reply" : "")}>
-      <Avatar name={m.from} uri={first ? avatarUri(m.fromMri) : ""} small={m.isReply && channel} mri={first && !m.mine ? m.fromMri : ""} status={first ? statusOf(m.fromMri) : undefined} onOpen={onOpenProfile} />
+      {first ? (
+        <Avatar name={m.from} uri={avatarUri(m.fromMri)} small={m.isReply && channel} mri={m.mine ? "" : m.fromMri} status={statusOf(m.fromMri)} onOpen={onOpenProfile} />
+      ) : (
+        // Continuation: the avatar column shows the time on hover instead.
+        <span className={"tc-msg-gutter" + (m.isReply && channel ? " sm" : "")}>{fmtClock(m.time)}</span>
+      )}
       <div className="tc-msg-body">
         {first && (
           <div className="tc-msg-meta">
@@ -120,11 +125,11 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onE
           </div>
         ) : (
           <div
-            className="tc-msg-content"
+            className={"tc-msg-content" + (html ? " rich" : "")}
             onClick={(e) => {
               // Click a quoted reply's blockquote to jump to the original.
-              const bq = (e.target as Element).closest?.('blockquote[itemtype="http://schema.skype.com/Reply"]');
-              if (bq) { const id = bq.getAttribute("itemid"); if (id) onJumpTo?.(id); }
+              const bq = (e.target as Element).closest?.("blockquote.tc-reply");
+              if (bq) { const id = bq.getAttribute("data-reply-id"); if (id) onJumpTo?.(id); }
             }}
           >
             {html ? <RichHtml html={m.content} /> : <Linkified text={text} />}

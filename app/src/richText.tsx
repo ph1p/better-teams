@@ -251,8 +251,14 @@ function toReact(node: Node): ReactNode {
     return kids.length ? <Fragment key={key}>{kids}</Fragment> : null;
   }
   const T = tag;
-  const props: { key: string; className?: string } = { key };
+  const props: { key: string; className?: string; "data-reply-id"?: string } = { key };
   if (cls) props.className = cls;
+  // Quoted reply: Teams marks it itemtype=".../Reply" itemid=<message id>.
+  // Keep the id (the click jumps to the original) and style it apart.
+  if (tag === "blockquote" && /schema\.skype\.com\/Reply/i.test(node.attrs.itemtype || "")) {
+    props.className = "tc-quote tc-reply";
+    if (node.attrs.itemid) props["data-reply-id"] = node.attrs.itemid;
+  }
   return <T {...props}>{kids}</T>;
 }
 

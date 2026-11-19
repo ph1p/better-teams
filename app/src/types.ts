@@ -47,6 +47,8 @@ export interface Chat {
   members: string[];
   favorite: boolean;
   pinned: boolean;
+  /** Hidden from the chat list (Teams' "Hide"); search still finds it. */
+  hidden: boolean;
   /** Last-activity time, ms since epoch. */
   time: number;
   unread: boolean;
@@ -94,13 +96,6 @@ export interface Quote {
   text: string;
   fromMri: string;
   time: number;
-}
-
-/** Captured ic3 bearer and region for direct chatsvc calls. */
-export interface Token {
-  ic3: string;
-  region: string;
-  at: number;
 }
 
 /** Result of a write operation against Teams' backend. */

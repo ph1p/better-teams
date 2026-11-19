@@ -4,7 +4,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./ui/App";
 import { CSS } from "./styles";
-import { installTokenCapture } from "./tokenCapture";
+import { installAuthCapture, installCdl } from "./services";
 import { initHighlighter } from "./highlight";
 
 const ROOT_ID = "tc-root";
@@ -41,7 +41,10 @@ function isCallWindow(): boolean {
 function mount(): NonNullable<Window["__teamsCalmApp"]> {
   // Capture Teams' own ic3 bearer off its chatsvc calls, so uncached chats can
   // load from the same backend. Idempotent; survives re-injection.
-  installTokenCapture();
+  installAuthCapture();
+  // Learn Teams' worker channel from its own GraphQL traffic (services/cdl.ts),
+  // so the overlay can send the same requests Teams' UI sends. Idempotent.
+  installCdl();
   // Warm up Shiki (async WASM + grammars) so code blocks highlight once ready.
   initHighlighter();
   // Re-injecting a new build replaces the running one in place (no reload).

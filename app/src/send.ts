@@ -49,6 +49,226 @@ export async function openNativeChat(conversationId: string, title?: string): Pr
   return !!(await waitFor(() => nativeThreadId() === conversationId));
 }
 
+// Teams' own chat-header call buttons (data-tids from the Teams bundle). The
+// header shows one kind as a direct button (which one varies by layout/width);
+// both kinds always sit in the "more call options" dropdown next to it.
+const CALL_DIRECT = {
+  audio: '[data-tid="default-chat-call-audio-button"], [data-tid="dropdown-audio-call-primary-btn"]',
+  video: '[data-tid="default-chat-call-video-button"]',
+};
+const CALL_MENU_TOGGLE = '[data-tid="dropdown-calling-toggle-more-options-btn"]';
+const CALL_MENU_ITEM = {
+  audio: '[data-tid="chat-call-audio-button"], [data-tid="dropdown-audio-call-btn"]',
+  video: '[data-tid="chat-call-video-button"], [data-tid="dropdown-video-call-btn"]',
+};
+
+function nativeButton(sel: string): HTMLElement | null {
+  const b = [...document.querySelectorAll<HTMLElement>(sel)].find((x) => !x.closest("#tc-root"));
+  return b || null;
+}
+
+/**
+ * Start an audio/video call exactly as the stock UI does: open the chat in the
+ * native client, then click Teams' own call button in its header. Teams then
+ * runs its whole calling flow (intent, ringing, call window) itself.
+ */
+export async function startNativeCall(conversationId: string, title: string, kind: "audio" | "video"): Promise<WriteResult> {
+  if (!(await openNativeChat(conversationId, title))) return { ok: false, reason: "chat not open in Teams" };
+  // Wait for the header to render, then use the direct button or the dropdown.
+  await waitFor(() => nativeButton(CALL_DIRECT[kind]) || nativeButton(CALL_MENU_TOGGLE));
+  let btn = nativeButton(CALL_DIRECT[kind]);
+  if (!btn) {
+    const toggle = nativeButton(CALL_MENU_TOGGLE);
+    if (toggle) {
+      toggle.click();
+      btn = await waitFor(() => nativeButton(CALL_MENU_ITEM[kind]));
+    }
+  }
+  if (!btn) return { ok: false, reason: "no call button in Teams" };
+  if (btn.hasAttribute("disabled") || btn.getAttribute("aria-disabled") === "true") {
+    return { ok: false, reason: "Teams has calling disabled for this chat" };
+  }
+  // Re-check the target right before clicking: never call the wrong chat.
+  if (nativeThreadId() !== conversationId) return { ok: false, reason: "Teams switched chats" };
+  btn.click();
+  return { ok: true, via: "native" };
+}
+
+// Teams' own "new message" flow: the left-rail New message button opens a
+// draft with a people picker ("To:"). Each pick adds a chip and the picker
+// stays open for more. Teams then shows the chat with exactly those people:
+// the existing one (its thread id appears), or an empty draft (no thread id)
+// that Teams creates on the first send. Picking yourself jumps to 48:notes.
+// Seen live 2026-11-19.
+const NEW_MESSAGE_BTN = '[data-testid^="simple-collab-left-rail-header-new-message"]';
+const PEOPLE_PICKER = '[data-tid="people-picker-search"]';
+const PICKER_OPTION = '[role="option"][data-tid^="people-picker-entry-"]';
+// Chip per picked person: data-tid ends with their UPN (or email).
+const PICKER_CHIP = '[data-tid^="people-picker-selected-user-"]';
+
+/** A person to add in Teams' people picker. */
+export interface PickPerson {
+  /** UPN / email: Teams' option data-tid ends with it. */
+  upn?: string;
+  /** Entra object id: Teams' option data-tid contains it. */
+  oid?: string;
+}
+
+export type NewChatResult =
+  | { ok: true; id: string; draft: boolean }
+  | { ok: false; reason: string };
+
+function chipCount(): number {
+  return [...document.querySelectorAll(PICKER_CHIP)].filter((c) => !c.closest("#tc-root")).length;
+}
+
+// Chip button per picked person: id "recipient-line-entry-<mri>"; clicking it
+// removes the person. Teams keeps a half-done draft (chips and all) across
+// reopen and even restart, so the picker can start non-empty.
+const CHIP_BUTTON = '[id^="recipient-line-entry-"]';
+
+function chipButtons(): HTMLElement[] {
+  return [...document.querySelectorAll<HTMLElement>(CHIP_BUTTON)].filter((c) => !c.closest("#tc-root"));
+}
+
+function chipIs(c: HTMLElement, p: PickPerson): boolean {
+  const key = (c.id + " " + (c.querySelector(PICKER_CHIP)?.getAttribute("data-tid") || "")).toLowerCase();
+  const upn = (p.upn || "").trim().toLowerCase();
+  const oid = (p.oid || "").trim().toLowerCase();
+  return (!!oid && key.includes(oid)) || (!!upn && key.endsWith(upn));
+}
+
+// Make the picker's chips exactly `list`: drop anyone else, report who is in.
+async function reconcileChips(list: PickPerson[]): Promise<Set<PickPerson>> {
+  for (const c of chipButtons()) {
+    if (list.some((p) => chipIs(c, p))) continue;
+    const n = chipButtons().length;
+    c.click();
+    await waitFor(() => chipButtons().length < n, 1500);
+  }
+  return new Set(list.filter((p) => chipButtons().some((c) => chipIs(c, p))));
+}
+
+function matchesOption(o: Element, p: PickPerson): boolean {
+  const tid = (o.getAttribute("data-tid") || "").toLowerCase();
+  const upn = (p.upn || "").trim().toLowerCase();
+  const oid = (p.oid || "").trim().toLowerCase();
+  return (!!upn && tid.endsWith(upn)) || (!!oid && tid.includes(oid));
+}
+
+// Type into the picker and click the one suggestion that matches `p`.
+async function pickPerson(p: PickPerson): Promise<boolean> {
+  const input = await waitFor(() => document.querySelector<HTMLInputElement>(PEOPLE_PICKER));
+  if (!input) return false;
+  const query = (p.upn || p.oid || "").trim();
+  if (!query) return false;
+  const n = chipCount();
+  input.focus();
+  // React tracks input values: set through the native setter, then fire input.
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, query);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  const opt = await waitFor(
+    () => [...document.querySelectorAll<HTMLElement>(PICKER_OPTION)].find((o) => !o.closest("#tc-root") && matchesOption(o, p)),
+    5000,
+  );
+  if (!opt) return false;
+  opt.click();
+  // A chip appears (or, for a single person, Teams may jump straight to the chat).
+  await waitFor(() => chipCount() > n || !document.querySelector(PEOPLE_PICKER), 2000);
+  return true;
+}
+
+// Thread id once Teams stops switching views: unchanged for `quiet` ms.
+async function settledThreadId(ms = 3000, quiet = 700): Promise<string> {
+  let last = nativeThreadId();
+  let since = Date.now();
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    await sleep(100);
+    const t = nativeThreadId();
+    if (t !== last) { last = t; since = Date.now(); }
+    else if (Date.now() - since >= quiet) break;
+  }
+  return last;
+}
+
+/**
+ * Start a chat with `people` exactly as the stock UI does: New message, then
+ * add each person in the people picker. Only a suggestion whose data-tid
+ * matches the person's UPN or object id is clicked. Never sends.
+ * Resolves with the chat Teams shows: its id, or draft=true for a new chat.
+ */
+export async function openNativeNewChat(people: PickPerson[]): Promise<NewChatResult> {
+  const list = people.filter((p) => (p.upn || p.oid || "").trim());
+  if (!list.length) return { ok: false, reason: "no one to add" };
+  const btn = nativeButton(NEW_MESSAGE_BTN);
+  if (!btn) return { ok: false, reason: "no New message button in Teams" };
+  btn.click();
+  if (!(await waitFor(() => document.querySelector(PEOPLE_PICKER)))) {
+    return { ok: false, reason: "no people picker in Teams" };
+  }
+  // Each pick re-resolves the conversation: after the first one Teams shows
+  // that person's 1:1 for a moment, which must not be taken for the group's.
+  const already = await reconcileChips(list);
+  if (chipButtons().length > already.size) return { ok: false, reason: "couldn't clear Teams' earlier draft" };
+  let firstId = "";
+  for (const [i, p] of list.entries()) {
+    if (already.has(p)) continue;
+    if (!(await pickPerson(p))) return { ok: false, reason: "person not found in Teams: " + (p.upn || p.oid) };
+    if (i === 0) firstId = nativeThreadId();
+  }
+  if (list.length > 1) {
+    // All chips in, then let the thread id settle on the final set.
+    await waitFor(() => chipCount() >= list.length || !document.querySelector(PEOPLE_PICKER), 6000);
+    let id = await settledThreadId(5000, 1200);
+    if (id && id === firstId) id = "";
+    return { ok: true, id, draft: !id && !!document.querySelector(PEOPLE_PICKER) };
+  }
+  const id = await settledThreadId();
+  return { ok: true, id, draft: !id && !!document.querySelector(PEOPLE_PICKER) };
+}
+
+/** Open the 1:1 chat with one person (see openNativeNewChat). */
+export async function openNativeDirect(upn: string, oid?: string): Promise<NewChatResult> {
+  return openNativeNewChat([{ upn, oid }]);
+}
+
+/**
+ * Send the first message of the new-chat draft Teams shows right now, which
+ * creates the chat. Safety: aborts unless the draft's chips are exactly
+ * `people` (by UPN), so text never goes to a different set of people.
+ * Resolves with the new chat's id ("" if Teams has not switched yet).
+ */
+export async function sendNativeDraft(people: PickPerson[], text: string): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
+  if (!text || !text.trim()) return { ok: false, reason: "empty" };
+  const want = people.map((p) => (p.upn || "").trim().toLowerCase()).filter(Boolean).sort();
+  const chipsOk = (): boolean => {
+    if (nativeThreadId()) return false; // an existing chat, not the draft
+    const got = [...document.querySelectorAll(PICKER_CHIP)]
+      .filter((c) => !c.closest("#tc-root"))
+      .map((c) => (c.getAttribute("data-tid") || "").slice("people-picker-selected-user-".length).toLowerCase())
+      .sort();
+    return want.length === people.length && got.length === want.length && got.every((g, i) => g === want[i]);
+  };
+  if (!chipsOk()) return { ok: false, reason: "draft-changed" };
+  const composer = await waitFor(() =>
+    document.querySelector<HTMLElement>('[data-tid="ckeditor"][id^="new-message-"][contenteditable="true"]') ||
+    document.querySelector<HTMLElement>('[id^="new-message-"][contenteditable="true"]'),
+  );
+  if (!composer || composer.closest("#tc-root")) return { ok: false, reason: "no-composer" };
+  setComposerText(composer, text);
+  const btn = await waitFor(() => {
+    const b = [...document.querySelectorAll<HTMLButtonElement>(SEND_BUTTON)].find((x) => !x.closest("#tc-root"));
+    return b && !b.disabled && b.getAttribute("aria-disabled") !== "true" ? b : null;
+  }, 1500);
+  // Re-check right before sending: the user may have changed the draft.
+  if (!chipsOk()) return { ok: false, reason: "draft-changed" };
+  if (!btn) return { ok: false, reason: "no-send-button" };
+  btn.click();
+  const id = await waitFor(() => nativeThreadId(), 8000);
+  return { ok: true, id };
+}
+
 function findComposer(): HTMLElement | null {
   return (
     document.querySelector<HTMLElement>('[data-tid="ckeditor"][contenteditable="true"]') ||
