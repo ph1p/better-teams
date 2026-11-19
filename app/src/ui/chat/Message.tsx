@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 import {
-  SmilePlus, Pencil, Trash2, Undo2, Paperclip, X, Reply,
+  SmilePlus, Pencil, Trash2, Undo2, Paperclip, X, Reply, Copy, Check,
 } from "lucide-react";
 import { splitQuote } from "../../teamsData";
 import { RichHtml } from "../../richText";
@@ -36,6 +36,8 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onE
   // Quote preserved while editing: the verbatim leading blockquote HTML, or ""
   // once the user removes it. null = message has no quote.
   const [editQuote, setEditQuote] = useState<string | null>(null);
+  // Brief "copied" tick after copying the message text to the clipboard.
+  const [copied, setCopied] = useState(false);
   // Close the reaction popover when clicking anywhere outside this message.
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -63,6 +65,13 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onE
     if ((v && v !== bodyText) || keptQuote !== (origQuote || "")) {
       if (v) onEdit(cid, m.id, v, keptQuote);
     }
+  };
+  const copyText = (): void => {
+    const t = bodyText || text;
+    if (!t) return;
+    Promise.resolve(navigator.clipboard?.writeText(t))
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); })
+      .catch(() => { /* clipboard blocked; ignore */ });
   };
   return (
     <div ref={root} data-mid={m.id} className={"tc-msg" + (first ? " first" : "") + (m.isReply && channel ? " reply" : "")}>
@@ -152,6 +161,7 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onE
         <div className="tc-tools">
           <div className="tc-tool-row">
             <button className="tc-tool" title="Add reaction" onClick={() => setPick((p) => !p)}><SmilePlus size={16} /></button>
+            <button className="tc-tool" title={copied ? "Copied" : "Copy text"} onClick={copyText}>{copied ? <Check size={15} /> : <Copy size={15} />}</button>
             <button className="tc-tool" title="Reply with quote" onClick={() => onQuote(m)}><Reply size={16} /></button>
             {m.mine ? <button className="tc-tool" title="Edit" onClick={startEdit}><Pencil size={15} /></button> : null}
             {m.mine ? <button className="tc-tool" title="Delete" onClick={() => onDelete(cid, m.id)}><Trash2 size={15} /></button> : null}

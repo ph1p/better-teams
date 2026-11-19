@@ -6,7 +6,9 @@ import {
 import { openNativeChat, sendMessage } from "../send";
 import {
   Send, Search, Hash, MailOpen, Mail, ExternalLink, X, Reply, Phone, Video, RotateCw,
+  ArrowDown, Smile,
 } from "lucide-react";
+import { EmojiPicker } from "./shared/EmojiPicker";
 import { Avatar } from "./shared/Avatar";
 import { Section } from "./sidebar/Section";
 import { MeBar } from "./sidebar/MeBar";
@@ -207,7 +209,9 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   const onScroll = (): void => {
     const el = scroller.current;
     if (!el) return;
-    stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    stick.current = near;
+    setAtBottom(near);
     if (el.scrollTop < 60) loadOlder();
   };
 
@@ -236,13 +240,15 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     // write and flip our flag only when the chat was actually unread.
     const hit = chatsRef.current.find((c) => c.id === id);
     if (hit && hit.unread) {
-      markRead(id, hit.time);
       setChats((cs) => cs.map((c) => (c.id === id ? { ...c, unread: false } : c)));
+      markRead(id, hit.time).then((res) => {
+        if (!res.ok) flash("Couldn't mark as read (" + res.reason + ")");
+      });
     }
     requestAnimationFrame(() => {
       document.querySelector(`#tc-root .tc-row[data-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest" });
     });
-  }, []);
+  }, [flash]);
 
   // Keyboard: ⌘K search, ⌥↑/⌥↓ previous/next chat, Esc leaves search.
   useEffect(() => {
@@ -275,6 +281,34 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
 
   const draft = (sel && drafts[sel]) || "";
   const setDraft = (v: string): void => setDrafts((d) => ({ ...d, [sel!]: v }));
+
+  // Insert text at the composer's caret (or append), keeping focus and caret.
+  const insertAtCaret = (ins: string): void => {
+    const el = composer.current;
+    if (!el) { setDraft(draft + ins); return; }
+    const s = el.selectionStart ?? draft.length;
+    const e = el.selectionEnd ?? draft.length;
+    const next = draft.slice(0, s) + ins + draft.slice(e);
+    setDraft(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = s + ins.length;
+      try { el.setSelectionRange(pos, pos); } catch { /* ignore */ }
+    });
+  };
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  // True while the message list is scrolled near the bottom; drives the
+  // scroll-to-newest button (stick is a ref, so we mirror it into state here).
+  const [atBottom, setAtBottom] = useState(true);
+  const scrollToBottom = (): void => {
+    const el = scroller.current;
+    stick.current = true;
+    if (el) el.scrollTop = el.scrollHeight;
+    setAtBottom(true);
+  };
+
+  // Close the emoji picker when the open chat changes.
+  useEffect(() => { setEmojiOpen(false); }, [sel]);
 
   // Auto-grow the composer.
   useLayoutEffect(() => {
@@ -472,6 +506,25 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     };
   }, [menu]);
 
+  // Close the emoji picker on any outside click, scroll, Escape, or resize. The
+  // picker and its toggle button stop mousedown propagation, so clicks inside
+  // them don't reach this capture-phase handler.
+  useEffect(() => {
+    if (!emojiOpen) return;
+    const close = (): void => setEmojiOpen(false);
+    const onKey = (e: KeyboardEvent): void => { if (e.key === "Escape") setEmojiOpen(false); };
+    document.addEventListener("mousedown", close, true);
+    document.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close, true);
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("mousedown", close, true);
+      document.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close, true);
+      window.removeEventListener("keydown", onKey, true);
+    };
+  }, [emojiOpen]);
+
   // Every chat the current user shares with `mri`: 1:1s and group chats whose
   // member list includes that MRI. Newest first (chats is already sorted).
   const sharedChats = useMemo(() => {
@@ -610,9 +663,6 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                   </button>
                 </>
               ) : null}
-              <button className="tc-ghost" onClick={openInTeams} title="Open this chat in Teams (calls, files, reactions)">
-                <ExternalLink size={15} /> Open in Teams
-              </button>
             </div>
             {msgSearchOpen ? (
               <div className="tc-msgsearch">
@@ -669,6 +719,11 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
               ) : null}
             </div>
             <div className="tc-composer">
+              {!atBottom ? (
+                <button className="tc-scroll-newest" onClick={scrollToBottom} title="Jump to newest" aria-label="Jump to newest">
+                  <ArrowDown size={16} />
+                </button>
+              ) : null}
               {quote ? (
                 <div className="tc-quote-chip">
                   <Reply size={13} className="tc-quote-chip-icon" />
@@ -679,7 +734,22 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                   <button className="tc-quote-chip-x" onClick={() => setQuote(null)} aria-label="Cancel quote"><X size={13} /></button>
                 </div>
               ) : null}
+              {emojiOpen ? (
+                <div className="tc-emoji-pop" onMouseDown={(e) => e.stopPropagation()}>
+                  <EmojiPicker onPick={(em) => { insertAtCaret(em); setEmojiOpen(false); }} />
+                </div>
+              ) : null}
               <div className="tc-composer-box">
+                <button
+                  className="tc-emoji-btn"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={() => setEmojiOpen((o) => !o)}
+                  title="Emoji"
+                  aria-label="Emoji"
+                  aria-expanded={emojiOpen}
+                >
+                  <Smile size={18} />
+                </button>
                 <textarea
                   ref={composer}
                   rows={1}
