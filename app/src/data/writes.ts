@@ -1,7 +1,8 @@
 // Message writes: send, react, delete, edit, undo. Worker (CDL) first where it
 // is safe, chatsvc REST as fallback.
 import type { Quote, WriteResult } from "../types";
-import { buildMentionContent, type MentionPick } from "../mentions";
+import type { MentionPick } from "../mentions";
+import { formatMessage } from "../markdown";
 import { buildQuoteHtml } from "../quote";
 import { chat, chatsvc, token } from "../services";
 import { myMri } from "./idb";
@@ -44,10 +45,10 @@ export async function sendRemote(
 ): Promise<WriteResult> {
   const body = (text || "").trim();
   if (!body) return { ok: false, reason: "empty" };
-  // HTML-escape the body and splice in any @mention spans (native Teams format).
-  const mc = buildMentionContent(body, mentions);
+  // Markdown-lite → native Teams HTML, with any @mention spans spliced in.
+  const mc = formatMessage(body, mentions);
   // Native quote-reply: prepend the Skype Reply blockquote (captured format).
-  const content = buildQuoteHtml(quote) + "<p>" + mc.html + "</p>";
+  const content = buildQuoteHtml(quote) + mc.html;
   const clientMessageId = chat.newClientMessageId();
   const channel = isChannelId(conversationId);
   const reply = !!rootId && channel;
@@ -171,9 +172,7 @@ export async function editMessage(
   text: string,
   quoteHtml = ""
 ): Promise<WriteResult> {
-  const esc = String(text)
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const content = (quoteHtml || "") + "<p>" + esc.replace(/\n/g, "<br>") + "</p>";
+  const content = (quoteHtml || "") + formatMessage(String(text)).html;
   const ref = msgRefs.get(String(messageId));
   if (ref && !isChannelId(conversationId)) {
     const c = await chat.sendMessage({

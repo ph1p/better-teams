@@ -8,6 +8,8 @@ import { Avatar } from "../shared/Avatar";
 import { isAppMri } from "../../apps";
 import { Linkified } from "../shared/Linkified";
 import { avatarUri, fmtClock, htmlToText, isHtmlMsg, messageText, oneLine } from "../lib/format";
+import { handleFormatKey } from "../lib/editKeys";
+import { htmlToMarkdown } from "../lib/htmlToMarkdown";
 import { usePresence } from "../lib/presence";
 import { glyphFor, PICKER } from "../lib/reactions";
 import type { Message as Msg } from "../../types";
@@ -55,8 +57,10 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onE
   // holds just the reply body; the quote shows as a removable chip.
   const { quoteHtml: origQuote, body: bodyHtml } = splitQuote(m.content);
   const bodyText = htmlToText(bodyHtml);
+  // The editor works in the composer's markdown-lite so formatting survives.
+  const bodyMd = html ? htmlToMarkdown(bodyHtml) : bodyText;
   const startEdit = (): void => {
-    setDraft(bodyText);
+    setDraft(bodyMd);
     setEditQuote(origQuote || null);
     setEditing(true);
   };
@@ -65,7 +69,7 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onE
     setEditing(false);
     const keptQuote = editQuote || "";
     // Save if the body changed, or the quote was removed.
-    if ((v && v !== bodyText) || keptQuote !== (origQuote || "")) {
+    if ((v && v !== bodyMd) || keptQuote !== (origQuote || "")) {
       if (v) onEdit(cid, m.id, v, keptQuote);
     }
   };
@@ -118,7 +122,8 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onE
               autoFocus
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveEdit(); }
+                if (handleFormatKey(e)) return;
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); saveEdit(); }
                 if (e.key === "Escape") setEditing(false);
               }}
             />

@@ -24,12 +24,12 @@ export function decodeEntities(s: string): string {
 
 type Attrs = Record<string, string>;
 // Parsed node: either a text string or an element with children.
-interface ElNode {
+export interface ElNode {
   tag: string;
   attrs: Attrs;
   children: Node[];
 }
-type Node = string | ElNode;
+export type Node = string | ElNode;
 
 // Which React tag + className we render an HTML tag as.
 // null tag = render children only (drop the wrapper).
@@ -78,7 +78,7 @@ function parseAttrs(s: string): Attrs {
 const tokenRe = /<\/?([a-z][a-z0-9]*)((?:[^>"']|"[^"]*"|'[^']*')*?)\/?>/gi;
 
 // Parse an HTML fragment into a tree of {tag, attrs, children} / strings.
-function parse(html: string): ElNode {
+export function parse(html: string): ElNode {
   const root: ElNode = { tag: "#root", attrs: {}, children: [] };
   const stack: ElNode[] = [root];
   let last = 0;
@@ -162,7 +162,7 @@ function prune(node: Node): Node | null {
 }
 
 // Flatten a parsed node to its raw text (code blocks need the source string).
-function textOf(node: Node): string {
+export function textOf(node: Node): string {
   if (typeof node === "string") return node;
   if (node.tag === "br") return "\n";
   return node.children.map(textOf).join("");

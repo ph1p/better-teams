@@ -2,7 +2,7 @@
 // of Teams' IndexedDB and chatsvc. parity.ts keeps the signatures in sync.
 import type { Chat, Message, Profile, Quote, WriteResult } from "../types";
 import type { MentionPick } from "../mentions";
-import { buildMentionContent } from "../mentions";
+import { formatMessage } from "../markdown";
 import { buildQuoteHtml } from "../quote";
 import { ME, ME_OID, PEOPLE } from "./fixtures";
 import * as store from "./store";
@@ -66,7 +66,7 @@ export async function sendRemote(
 ): Promise<WriteResult> {
   const body = (text || "").trim();
   if (!body) return fail("empty");
-  const html = buildQuoteHtml(quote) + "<p>" + buildMentionContent(body, mentions).html.replace(/\n/g, "<br>") + "</p>";
+  const html = buildQuoteHtml(quote) + formatMessage(body, mentions).html;
   await later(null);
   return store.post(conversationId, ME, html, rootId) ? ok : fail("unknown chat");
 }
@@ -114,8 +114,7 @@ export async function editMessage(
   text: string,
   quoteHtml = "",
 ): Promise<WriteResult> {
-  const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return store.edit(conversationId, messageId, quoteHtml + "<p>" + esc.replace(/\n/g, "<br>") + "</p>")
+  return store.edit(conversationId, messageId, quoteHtml + formatMessage(text).html)
     ? ok : fail("not yours");
 }
 

@@ -2,6 +2,8 @@ import type { JSX, RefObject } from "react";
 import { ChevronsUpDown, ExternalLink, MessageSquareReply, RotateCw, Video } from "lucide-react";
 import { Message } from "./Message";
 import { Avatar } from "../shared/Avatar";
+import { RichHtml } from "../../richText";
+import { formatMessage } from "../../markdown";
 import { fmtClock, fmtDay, messageText } from "../lib/format";
 import { GROUP_GAP_MS, LIVE_CALL_MS, THREAD_TAIL } from "../lib/constants";
 import type { Pending } from "../hooks/useMessages";
@@ -57,7 +59,7 @@ const renderPending = (p: Pending): JSX.Element => (
         <span className="who">You</span>
         <span className="when">sending…</span>
       </div>
-      <div className="tc-msg-content">{p.text}</div>
+      <div className="tc-msg-content rich"><RichHtml html={formatMessage(p.text, [], () => "pending-" + p.key).html} /></div>
     </div>
   </div>
 );
