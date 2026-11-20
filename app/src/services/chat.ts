@@ -8,7 +8,7 @@
 //              actionId `consumptionhorizon_<clientMessageId>`
 // Chats only: channel posts carry reply-chain state this module does not model.
 
-import { cdl, cdlSubscribe, type CdlRes } from "./cdl";
+import { cdl, cdlSubscribe, check, type CdlRes } from "./cdl";
 import * as D from "./chatDocs";
 
 /** One @mention, as Teams' MentionInput. `itemId` matches the span's itemid. */
@@ -35,16 +35,6 @@ export function newClientMessageId(): string {
   let s = String(1 + Math.floor(Math.random() * 9));
   while (s.length < 19) s += Math.floor(Math.random() * 10);
   return s;
-}
-
-function check<T>(r: CdlRes<Record<string, unknown>>, field: string, bad?: RegExp): CdlRes<T> {
-  if (!r.ok) return r;
-  const v = r.data[field] as { __typename?: string; errorCode?: string; errorMessage?: string } | null | undefined;
-  if (!v) return { ok: false, reason: `no ${field}` };
-  if (bad && v.__typename && bad.test(v.__typename)) {
-    return { ok: false, reason: `${v.__typename}${v.errorCode ? ": " + v.errorCode : ""}${v.errorMessage ? " " + v.errorMessage : ""}` };
-  }
-  return { ok: true, data: v as T };
 }
 
 export interface SendInput {

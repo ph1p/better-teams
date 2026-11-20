@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { onTeamsChange } from "./live";
 import { myMri } from "../../teamsData";
 import { watchPresence, type PresenceEvent } from "../../services/presence";
+import { t } from "../../i18n";
 
 export type Status =
   | "Available"
@@ -301,13 +302,5 @@ export const STATUS_COLOR: Record<Status, string> = {
   Unknown: "transparent",
 };
 
-// Human-readable status names (sidebar footer, chat header).
-export const STATUS_LABEL: Record<Status, string> = {
-  Available: "Available",
-  Busy: "Busy",
-  DoNotDisturb: "Do not disturb",
-  BeRightBack: "Be right back",
-  Away: "Away",
-  Offline: "Offline",
-  Unknown: "Status unknown",
-};
+// Human-readable status name (sidebar footer, chat header), in the UI language.
+export const statusLabel = (s: Status): string => t().common.status[s];

@@ -4,7 +4,8 @@
 // posts to its web worker; the worker authenticates and calls the backend, so
 // no token is needed and it works in prod (docs/cdl-api.md). Used for presence
 // (set and watch), status note, the chat message list, chat writes (send, edit, delete,
-// react, read/unread, hide) and the typing indicator (send and subscribe).
+// react, read/unread, hide), group chat management
+// (rename, members, leave, mute, channel notifications) and the typing indicator (send and subscribe).
 //
 // Legacy transport: http.call(). it attaches the bearer Teams itself uses
 // for that backend (passively captured, auth.ts) and refuses any host outside
@@ -21,6 +22,7 @@
 export { cdl, cdlReady, cdlSubscribe, installCdl, whenCdl, type CdlRes } from "./cdl";
 export * as chat from "./chat";
 export * as chatsvc from "./chatsvc";
+export * as groups from "./groups";
 export * as presence from "./presence";
 export * as substrate from "./substrate";
 export * as typing from "./typing";

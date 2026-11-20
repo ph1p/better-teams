@@ -1,10 +1,14 @@
 import { profile } from "../../teamsData";
 import type { Chat } from "../../types";
+import type { Messages } from "../../i18n";
 
-// One sidebar group as built by buildSections; rendered by <Section>.
+/** A headed section; its title comes from t().sidebar.sections at render time. */
+export type SectionId = keyof Messages["sidebar"]["sections"];
+
+// One sidebar group as built by buildSections; rendered by <Section>. Search
+// results and the Unread inbox have no header.
 export interface SideSection {
-  id: string;
-  title: string;
+  id: SectionId | "search" | "unread";
   rows: Chat[];
   capped?: boolean;
   groupByTeam?: boolean;
@@ -23,14 +27,14 @@ export function buildSections(chats: Chat[], query: string, unreadOnly: boolean,
     const byTitle = chats.filter((c) => c.title.toLowerCase().includes(q));
     const byOther = chats.filter((c) => !c.title.toLowerCase().includes(q) && hay(c).includes(q));
     const list = [...byTitle, ...byOther];
-    return list.length ? [{ id: "search", title: "", rows: list, capped: false }] : [];
+    return list.length ? [{ id: "search", rows: list, capped: false }] : [];
   }
   // Hidden chats leave the list, as in Teams; search still finds them.
   const list = chats.filter((c) => !c.hidden && (!unreadOnly || c.unread || keep.has(c.id)));
   if (unreadOnly) {
     // Unread filter: one flat inbox, newest first; headers would only repeat
     // the filter's own count.
-    return list.length ? [{ id: "unread", title: "", rows: list, capped: false }] : [];
+    return list.length ? [{ id: "unread", rows: list, capped: false }] : [];
   }
   // The self-chat (Notes) lives in its own slot at the bottom of the sidebar,
   // never in a section.
@@ -43,11 +47,11 @@ export function buildSections(chats: Chat[], query: string, unreadOnly: boolean,
   channels.forEach((c, i) => { if (!teamRank.has(c.team)) teamRank.set(c.team, i); });
   channels.sort((a, b) => teamRank.get(a.team)! - teamRank.get(b.team)!);
   return ([
-    { id: "fav", title: "Favorites", rows: list.filter(pinned) },
-    { id: "dms", title: "Direct messages", rows: rest.filter((c) => c.kind === "chat" && !c.app && c.members.length <= 1) },
-    { id: "groups", title: "Groups", rows: rest.filter((c) => c.kind === "chat" && c.members.length > 1) },
-    { id: "channels", title: "Channels", rows: channels, groupByTeam: true },
-    { id: "apps", title: "Apps", rows: rest.filter((c) => c.app) },
-    { id: "meetings", title: "Meetings", rows: rest.filter((c) => c.kind === "meeting"), defaultCollapsed: true },
+    { id: "fav", rows: list.filter(pinned) },
+    { id: "dms", rows: rest.filter((c) => c.kind === "chat" && !c.app && !c.group) },
+    { id: "groups", rows: rest.filter((c) => c.kind === "chat" && c.group) },
+    { id: "channels", rows: channels, groupByTeam: true },
+    { id: "apps", rows: rest.filter((c) => c.app) },
+    { id: "meetings", rows: rest.filter((c) => c.kind === "meeting"), defaultCollapsed: true },
   ] as SideSection[]).filter((s) => s.rows.length);
 }

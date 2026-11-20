@@ -20,8 +20,13 @@ import { useMessages } from "./hooks/useMessages";
 import { useComposerState } from "./hooks/useComposerState";
 import { useChatActions } from "./hooks/useChatActions";
 import { useShortcuts } from "./hooks/useShortcuts";
+import { useFollowNative } from "./hooks/useFollowNative";
+import { t, useLang } from "../i18n";
 
 export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
+  // Re-render everything on a language switch; tag the overlay for screen readers.
+  const uiLang = useLang();
+  useEffect(() => { document.getElementById("tc-root")?.setAttribute("lang", uiLang); }, [uiLang]);
   const [toast, flash] = useToast();
   const { chats, setChats, chatsRef, error, sel, setSel } = useChatList();
   const [query, setQuery] = useState("");
@@ -84,7 +89,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
       markRead(id, hit.time).then((res) => {
         if (res.ok) return;
         setChats((cs) => cs.map((c) => (c.id === id ? { ...c, unread: true } : c)));
-        flash("Couldn't mark as read (" + res.reason + ")");
+        flash(t().app.markReadFailed(res.reason));
       });
     }
     requestAnimationFrame(() => {
@@ -113,6 +118,14 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   useShortcuts({
     flat, sel, pick, searchRef: search, msgSearchOpen,
     openMsgSearch: () => setMsgSearchOpen(true), closeMsgSearch, toggleNotes, unreadOnly, setUnreadFilter,
+  });
+
+  // A chat Teams opens by itself (a notification click) opens here too, ready
+  // for a reply.
+  useFollowNative(sel, chats, chatsRef, (id) => {
+    pick(id);
+    setProfileMri(null);
+    requestAnimationFrame(() => cs.composer.current?.focus());
   });
 
   const a = useChatActions({ sel, chatsRef, setChats, pick, flash });
@@ -211,6 +224,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
         {selChat ? (
           <>
             <ChatHeader
+              key={selChat.id}
               chat={selChat}
               searchOpen={msgSearchOpen} onToggleSearch={() => setMsgSearchOpen((o) => !o)}
               notesOpen={notesOpen} onToggleNotes={toggleNotes}
@@ -218,6 +232,13 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
               onJoinCall={(rootId) => void a.joinCall(rootId)}
               onMeetNow={() => void a.meetNow()}
               onCall={(mris, kind, chat) => void a.startCall(mris, kind, chat)}
+              flash={flash}
+              knownPeople={a.knownPeople}
+              onRename={a.rename}
+              onSetMuted={a.setMuted}
+              onAddMembers={a.addMembers}
+              onRemoveMember={a.removeMember}
+              onLeave={a.leave}
             />
             {msgSearchOpen ? (
               <MessageSearchBar query={msgSearch} onQuery={setMsgSearch} matches={visible.length} onClose={closeMsgSearch} />
@@ -226,7 +247,11 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
               {m.stickyDay && !mq ? (
                 <div className="tc-day-sticky"><span>{m.stickyDay}</span></div>
               ) : null}
-              <div className="tc-msgs" ref={m.scroller} onScroll={m.onScroll}>
+              <div
+                className="tc-msgs" ref={m.scroller} onScroll={m.onScroll}
+                // At scrollTop 0 the wheel fires no scroll event: retry paging on it.
+                onWheel={(e) => { if (e.deltaY < 0 && e.currentTarget.scrollTop < 60) void m.loadOlder(); }}
+              >
                 <Timeline
                   visible={visible} cid={selChat.id} chat={selChat} channel={selIsChannel}
                   pending={m.myPending} mq={mq} searchText={msgSearch}
@@ -234,7 +259,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                   replyingTo={cs.threadTo?.rootId} msgRoot={msgRoot}
                   loading={m.loading} ready={m.ready} failed={m.failed} empty={!m.shown.length}
                   onRetry={m.refetch} onOpenInTeams={() => void openInTeams()}
-                  onReact={m.react} onDelete={m.remove} onUndo={m.undo} onEdit={m.edit}
+                  onReact={m.react} onDelete={m.remove} onRemoveFile={m.removeFile} onUndo={m.undo} onEdit={m.edit}
                   onOpenProfile={openProfile} onQuote={cs.onQuote} onJumpTo={onJumpTo}
                   onThreadReply={cs.onThreadReply} onJoinCall={(rootId) => void a.joinCall(rootId)}
                 />
@@ -245,7 +270,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
         ) : (
           <>
             <div className="tc-drag tc-main-drag" />
-            <div className="tc-empty">{error ? "No Teams data here." : "Select a chat"}</div>
+            <div className="tc-empty">{error ? t().app.noTeamsData : t().app.selectChat}</div>
           </>
         )}
       </main>
@@ -284,6 +309,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
           onClose={() => setMenu(null)}
           onSetUnread={(chat, unread) => void a.setChatUnread(chat, unread)}
           onSetHidden={(chat, hidden) => void a.setHidden(chat, hidden)}
+          onSetMuted={a.setMuted}
         />
       ) : null}
 

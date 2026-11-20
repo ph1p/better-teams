@@ -1,11 +1,12 @@
 // Mock of src/teamsData.ts: same exports, backed by the in-memory store instead
 // of Teams' IndexedDB and chatsvc. parity.ts keeps the signatures in sync.
-import type { Chat, Message, Profile, Quote, WriteResult } from "../types";
+import type { Chat, FileRef, Message, Profile, Quote, WriteResult } from "../types";
 import type { MentionPick } from "../mentions";
 import { formatMessage } from "../markdown";
 import { buildQuoteHtml } from "../quote";
 import { ME, ME_OID, PEOPLE } from "./fixtures";
 import * as store from "./store";
+import type { ChannelNotifications, ChannelPreset } from "../services/groups";
 
 export interface PeopleHit {
   mri: string;
@@ -48,7 +49,7 @@ export async function listMessages(
   return store.recent(conversationId);
 }
 
-export async function fetchOlderRemote(conversationId: string, _channel = false): Promise<Message[] | null> {
+export async function fetchOlderRemote(conversationId: string, _channel = false, _before?: string): Promise<Message[] | null> {
   return later(store.older(conversationId), 300);
 }
 
@@ -108,6 +109,10 @@ export async function deleteMessage(conversationId: string, messageId: string): 
   return store.setDeleted(conversationId, messageId, true) ? ok : fail("not yours");
 }
 
+export async function removeFiles(conversationId: string, messageId: string, keep: FileRef[]): Promise<WriteResult> {
+  return store.setFiles(conversationId, messageId, keep) ? ok : fail("not yours");
+}
+
 export async function editMessage(
   conversationId: string,
   messageId: string,
@@ -120,4 +125,40 @@ export async function editMessage(
 
 export async function undoDelete(conversationId: string, messageId: string): Promise<WriteResult> {
   return store.setDeleted(conversationId, messageId, false) ? ok : fail("not yours");
+}
+
+// Group chat management and notifications (src/data/groups.ts).
+export type { ChannelNotifications, ChannelPreset };
+
+export async function renameChat(conversationId: string, title: string): Promise<WriteResult> {
+  const t = title.trim();
+  if (!t) return fail("empty name");
+  return later(store.setTopic(conversationId, t) ? ok : fail("not a group chat"));
+}
+
+export async function addChatMembers(conversationId: string, mris: string[], _shareHistoryDays = 0): Promise<WriteResult> {
+  return later(store.setMembers(conversationId, mris, []) ? ok : fail("not a group chat"));
+}
+
+export async function removeChatMember(conversationId: string, mri: string): Promise<WriteResult> {
+  return later(store.setMembers(conversationId, [], [mri]) ? ok : fail("not a group chat"));
+}
+
+export async function leaveChat(conversationId: string): Promise<WriteResult> {
+  return later(store.setMembers(conversationId, [], [ME]) ? ok : fail("not a group chat"));
+}
+
+export async function setChatMuted(conversationId: string, muted: boolean): Promise<WriteResult> {
+  return later(store.setMuted(conversationId, muted) ? ok : fail("unknown chat"));
+}
+
+export async function getChannelNotifications(channelId: string): Promise<ChannelNotifications | null> {
+  const preset = store.channelPreset(channelId);
+  return later(preset ? { preset, tagMentions: true, channelTeamMentions: true, customized: false } : null);
+}
+
+export async function setChannelNotifications(
+  channelId: string, preset: ChannelPreset, _current?: ChannelNotifications | null,
+): Promise<WriteResult> {
+  return later(store.channelPreset(channelId, preset) ? ok : fail("not a channel"));
 }

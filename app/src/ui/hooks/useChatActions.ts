@@ -1,11 +1,15 @@
 import { useCallback, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
-import { markRead, markUnread, myMri, profile, sendRemote, setChatHidden, type PeopleHit } from "../../teamsData";
+import {
+  addChatMembers, leaveChat, markRead, markUnread, myMri, profile, removeChatMember, renameChat, sendRemote, setChatHidden,
+  setChatMuted, type PeopleHit,
+} from "../../teamsData";
 import {
   joinNativeMeeting, openNativeNewChat, sendMessage, sendNativeDraft, startNativeCall, startNativeChannelMeeting, type PickPerson,
 } from "../../send";
 import type { NewChatOutcome } from "../sidebar/NewChat";
 import type { Flash } from "../lib/toast";
-import type { Chat } from "../../types";
+import type { Chat, WriteResult } from "../../types";
+import { t } from "../../i18n";
 
 // New chat dialog: null = closed. `draft` = Teams already shows an empty new
 // chat with exactly `people` (so the dialog asks for the first message).
@@ -67,7 +71,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   const sendInto = useCallback(async (id: string, title: string, text: string): Promise<boolean> => {
     let r = await sendRemote(id, text, null, []);
     if (!r.ok && r.reason === "no-token") r = await sendMessage(id, title, text);
-    if (!r.ok) flash("Opened the chat, but the message wasn't sent (" + r.reason + ")", 5000);
+    if (!r.ok) flash(t().app.sentFailedAfterOpen(r.reason), 5000);
     return r.ok;
   }, [flash]);
 
@@ -79,13 +83,13 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   const startNewChat = useCallback(async (people: PeopleHit[], text: string): Promise<NewChatOutcome> => {
     const ppl = people.map(toPick);
     const missing = people.find((_, i) => !ppl[i].upn && !ppl[i].oid);
-    if (missing) return { kind: "error", message: "No email on file for " + (missing.displayName || "this person") + "." };
+    if (missing) return { kind: "error", message: t().app.noEmail(missing.displayName || t().app.thisPerson) };
     const opened = async (id: string): Promise<NewChatOutcome> => {
       setNewChat(null);
       const known = chatsRef.current.find((c) => c.id === id);
       if (known) pick(id);
       if (text) await sendInto(id, known?.title || "", text);
-      if (!known && !(await pickWhenListed(id))) flash("Chat opened in Teams. It shows up here shortly.", 4000);
+      if (!known && !(await pickWhenListed(id))) flash(t().app.chatOpenedSoon, 4000);
       return { kind: "done" };
     };
     // A chat we list whose members aren't exactly these people (e.g. the 1:1
@@ -107,17 +111,17 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
       let r = await sendNativeDraft(ppl, text);
       if (!r.ok && r.reason === "draft-changed") {
         const o = await openNativeNewChat(ppl);
-        if (!o.ok) return { kind: "error", message: "Couldn't open the chat in Teams (" + o.reason + ")" };
+        if (!o.ok) return { kind: "error", message: t().app.openInTeamsFailed(o.reason) };
         if (o.id && !wrongChat(o.id)) return opened(o.id);
         r = await sendNativeDraft(ppl, text);
       }
-      if (!r.ok) return { kind: "error", message: "Not sent (" + r.reason + ")" };
+      if (!r.ok) return { kind: "error", message: t().app.notSent(r.reason) };
       setNewChat(null);
-      if (!r.id || !(await pickWhenListed(r.id))) flash("Chat created in Teams. It shows up here shortly.", 4000);
+      if (!r.id || !(await pickWhenListed(r.id))) flash(t().app.chatCreatedSoon, 4000);
       return { kind: "done" };
     }
     const o = await openNativeNewChat(ppl);
-    if (!o.ok) return { kind: "error", message: "Couldn't open the chat in Teams (" + o.reason + ")" };
+    if (!o.ok) return { kind: "error", message: t().app.openInTeamsFailed(o.reason) };
     if (o.id && !wrongChat(o.id)) return opened(o.id);
     return { kind: "draft" };
   }, [pick, sendInto, pickWhenListed, flash, chatsRef]);
@@ -140,11 +144,11 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
     const target = chat || (mris.length === 1
       ? chatsRef.current.find((c) => c.kind === "chat" && c.members.length === 1 && c.members[0] === mris[0])
       : undefined);
-    if (!target) { flash("No 1:1 chat with this person yet — start one to call them.", 4000); return; }
+    if (!target) { flash(t().app.noDmToCall, 4000); return; }
     // The overlay stays up: Teams' buttons are clicked underneath it, and the
     // call-window guard (mount.tsx) hides the overlay wherever the call shows.
     const res = await startNativeCall(target.id, target.title, kind);
-    if (!res.ok) flash("Couldn't start the call (" + res.reason + ")", 4000);
+    if (!res.ok) flash(t().app.callFailed(res.reason), 4000);
   }, [flash, chatsRef]);
 
   // Join the selected conversation's running call through Teams' own Join
@@ -153,7 +157,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
     const c = chatsRef.current.find((x) => x.id === sel);
     if (!c) return;
     const res = await joinNativeMeeting(c.id, c.title, rootId);
-    if (!res.ok) flash("Couldn't join the call (" + res.reason + ")", 4000);
+    if (!res.ok) flash(t().app.joinFailed(res.reason), 4000);
   }, [sel, flash, chatsRef]);
 
   // Start a meeting in the selected channel (Teams' "Meet now").
@@ -161,33 +165,67 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
     const c = chatsRef.current.find((x) => x.id === sel);
     if (!c) return;
     const res = await startNativeChannelMeeting(c.id, c.title);
-    if (!res.ok) flash("Couldn't start the meeting (" + res.reason + ")", 4000);
+    if (!res.ok) flash(t().app.meetingFailed(res.reason), 4000);
   }, [sel, flash, chatsRef]);
 
-  // Set a chat's read/unread state (used by the right-click menu). Optimistic;
-  // reverts on failure. Writes the read pointer to Teams (syncs all devices).
-  const setChatUnread = useCallback(async (chat: Chat, wantUnread: boolean): Promise<void> => {
-    const id = chat.id;
-    setChats((cs) => cs.map((c) => (c.id === id ? { ...c, unread: wantUnread } : c)));
-    const res = wantUnread ? await markUnread(id, chat.time) : await markRead(id, chat.time);
-    if (!res.ok) {
-      setChats((cs) => cs.map((c) => (c.id === id ? { ...c, unread: !wantUnread } : c)));
-      flash("Couldn't change read state (" + res.reason + ")");
-    }
+  // Apply a change to our list at once and put the old fields back (with a
+  // flash) when Teams refuses it. Used by every chat action below.
+  const optimistic = useCallback(async (
+    chat: Chat, next: Partial<Chat>, write: () => Promise<WriteResult>, failed: (reason: string) => string,
+  ): Promise<boolean> => {
+    setChats((cs) => cs.map((c) => (c.id === chat.id ? { ...c, ...next } : c)));
+    const res = await write();
+    if (res.ok) return true;
+    const back = Object.fromEntries(Object.keys(next).map((k) => [k, chat[k as keyof Chat]]));
+    setChats((cs) => cs.map((c) => (c.id === chat.id ? { ...c, ...back } : c)));
+    flash(failed(res.reason), 4000);
+    return false;
   }, [flash, setChats]);
 
-  // Hide or unhide a chat (right-click menu). Optimistic; reverts on failure.
+  // Set a chat's read/unread state (used by the right-click menu). Writes the
+  // read pointer to Teams (syncs all devices).
+  const setChatUnread = useCallback(async (chat: Chat, wantUnread: boolean): Promise<void> => {
+    await optimistic(chat, { unread: wantUnread },
+      () => (wantUnread ? markUnread(chat.id, chat.time) : markRead(chat.id, chat.time)), t().app.readStateFailed);
+  }, [optimistic]);
+
+  // Hide or unhide a chat (right-click menu).
   const setHidden = useCallback(async (chat: Chat, hidden: boolean): Promise<void> => {
-    const id = chat.id;
-    setChats((cs) => cs.map((c) => (c.id === id ? { ...c, hidden } : c)));
-    const res = await setChatHidden(id, hidden);
-    if (!res.ok) {
-      setChats((cs) => cs.map((c) => (c.id === id ? { ...c, hidden: !hidden } : c)));
-      flash("Couldn't " + (hidden ? "hide" : "unhide") + " chat (" + res.reason + ")");
-    } else if (hidden) flash("Chat hidden. Search finds it; a new message brings it back.", 4000);
-  }, [flash, setChats]);
+    if (await optimistic(chat, { hidden }, () => setChatHidden(chat.id, hidden), (r) => t().app.hideFailed(hidden, r)) && hidden) {
+      flash(t().app.chatHidden, 4000);
+    }
+  }, [optimistic, flash]);
+
+  const rename = useCallback((chat: Chat, title: string): Promise<boolean> => {
+    const name = title.trim();
+    if (!name || name === chat.title) return Promise.resolve(true);
+    return optimistic(chat, { title: name }, () => renameChat(chat.id, name), t().app.renameFailed);
+  }, [optimistic]);
+
+  const setMuted = useCallback(async (chat: Chat, muted: boolean): Promise<void> => {
+    if (await optimistic(chat, { muted }, () => setChatMuted(chat.id, muted), (r) => t().app.muteFailed(muted, r))) {
+      flash(muted ? t().app.muted : t().app.unmuted, 3000);
+    }
+  }, [optimistic, flash]);
+
+  const addMembers = useCallback(async (chat: Chat, people: PeopleHit[], shareHistoryDays = 0): Promise<boolean> => {
+    const mris = people.map((p) => p.mri).filter((m) => !chat.members.includes(m));
+    if (!mris.length) return true;
+    return optimistic(chat, { members: [...chat.members, ...mris] }, () => addChatMembers(chat.id, mris, shareHistoryDays), t().app.addFailed);
+  }, [optimistic]);
+
+  const removeMember = useCallback((chat: Chat, mri: string): Promise<boolean> =>
+    optimistic(chat, { members: chat.members.filter((m) => m !== mri) }, () => removeChatMember(chat.id, mri), t().app.removeFailed),
+  [optimistic]);
+
+  const leave = useCallback(async (chat: Chat): Promise<void> => {
+    if (await optimistic(chat, { left: true, hidden: true }, () => leaveChat(chat.id), t().app.leaveFailed)) {
+      flash(t().app.left(chat.title), 4000);
+    }
+  }, [optimistic, flash]);
 
   return {
     newChat, setNewChat, knownPeople, startNewChat, startDirect, startCall, joinCall, meetNow, setChatUnread, setHidden,
+    rename, setMuted, addMembers, removeMember, leave,
   };
 }

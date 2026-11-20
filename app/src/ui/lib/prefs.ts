@@ -5,7 +5,7 @@ import { useCallback, useState } from "react";
 
 const PREFIX = "teams-calm:";
 
-function read<T>(key: string, fallback: T): T {
+export function read<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(PREFIX + key);
     return raw === null ? fallback : (JSON.parse(raw) as T);
@@ -14,7 +14,7 @@ function read<T>(key: string, fallback: T): T {
   }
 }
 
-function write<T>(key: string, value: T): void {
+export function write<T>(key: string, value: T): void {
   try {
     localStorage.setItem(PREFIX + key, JSON.stringify(value));
   } catch {

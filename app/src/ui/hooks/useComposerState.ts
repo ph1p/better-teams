@@ -4,6 +4,7 @@ import { sendFiles, sendMessage } from "../../send";
 import { splitQuote } from "../../quote";
 import { typing } from "../../services";
 import { oneLine } from "../lib/format";
+import { t } from "../../i18n";
 import type { Flash } from "../lib/toast";
 import type { Messages } from "./useMessages";
 import type { Chat, Message as Msg, Quote } from "../../types";
@@ -31,21 +32,6 @@ export interface ComposerState {
   onThreadReply: (m: Msg) => void;
   send: () => Promise<void>;
 }
-
-// Why a send failed, in words.
-const SEND_ERRORS: Record<string, string> = {
-  "chat-not-open": "Teams has no visible row for this chat. Open it once in Teams (⌥⌘T), then retry.",
-  "wrong-chat": "Teams switched to another chat. Not sent.",
-  "no-composer": "Teams' message box wasn't found. Not sent.",
-  "fetch-failed": "Couldn't reach Teams' backend. Not sent.",
-  "http-401": "Teams' token expired. Open any chat in Teams to refresh, then retry.",
-  "http-403": "Teams' backend refused the send (403). Not sent.",
-  "no-token-thread": "Teams isn't ready to send yet. Retry in a moment.",
-  "native-busy": "Teams' own message box already holds files. Send or remove them in Teams first.",
-  "no-file-input": "Teams' attach menu wasn't found. Not sent.",
-  "upload-timeout": "Teams didn't finish uploading in time. Not sent.",
-  "no-send-button": "Teams' send button wasn't ready. Not sent.",
-};
 
 // Per-chat drafts and @mention picks, the quote / thread-reply target, and the
 // send itself (optimistic, restored on failure).
@@ -93,14 +79,14 @@ export function useComposerState(sel: string | null, selChat: Chat | undefined, 
 
   // Start a quote-reply: remember the target message and focus the composer.
   const onQuote = useCallback((msg: Msg): void => {
-    setQuote({ id: msg.id, from: msg.from || (msg.mine ? "You" : "Unknown"), text: oneLine(splitQuote(msg.content).body).slice(0, 280), time: msg.time, fromMri: msg.fromMri });
+    setQuote({ id: msg.id, from: msg.from || (msg.mine ? t().common.you : t().common.unknown), text: oneLine(splitQuote(msg.content).body).slice(0, 280), time: msg.time, fromMri: msg.fromMri });
     requestAnimationFrame(() => composer.current?.focus());
   }, []);
 
   // Answer in a channel thread: the composer posts into m's thread until sent
   // or cancelled. Replies target their thread's root.
   const onThreadReply = useCallback((msg: Msg): void => {
-    setThreadTo({ rootId: msg.rootId || msg.id, from: msg.from || (msg.mine ? "You" : "Unknown"), text: oneLine(splitQuote(msg.content).body).slice(0, 200) });
+    setThreadTo({ rootId: msg.rootId || msg.id, from: msg.from || (msg.mine ? t().common.you : t().common.unknown), text: oneLine(splitQuote(msg.content).body).slice(0, 200) });
     requestAnimationFrame(() => composer.current?.focus());
   }, []);
 
@@ -113,7 +99,7 @@ export function useComposerState(sel: string | null, selChat: Chat | undefined, 
     const sending = files;
     // Files go through Teams' own composer, which has no quote or thread target.
     if (sending.length && (q || thread)) {
-      flash("Files can't go with a quote or thread reply yet. Cancel it to send.", 5000);
+      flash(t().composer.filesWithQuote, 5000);
       return;
     }
     const picks = mentionPicks[chat.id] || [];
@@ -138,7 +124,9 @@ export function useComposerState(sel: string | null, selChat: Chat | undefined, 
       setMentionPicks((mp) => ({ ...mp, [chat.id]: picks }));
       setStaged((st) => ({ ...st, [chat.id]: [...sending, ...(st[chat.id] || [])] }));
       if (thread) setThreadTo((t) => t || thread);
-      flash(SEND_ERRORS[r.reason] || "Send failed: " + r.reason, 5000);
+      // Why a send failed, in words; unknown reasons show as-is.
+      const known = t().composer.sendErrors;
+      flash(r.reason in known ? known[r.reason as keyof typeof known] : t().composer.sendFailed(r.reason), 5000);
     }
   }
 

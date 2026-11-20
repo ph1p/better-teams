@@ -1,6 +1,6 @@
-// Message writes: send, react, delete, edit, undo. Worker (CDL) first where it
+// Message writes: send, react, delete, edit, undo, remove a file. Worker (CDL) first where it
 // is safe, chatsvc REST as fallback.
-import type { Quote, WriteResult } from "../types";
+import type { FileRef, Quote, WriteResult } from "../types";
 import type { MentionPick } from "../mentions";
 import { formatMessage } from "../markdown";
 import { buildQuoteHtml } from "../quote";
@@ -197,6 +197,19 @@ export async function editMessage(
 //   DELETE .../messages/<id>/properties?name=deletetime   body {"deletetime":null}
 export async function undoDelete(conversationId: string, messageId: string): Promise<WriteResult> {
   const r = await chatsvc.undoSoftDelete(conversationId, messageId);
+  if (!r.ok) return toWrite(r);
+  remoteCache.delete(conversationId);
+  return { ok: true };
+}
+
+/**
+ * Take files off a sent message: rewrite its properties.files with only the
+ * ones to keep. The files stay in the sender's OneDrive, as when Teams itself
+ * removes an attachment.
+ */
+export async function removeFiles(conversationId: string, messageId: string, keep: FileRef[]): Promise<WriteResult> {
+  if (keep.some((f) => f.raw === undefined)) return { ok: false, reason: "file data missing" };
+  const r = await chatsvc.putMessageProperty(conversationId, messageId, "files", JSON.stringify(keep.map((f) => f.raw)));
   if (!r.ok) return toWrite(r);
   remoteCache.delete(conversationId);
   return { ok: true };

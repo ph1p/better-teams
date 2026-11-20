@@ -5,7 +5,7 @@ import { POLL_MS } from "../lib/constants";
 import type { Chat } from "../../types";
 
 // Cheap change signature so polling doesn't re-render (and jump) when idle.
-const chatSig = (list: Chat[]): string => list.map((c) => `${c.id}:${c.time}:${c.unread}:${c.hidden}:${c.title}:${c.liveCall || ""}`).join("|");
+const chatSig = (list: Chat[]): string => list.map((c) => `${c.id}:${c.time}:${c.unread}:${c.hidden}:${c.title}:${c.liveCall || ""}:${c.muted ? 1 : 0}:${c.group ? 1 : 0}:${c.left ? 1 : 0}:${c.members.length}`).join("|");
 
 export interface ChatList {
   chats: Chat[];

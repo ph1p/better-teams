@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type JSX, type KeyboardEvent } from "react";
 import { X } from "lucide-react";
-import { myMri, searchPeople, type PeopleHit } from "../../teamsData";
+import { myMri, type PeopleHit } from "../../teamsData";
 import { Avatar } from "../shared/Avatar";
 import { avatarUri } from "../lib/format";
+import { usePeopleSearch } from "../lib/peopleSearch";
+import { t } from "../../i18n";
 
 /** Outcome of a start attempt, reported back by App. */
 export type NewChatOutcome =
@@ -29,49 +31,29 @@ interface NewChatProps {
 export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewChatProps): JSX.Element {
   const [picked, setPicked] = useState<PeopleHit[]>(initial || []);
   const [q, setQ] = useState("");
-  const [hits, setHits] = useState<PeopleHit[]>([]);
   const [hi, setHi] = useState(0);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [isDraft, setIsDraft] = useState(!!initialDraft);
-  const [note, setNote] = useState(initialDraft ? "New conversation. Write the first message to create it." : "");
+  // What to tell the user under the message box: Teams wants a first message
+  // (draft), or why starting failed (error text from App).
+  const [note, setNote] = useState<{ kind: "draft" } | { kind: "error"; message: string } | null>(
+    initialDraft ? { kind: "draft" } : null,
+  );
+  const [people] = useState(() => known?.() || []);
+  const hits = usePeopleSearch(q, people, 12);
   const input = useRef<HTMLInputElement>(null);
   const msg = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => { (initialDraft ? msg : input).current?.focus(); }, [initialDraft]);
 
-  // People from known chats match instantly; the org directory (substrate,
-  // only once Teams itself has used it and its token was captured) streams in
-  // after a short debounce and is merged behind them. Stale answers dropped.
-  useEffect(() => {
-    const term = q.trim().toLowerCase();
-    if (term.length < 2) { setHits([]); return; }
-    const local = (known?.() || [])
-      .filter((p) => p.displayName.toLowerCase().includes(term) || p.email.toLowerCase().includes(term))
-      .slice(0, 8);
-    setHits(local);
-    setHi(0);
-    let live = true;
-    const h = setTimeout(() => {
-      searchPeople(term, 8)
-        .then((r) => {
-          if (!live || !r.length) return;
-          const seen = new Set(local.map((p) => p.mri));
-          setHits([...local, ...r.filter((p) => !seen.has(p.mri))].slice(0, 12));
-        })
-        .catch(() => { /* keep local hits */ });
-    }, 250);
-    return () => { live = false; clearTimeout(h); };
-  }, [q, known]);
-
   const me = myMri();
   const shown = hits.filter((h) => h.mri !== me && !picked.some((p) => p.mri === h.mri));
 
-  const changed = (): void => { setIsDraft(false); setNote(""); };
+  const changed = (): void => { setIsDraft(false); setNote(null); };
   const add = (p: PeopleHit): void => {
     setPicked((s) => [...s, p]);
     setQ("");
-    setHits([]);
     changed();
     input.current?.focus();
   };
@@ -80,17 +62,17 @@ export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewC
   const submit = async (): Promise<void> => {
     if (!picked.length || busy) return;
     setBusy(true);
-    setNote("");
+    setNote(null);
     const r = await onStart(picked, text.trim());
     setBusy(false);
     if (r.kind === "done") return; // App closes the dialog
     if (r.kind === "draft") {
       setIsDraft(true);
-      setNote("New conversation. Write the first message to create it.");
+      setNote({ kind: "draft" });
       msg.current?.focus();
       return;
     }
-    setNote(r.message);
+    setNote(r);
   };
 
   const onInputKey = (e: KeyboardEvent<HTMLInputElement>): void => {
@@ -104,29 +86,30 @@ export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewC
     else if (e.key === "Escape") { e.preventDefault(); onClose(); }
   };
 
-  const label = busy ? "Opening…" : text.trim() ? "Send" : isDraft ? "Send" : "Open chat";
+  const s = t().sidebar;
+  const label = busy ? s.opening : text.trim() || isDraft ? t().common.send : s.openChat;
 
   return (
     <div className="tc-scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="tc-newchat" role="dialog" aria-label="New chat">
+      <div className="tc-newchat" role="dialog" aria-label={s.newChat}>
         <div className="tc-newchat-head">
-          <span>New chat</span>
-          <button className="tc-profile-close" onClick={onClose} title="Close" aria-label="Close"><X size={16} /></button>
+          <span>{s.newChat}</span>
+          <button className="tc-profile-close" onClick={onClose} title={t().common.close} aria-label={t().common.close}><X size={16} /></button>
         </div>
         <div className="tc-newchat-to" onClick={() => input.current?.focus()}>
-          <span className="tc-newchat-label">To:</span>
+          <span className="tc-newchat-label">{s.to}</span>
           {picked.map((p) => (
             <span key={p.mri} className="tc-chip">
               <Avatar name={p.displayName} uri={avatarUri(p.mri)} small />
               <span className="tc-chip-name">{p.displayName}</span>
-              <button onClick={(e) => { e.stopPropagation(); remove(p.mri); }} title="Remove" aria-label={"Remove " + p.displayName}><X size={12} /></button>
+              <button onClick={(e) => { e.stopPropagation(); remove(p.mri); }} title={t().common.remove} aria-label={t().common.removeNamed(p.displayName)}><X size={12} /></button>
             </span>
           ))}
           <input
             ref={input}
             value={q}
-            placeholder={picked.length ? "Add more people" : "Type a name or email"}
-            onChange={(e) => setQ(e.target.value)}
+            placeholder={picked.length ? s.addMorePeople : s.typeNameOrEmail}
+            onChange={(e) => { setQ(e.target.value); setHi(0); }}
             onKeyDown={onInputKey}
           />
         </div>
@@ -155,16 +138,16 @@ export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewC
           className="tc-newchat-msg"
           rows={3}
           value={text}
-          placeholder={isDraft ? "First message" : "First message (optional)"}
+          placeholder={isDraft ? s.firstMessage : s.firstMessageOptional}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void submit(); }
             else if (e.key === "Escape") { e.preventDefault(); onClose(); }
           }}
         />
-        {note ? <div className="tc-newchat-note">{note}</div> : null}
+        {note ? <div className="tc-newchat-note">{note.kind === "draft" ? s.draftNote : note.message}</div> : null}
         <div className="tc-newchat-foot">
-          <small>{picked.length > 1 ? picked.length + " people · group chat" : " "}</small>
+          <small>{picked.length > 1 ? s.groupOf(picked.length) : " "}</small>
           <button className="tc-newchat-go" disabled={!picked.length || busy || (isDraft && !text.trim())} onClick={() => void submit()}>
             {label}
           </button>

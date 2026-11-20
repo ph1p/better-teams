@@ -83,6 +83,10 @@ async function fetchRemoteMessages(
 // conversationId -> worker cursor for the next older page (null: start of
 // history). Set by the first CDL page, advanced by fetchOlderRemote.
 const cdlCursors = new Map<string, string | null>();
+// conversationId -> the oldest shown id fetchOlderRemote already paged from.
+// A page of only hidden messages leaves the oldest shown id unchanged; paging
+// from it again would refetch that page forever instead of walking on.
+const pagedFrom = new Map<string, string>();
 
 // One CDL page, oldest first. null when the worker failed or holds nothing for
 // the chat (uncached: it answers an empty page), so callers fall back to REST.
@@ -111,27 +115,49 @@ const backwardLinks = new Map<string, string | null>();
 
 // Load the next older page: through Teams' worker when the chat was paged there,
 // else by following the stored chatsvc backwardLink.
-// Returns an array of older messages (may be empty at start of history), or null
-// if there's no link yet or the request fails. Advances the link for the next call.
-export async function fetchOlderRemote(conversationId: string, channel = false): Promise<Message[] | null> {
+// `before` is the oldest message the view shows. The worker's cursor is a
+// message id, so paging starts right there instead of walking down from the
+// newest page through up to 300 locally cached messages, which took more hops
+// than one scroll allowed and left the view stuck at the top in real chats.
+// Returns older messages ([] = nothing yet, retry later), or null at the start
+// of history or when there is no way to page.
+export async function fetchOlderRemote(conversationId: string, channel = false, before?: string): Promise<Message[] | null> {
   // Scrolled up before the chat's priming finished: get a cursor first rather
   // than reporting "no history".
   if (!cdlCursors.has(conversationId) && !backwardLinks.has(conversationId)) await primeRemote(conversationId, channel);
   if (cdlCursors.has(conversationId)) {
-    const cursor = cdlCursors.get(conversationId);
-    if (!cursor) return null;
-    const p = await cdlPage(conversationId, cursor, channel);
-    // Transient failure: keep the cursor, report "nothing yet" so a later
-    // scroll retries instead of marking the history as ended.
-    if (!p) return [];
-    cdlCursors.set(conversationId, p.older);
-    return p.msgs;
+    const stored = cdlCursors.get(conversationId) ?? null;
+    // Page from `before` once per oldest shown id, then walk the stored cursor.
+    let cursor = before && before !== stored && before !== pagedFrom.get(conversationId) ? before : stored;
+    // Pages of only hidden messages (system events, deleted ones) are empty
+    // after filtering while `older` still moves on: walk past them here, so
+    // the caller sees either something to show, [] or the end.
+    for (let hop = 0; hop < 10; hop++) {
+      if (!cursor) return null;
+      const p = await cdlPage(conversationId, cursor, channel);
+      // Transient failure: keep the cursor, report "nothing yet" so a later
+      // scroll retries instead of marking the history as ended.
+      if (!p) return [];
+      if (cursor === before) pagedFrom.set(conversationId, before);
+      if (!p.msgs.length && !p.older) {
+        // An empty raw page for `before`: the worker doesn't know that id.
+        if (cursor === before && stored && stored !== before) { cursor = stored; continue; }
+        cdlCursors.set(conversationId, null);
+        return null;
+      }
+      cdlCursors.set(conversationId, p.older);
+      if (p.msgs.length) return p.msgs;
+      cursor = p.older;
+    }
+    return [];
   }
   const link = backwardLinks.get(conversationId);
   if (!link) return null;
   // backwardLink is an absolute teams.microsoft.com URL; the service layer
   // keeps same-origin links relative and refuses any other host.
-  const r = await chatsvc.getMessagesByLink(link);
+  // The link keeps the first page's size (30); bigger pages get past the
+  // locally cached messages and runs of hidden ones in fewer hops.
+  const r = await chatsvc.getMessagesByLink(link.replace(/([?&]pageSize=)\d+/, "$1100"));
   if (!r.ok) return null;
   const j: unknown = r.data;
   // Advance (or clear) the link. A link that doesn't change, or no messages,

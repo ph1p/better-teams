@@ -1,0 +1,87 @@
+export const app = {
+  // App shell
+  noTeamsData: "No Teams data here.",
+  selectChat: "Select a chat",
+  markReadFailed: (reason: string) => `Couldn't mark as read (${reason})`,
+  // The pill in Teams' title bar; one is picked at random each time it shows.
+  pill: [
+    "Get me out of here",
+    "Too many buttons",
+    "Make it stop",
+    "Where's my chat?",
+    "Fewer pixels, please",
+    "Escape",
+    "I've seen enough",
+    "Back to sanity",
+  ],
+  pillTitle: "Back to the calm view (⌥⌘T)",
+
+  // Chat actions (toasts)
+  sentFailedAfterOpen: (reason: string) => `Opened the chat, but the message wasn't sent (${reason})`,
+  noEmail: (name: string) => `No email on file for ${name}.`,
+  thisPerson: "this person",
+  chatOpenedSoon: "Chat opened in Teams. It shows up here shortly.",
+  chatCreatedSoon: "Chat created in Teams. It shows up here shortly.",
+  openInTeamsFailed: (reason: string) => `Couldn't open the chat in Teams (${reason})`,
+  notSent: (reason: string) => `Not sent (${reason})`,
+  noDmToCall: "No 1:1 chat with this person yet — start one to call them.",
+  callFailed: (reason: string) => `Couldn't start the call (${reason})`,
+  joinFailed: (reason: string) => `Couldn't join the call (${reason})`,
+  meetingFailed: (reason: string) => `Couldn't start the meeting (${reason})`,
+  readStateFailed: (reason: string) => `Couldn't change read state (${reason})`,
+  hideFailed: (hidden: boolean, reason: string) =>
+    hidden ? `Couldn't hide the chat (${reason})` : `Couldn't unhide the chat (${reason})`,
+  chatHidden: "Chat hidden. Search finds it; a new message brings it back.",
+  renameFailed: (reason: string) => `Couldn't rename the chat (${reason})`,
+  muteFailed: (muted: boolean, reason: string) =>
+    muted ? `Couldn't mute the chat (${reason})` : `Couldn't unmute the chat (${reason})`,
+  addFailed: (reason: string) => `Couldn't add people (${reason})`,
+  removeFailed: (reason: string) => `Couldn't remove them (${reason})`,
+  leaveFailed: (reason: string) => `Couldn't leave the chat (${reason})`,
+  muted: "Muted. You won't get notifications for this chat.",
+  unmuted: "Unmuted.",
+  left: (name: string) => `You left ${name}.`,
+
+  // Messages (toasts)
+  reactionFailed: (reason: string) => `Reaction failed (${reason})`,
+  deleteFailed: (reason: string) => `Delete failed (${reason})`,
+  undoFailed: (reason: string) => `Undo failed (${reason})`,
+  removeFileFailed: (reason: string) => `Removing the file failed (${reason})`,
+  editFailed: (reason: string) => `Edit failed (${reason})`,
+
+  // Notes panel
+  closeNotes: "Close notes",
+  closeNotesTitle: "Close (⌥N)",
+  notesPlaceholder: "Jot anything down. Saved on this Mac only.",
+
+  // Profile panel
+  openDm: "Open the direct chat",
+  startDm: "Start a direct chat in Teams",
+  messageDirectly: "Message directly",
+  audioCallTitle: "Audio call in Teams",
+  videoCallTitle: "Video call in Teams",
+  groupChats: "Group chats",
+  channels: "Channels",
+  noShared: "No shared group chats or channels.",
+  viewProfile: (name: string) => `View ${name}`,
+  profile: "profile",
+
+  // File viewer
+  image: "Image",
+  imageLoadFailed: "The image could not be loaded.",
+  fitToWindow: "Fit to window",
+  actualSize: "Actual size",
+  cantPreview: "This file can't be previewed here.",
+  textLoadFailed: "The file's text could not be loaded.",
+  textTruncated: "… (truncated, download for the rest)",
+  emptyFile: "(empty file)",
+  noPreviewType: "No preview for this file type.",
+  noLink: "Teams shared no link for this file. Open it in Teams.",
+  download: "Download",
+  saveImage: "Save image",
+  copyLink: "Copy link",
+  closeEsc: "Close (Esc)",
+  previous: "Previous (←)",
+  next: "Next (→)",
+  nOfM: (n: number, m: number) => `${n} of ${m}`,
+};

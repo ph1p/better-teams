@@ -1,0 +1,72 @@
+export const sidebar = {
+  sections: {
+    fav: "Favorites",
+    dms: "Direct messages",
+    groups: "Groups",
+    channels: "Channels",
+    apps: "Apps",
+    meetings: "Meetings",
+  },
+  otherTeam: "Other",
+  unreadCount: (n: number) => `${n} unread`,
+  showLess: "Show less",
+  showOlder: (n: number) => `Show ${n} older`,
+
+  // Header, search and filter
+  showPreviews: "Show message previews",
+  compactList: "Compact list",
+  newChat: "New chat",
+  search: "Search  ⌘K",
+  unread: "Unread",
+  unreadFilterTitle: "Only unread conversations  ⌥U · next unread ⌥⇧↓",
+  cantRead: "Can't read Teams' local data in this window.",
+  noMatch: (q: string) => `No chats match “${q}”.`,
+  caughtUp: "All caught up",
+  noUnread: "No unread conversations.",
+  showAll: "Show all conversations",
+  noChats: "No conversations yet.",
+
+  // Rows
+  card: "[Card]",
+  liveCall: "Call in progress",
+  unreadDot: "Unread",
+
+  // Right-click menu
+  markRead: "Mark as read",
+  markUnread: "Mark as unread",
+  hide: "Hide",
+  unhide: "Unhide",
+
+  // Status menu (MeBar)
+  statusHeading: "Status",
+  appearAway: "Appear away",
+  appearOffline: "Appear offline",
+  resetStatus: "Reset status",
+  statusMessage: "Status message",
+  clearAfter: "Clear after",
+  expiry: {
+    never: "Never",
+    "1h": "1 hour",
+    "4h": "4 hours",
+    today: "Today",
+    week: "This week",
+  },
+  showWhenMessaged: "Show when people message me",
+  editStatusMessage: "Edit status message",
+  setStatusMessage: "Set status message",
+  switchToTeams: "Switch to Teams",
+  statusAndView: "Status and view",
+  statusError: (reason: string) => `Couldn't change status: ${reason}`,
+  noteError: (reason: string) => `Couldn't set status message: ${reason}`,
+
+  // New chat dialog
+  draftNote: "New conversation. Write the first message to create it.",
+  opening: "Opening…",
+  openChat: "Open chat",
+  to: "To:",
+  addMorePeople: "Add more people",
+  typeNameOrEmail: "Type a name or email",
+  firstMessage: "First message",
+  firstMessageOptional: "First message (optional)",
+  groupOf: (n: number) => `${n} people · group chat`,
+};

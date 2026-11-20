@@ -5,6 +5,7 @@ import { Row } from "./Row";
 import { MeBar } from "./MeBar";
 import type { SideSection } from "./sections";
 import type { Chat } from "../../types";
+import { t } from "../../i18n";
 
 interface SidebarProps {
   sections: SideSection[];
@@ -34,15 +35,16 @@ interface SidebarProps {
 // slot and the "me" bar.
 export function Sidebar(p: SidebarProps): JSX.Element {
   const { sections, selfSlot, sel, error, compact, query, unreadOnly, unreadCount } = p;
+  const s = t().sidebar;
   return (
     <aside className="tc-side">
       <div className="tc-side-head">
         <div className="tc-side-spacer" />
         <button className="tc-side-btn" onClick={p.onToggleCompact}
-          title={compact ? "Show message previews" : "Compact list"} aria-label={compact ? "Show message previews" : "Compact list"}>
+          title={compact ? s.showPreviews : s.compactList} aria-label={compact ? s.showPreviews : s.compactList}>
           {compact ? <Rows2 size={16} /> : <Rows3 size={16} />}
         </button>
-        <button className="tc-side-btn" onClick={p.onNewChat} title="New chat" aria-label="New chat">
+        <button className="tc-side-btn" onClick={p.onNewChat} title={s.newChat} aria-label={s.newChat}>
           <SquarePen size={16} />
         </button>
       </div>
@@ -51,7 +53,7 @@ export function Sidebar(p: SidebarProps): JSX.Element {
           <Search size={15} className="tc-search-icon" />
           <input
             ref={p.searchRef}
-            placeholder="Search  ⌘K"
+            placeholder={s.search}
             value={query}
             onChange={(e) => p.onQuery(e.target.value)}
             onKeyDown={(e) => {
@@ -68,34 +70,35 @@ export function Sidebar(p: SidebarProps): JSX.Element {
           className={"tc-unread-pill" + (unreadOnly ? " on" : "")}
           aria-pressed={unreadOnly}
           onClick={() => p.onUnreadFilter(!unreadOnly)}
-          title="Only unread conversations  ⌥U · next unread ⌥⇧↓"
+          title={s.unreadFilterTitle}
         >
-          Unread{unreadCount ? <span className="tc-unread-n">{unreadCount}</span> : null}
+          {s.unread}{unreadCount ? <span className="tc-unread-n">{unreadCount}</span> : null}
         </button>
       </div>
       <div className="tc-list">
         {error ? (
           <div className="tc-note">
-            Can't read Teams' local data in this window.
+            {s.cantRead}
             <br />
             <small>{error}</small>
           </div>
         ) : null}
-        {sections.map((s) => (
-          <Section key={s.id} id={s.id} title={s.title} rows={s.rows} sel={sel} compact={compact}
-            capped={s.capped} groupByTeam={s.groupByTeam} defaultCollapsed={s.defaultCollapsed}
+        {sections.map((sec) => (
+          <Section key={sec.id} id={sec.id} title={sec.id === "search" || sec.id === "unread" ? "" : s.sections[sec.id]}
+            rows={sec.rows} sel={sel} compact={compact}
+            capped={sec.capped} groupByTeam={sec.groupByTeam} defaultCollapsed={sec.defaultCollapsed}
             onPick={p.onPick} onOpenProfile={p.onOpenProfile} onMenu={p.onMenu} />
         ))}
         {!error && !sections.length ? (
           <div className="tc-list-empty">
-            {query ? <>No chats match “{query}”.</> : unreadOnly ? (
+            {query ? s.noMatch(query) : unreadOnly ? (
               <div className="tc-caught-up">
                 <CheckCheck size={28} className="tc-caught-up-icon" />
-                <strong>All caught up</strong>
-                <span>No unread conversations.</span>
-                <button className="tc-more" onClick={() => p.onUnreadFilter(false)}>Show all conversations</button>
+                <strong>{s.caughtUp}</strong>
+                <span>{s.noUnread}</span>
+                <button className="tc-more" onClick={() => p.onUnreadFilter(false)}>{s.showAll}</button>
               </div>
-            ) : "No conversations yet."}
+            ) : s.noChats}
           </div>
         ) : null}
       </div>

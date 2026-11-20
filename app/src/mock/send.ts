@@ -73,3 +73,7 @@ export async function sendFiles(conversationId: string, _title: string, text: st
   await later(null, 600);
   return store.post(conversationId, ME, html, undefined, refs) ? { ok: true, via: "mock" } : { ok: false, reason: "unknown chat" };
 }
+
+// No native Teams client to follow in the browser.
+export function nativeThreadId(): string { return ""; }
+export function nativeDriven(): boolean { return false; }

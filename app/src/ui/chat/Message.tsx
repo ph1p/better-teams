@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type JSX } from "react";
+import { t } from "../../i18n";
 import {
   SmilePlus, Pencil, Trash2, Undo2, X, Reply, Copy, Check, MessageSquareReply,
 } from "lucide-react";
@@ -8,7 +9,7 @@ import { Avatar } from "../shared/Avatar";
 import { Attachments } from "./Attachments";
 import { isAppMri } from "../../apps";
 import { Linkified } from "../shared/Linkified";
-import { avatarUri, fmtClock, htmlToText, isHtmlMsg, messageText, oneLine } from "../lib/format";
+import { avatarUri, fmtClock, fmtFull, htmlToText, isHtmlMsg, messageText, oneLine } from "../lib/format";
 import { handleFormatKey } from "../lib/editKeys";
 import { htmlToMarkdown } from "../lib/htmlToMarkdown";
 import { usePresence } from "../lib/presence";
@@ -24,6 +25,7 @@ interface MessageProps {
   cid: string;
   onReact: (cid: string, messageId: string, key: string, add: boolean) => void;
   onDelete: (cid: string, messageId: string) => void;
+  onRemoveFile: (cid: string, messageId: string, index: number) => void;
   onUndo: (cid: string, messageId: string) => void;
   onEdit: (cid: string, messageId: string, text: string, quoteHtml: string) => void;
   onOpenProfile: (mri: string) => void;
@@ -36,7 +38,7 @@ interface MessageProps {
 // One rendered message: avatar + meta on the first of a group, content (rich
 // HTML or linkified text), files, reactions, and a hover toolbar (react / quote
 // / edit / delete). Edit swaps the content for a textarea with a quote chip.
-export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onEdit, onOpenProfile, onQuote, onJumpTo, onThreadReply }: MessageProps): JSX.Element {
+export function Message({ m, first, channel, cid, onReact, onDelete, onRemoveFile, onUndo, onEdit, onOpenProfile, onQuote, onJumpTo, onThreadReply }: MessageProps): JSX.Element {
   const { statusOf } = usePresence();
   const [pick, setPick] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -88,19 +90,19 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onE
       <div className="tc-msg-body">
         {first && (
           <div className="tc-msg-meta">
-            <span className="who">{m.from || (m.mine ? "You" : "Unknown")}</span>
-            {isAppMri(m.fromMri) ? <span className="tc-app-badge">App</span> : null}
-            <span className="when" title={new Date(m.time).toLocaleString()}>{fmtClock(m.time)}</span>
+            <span className="who">{m.from || (m.mine ? t().common.you : t().common.unknown)}</span>
+            {isAppMri(m.fromMri) ? <span className="tc-app-badge">{t().common.app}</span> : null}
+            <span className="when" title={fmtFull(m.time)}>{fmtClock(m.time)}</span>
             {m.importance === "high" || m.importance === "urgent" ? (
-              <span className="tc-imp">{m.importance}</span>
+              <span className="tc-imp">{t().chat.importance[m.importance]}</span>
             ) : null}
           </div>
         )}
         {m.subject && !m.isReply ? <div className="tc-subject">{htmlToText(m.subject)}</div> : null}
         {m.deleted ? (
           <div className="tc-deleted">
-            Message deleted
-            {m.mine ? <button className="tc-undo" onClick={() => onUndo(cid, m.id)}><Undo2 size={13} /> Undo</button> : null}
+            {t().chat.deleted}
+            {m.mine ? <button className="tc-undo" onClick={() => onUndo(cid, m.id)}><Undo2 size={13} /> {t().chat.undo}</button> : null}
           </div>
         ) : editing ? (
           <div className="tc-edit">
@@ -110,7 +112,7 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onE
                 <div className="tc-quote-chip-body">
                   <span className="tc-quote-chip-text">{oneLine(editQuote)}</span>
                 </div>
-                <button className="tc-quote-chip-x" onClick={() => setEditQuote("")} title="Remove quote" aria-label="Remove quote"><X size={13} /></button>
+                <button className="tc-quote-chip-x" onClick={() => setEditQuote("")} title={t().chat.removeQuote} aria-label={t().chat.removeQuote}><X size={13} /></button>
               </div>
             ) : null}
             <textarea
@@ -125,8 +127,8 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onE
               }}
             />
             <div className="tc-edit-actions">
-              <button className="tc-edit-save" onClick={saveEdit}>Save</button>
-              <button className="tc-edit-cancel" onClick={() => setEditing(false)}>Cancel</button>
+              <button className="tc-edit-save" onClick={saveEdit}>{t().common.save}</button>
+              <button className="tc-edit-cancel" onClick={() => setEditing(false)}>{t().common.cancel}</button>
             </div>
           </div>
         ) : (
@@ -145,17 +147,17 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onE
             }}
           >
             {html ? <RichHtml html={m.content} /> : <Linkified text={text} />}
-            {m.edited ? <span className="tc-edited"> (edited)</span> : null}
+            {m.edited ? <span className="tc-edited">{t().chat.edited}</span> : null}
           </div>
         )}
-        <Attachments files={m.files} />
+        {m.files.length ? <Attachments files={m.files} onRemove={m.mine && !m.deleted ? (i) => onRemoveFile(cid, m.id, i) : undefined} /> : null}
         {!m.deleted && m.reactions.length ? (
           <div className="tc-reacts">
             {m.reactions.map((r) => (
               <button
                 key={r.key}
                 className={"tc-react" + (r.mine ? " mine" : "")}
-                title={r.mine ? "Remove your " + r.key : "React " + r.key}
+                title={r.mine ? t().chat.removeReaction(r.key) : t().chat.react(r.key)}
                 onClick={() => onReact(cid, m.id, r.key, !r.mine)}
               >
                 {glyphFor(r)} {r.count}
@@ -167,14 +169,14 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onE
       {!m.deleted && !editing ? (
         <div className="tc-tools">
           <div className="tc-tool-row">
-            <button className="tc-tool" title="Add reaction" onClick={() => setPick((p) => !p)}><SmilePlus size={16} /></button>
-            <button className="tc-tool" title={copied ? "Copied" : "Copy text"} onClick={copyText}>{copied ? <Check size={15} /> : <Copy size={15} />}</button>
+            <button className="tc-tool" title={t().chat.addReaction} onClick={() => setPick((p) => !p)}><SmilePlus size={16} /></button>
+            <button className="tc-tool" title={copied ? t().chat.copied : t().chat.copyText} onClick={copyText}>{copied ? <Check size={15} /> : <Copy size={15} />}</button>
             {channel && onThreadReply ? (
-              <button className="tc-tool" title="Reply in thread" onClick={() => onThreadReply(m)}><MessageSquareReply size={16} /></button>
+              <button className="tc-tool" title={t().chat.replyInThread} onClick={() => onThreadReply(m)}><MessageSquareReply size={16} /></button>
             ) : null}
-            <button className="tc-tool" title="Reply with quote" onClick={() => onQuote(m)}><Reply size={16} /></button>
-            {m.mine ? <button className="tc-tool" title="Edit" onClick={startEdit}><Pencil size={15} /></button> : null}
-            {m.mine ? <button className="tc-tool" title="Delete" onClick={() => onDelete(cid, m.id)}><Trash2 size={15} /></button> : null}
+            <button className="tc-tool" title={t().chat.replyQuote} onClick={() => onQuote(m)}><Reply size={16} /></button>
+            {m.mine ? <button className="tc-tool" title={t().chat.edit} onClick={startEdit}><Pencil size={15} /></button> : null}
+            {m.mine ? <button className="tc-tool" title={t().chat.delete} onClick={() => onDelete(cid, m.id)}><Trash2 size={15} /></button> : null}
           </div>
           {pick ? (
             <div className="tc-react-pop">

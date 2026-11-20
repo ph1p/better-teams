@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import type { JSX, RefObject } from "react";
 import { ChevronsUpDown, ExternalLink, MessageSquareReply, RotateCw, Video } from "lucide-react";
 import { Message } from "./Message";
@@ -40,6 +41,7 @@ interface TimelineProps {
   // Per-message actions.
   onReact: (cid: string, messageId: string, key: string, add: boolean) => void;
   onDelete: (cid: string, messageId: string) => void;
+  onRemoveFile: (cid: string, messageId: string, index: number) => void;
   onUndo: (cid: string, messageId: string) => void;
   onEdit: (cid: string, messageId: string, text: string, quoteHtml?: string) => void;
   onOpenProfile: (mri: string) => void;
@@ -55,11 +57,11 @@ const continues = (prev: Msg | null, m: Msg): boolean =>
 
 const renderPending = (p: Pending): JSX.Element => (
   <div key={p.key} className="tc-msg first pending">
-    <Avatar name="You" />
+    <Avatar name={t().common.you} />
     <div className="tc-msg-body">
       <div className="tc-msg-meta">
-        <span className="who">You</span>
-        <span className="when">sending…</span>
+        <span className="who">{t().common.you}</span>
+        <span className="when">{t().chat.sending}</span>
       </div>
       {p.text ? <div className="tc-msg-content rich"><RichHtml html={formatMessage(p.text, [], () => "pending-" + p.key).html} /></div> : null}
       {p.files?.length ? (
@@ -70,7 +72,7 @@ const renderPending = (p: Pending): JSX.Element => (
                 <KindIcon kind={fileKind(extOf(name))} className="tc-card-icon" size={18} />
                 <span className="tc-card-text">
                   <span className="tc-card-name">{name}</span>
-                  <span className="tc-card-ext">Uploading…</span>
+                  <span className="tc-card-ext">{t().chat.uploading}</span>
                 </span>
               </span>
             </div>
@@ -87,7 +89,7 @@ export function Timeline(p: TimelineProps): JSX.Element {
   const { visible, cid, chat, channel, pending: myPending, mq, openThreads } = p;
   const body: JSX.Element[] = [];
   const renderMsg = (m: Msg, first: boolean): JSX.Element => (
-    <Message key={m.id} m={m} first={first} channel={channel} cid={cid} onReact={p.onReact} onDelete={p.onDelete}
+    <Message key={m.id} m={m} first={first} channel={channel} cid={cid} onReact={p.onReact} onDelete={p.onDelete} onRemoveFile={p.onRemoveFile}
       onUndo={p.onUndo} onEdit={p.onEdit} onOpenProfile={p.onOpenProfile} onQuote={p.onQuote} onJumpTo={p.onJumpTo}
       onThreadReply={channel ? p.onThreadReply : undefined} />
   );
@@ -118,55 +120,55 @@ export function Timeline(p: TimelineProps): JSX.Element {
     threads.sort((a, b) => a.at - b.at);
     p.msgRoot.current = new Map(visible.map((m) => [m.id, m.rootId]));
     let lastDay = "";
-    for (const t of threads) {
-      const head = t.msgs[0];
-      const at = t.at;
+    for (const th of threads) {
+      const head = th.msgs[0];
+      const at = th.at;
       const day = new Date(at).toDateString();
       if (day !== lastDay) {
-        body.push(<div key={"d" + t.root} className="tc-day"><span>{fmtDay(at)}</span></div>);
+        body.push(<div key={"d" + th.root} className="tc-day"><span>{fmtDay(at)}</span></div>);
         lastDay = day;
       }
       const rootMsg = head.isReply ? null : head;
-      const replies = rootMsg ? t.msgs.slice(1) : t.msgs;
-      const expanded = !!mq || openThreads.has(t.root);
+      const replies = rootMsg ? th.msgs.slice(1) : th.msgs;
+      const expanded = !!mq || openThreads.has(th.root);
       const hidden = expanded ? 0 : Math.max(0, replies.length - THREAD_TAIL);
       const tail = replies.slice(hidden);
       const people = new Set(replies.filter((m) => !m.call).map((m) => m.fromMri)).size;
-      const mine = myPending.filter((x) => x.rootId === t.root);
+      const mine = myPending.filter((x) => x.rootId === th.root);
       for (const x of mine) threadPending.add(x.key);
       // Live: Teams' own live state on the conversation (Chat.liveCall) names
       // the running call's root. Without the chat row, fall back to the posts:
       // a start without an end marker, younger than LIVE_CALL_MS.
-      const live = chat ? chat.liveCall === t.root
-        : rootMsg?.call === "start" && !t.msgs.some((m) => m.call === "end") && Date.now() - rootMsg.time < LIVE_CALL_MS;
+      const live = chat ? chat.liveCall === th.root
+        : rootMsg?.call === "start" && !th.msgs.some((m) => m.call === "end") && Date.now() - rootMsg.time < LIVE_CALL_MS;
       body.push(
-        <div key={"t" + t.root} className={"tc-thread" + (p.replyingTo === t.root ? " replying" : "") + (live ? " live" : "")}>
-          {live ? <span className="tc-live-badge"><span className="tc-live-dot" /> Live</span> : null}
-          {rootMsg ? renderMsg(rootMsg, true) : <div className="tc-thread-orphan">Replies to an older post</div>}
+        <div key={"t" + th.root} className={"tc-thread" + (p.replyingTo === th.root ? " replying" : "") + (live ? " live" : "")}>
+          {live ? <span className="tc-live-badge"><span className="tc-live-dot" /> {t().chat.live}</span> : null}
+          {rootMsg ? renderMsg(rootMsg, true) : <div className="tc-thread-orphan">{t().chat.olderPost}</div>}
           {replies.length || mine.length ? (
             <div className="tc-thread-replies">
               {hidden ? (
-                <button className="tc-thread-more" onClick={() => p.onToggleThread(t.root)}>
-                  <ChevronsUpDown size={13} /> {hidden} earlier {hidden === 1 ? "reply" : "replies"}
-                  {people > 1 ? <span className="tc-thread-people"> · {people} people</span> : null}
+                <button className="tc-thread-more" onClick={() => p.onToggleThread(th.root)}>
+                  <ChevronsUpDown size={13} /> {t().chat.earlierReplies(hidden)}
+                  {people > 1 ? <span className="tc-thread-people">{t().chat.threadPeople(people)}</span> : null}
                 </button>
               ) : null}
               {tail.map((m, i) => renderReply(m, !continues(i ? tail[i - 1] : null, m)))}
               {mine.map(renderPending)}
-              {!mq && openThreads.has(t.root) && replies.length > THREAD_TAIL ? (
-                <button className="tc-thread-more" onClick={() => p.onToggleThread(t.root)}>
-                  <ChevronsUpDown size={13} /> Collapse
+              {!mq && openThreads.has(th.root) && replies.length > THREAD_TAIL ? (
+                <button className="tc-thread-more" onClick={() => p.onToggleThread(th.root)}>
+                  <ChevronsUpDown size={13} /> {t().chat.collapse}
                 </button>
               ) : null}
             </div>
           ) : null}
           <div className="tc-thread-actions">
             <button className="tc-thread-reply" onClick={() => p.onThreadReply(rootMsg || head)}>
-              <MessageSquareReply size={14} /> Reply
+              <MessageSquareReply size={14} /> {t().chat.reply}
             </button>
             {live ? (
-              <button className="tc-join" onClick={() => p.onJoinCall(t.root)}>
-                <Video size={14} /> Join call
+              <button className="tc-join" onClick={() => p.onJoinCall(th.root)}>
+                <Video size={14} /> {t().chat.joinCall}
               </button>
             ) : null}
           </div>
@@ -190,26 +192,26 @@ export function Timeline(p: TimelineProps): JSX.Element {
   return (
     <>
       {mq && !body.length ? (
-        <div className="tc-empty"><p className="tc-sub">No messages match “{p.searchText}”.</p></div>
+        <div className="tc-empty"><p className="tc-sub">{t().chat.noMatch(p.searchText)}</p></div>
       ) : null}
       {body}
       {myPending.filter((x) => !threadPending.has(x.key)).map(renderPending)}
       {p.loading && !myPending.length ? (
-        <div className="tc-empty"><p className="tc-sub">Loading…</p></div>
+        <div className="tc-empty"><p className="tc-sub">{t().chat.loading}</p></div>
       ) : null}
       {p.failed && p.empty && !myPending.length ? (
         <div className="tc-empty">
-          <p>Couldn't load this conversation.</p>
-          <p className="tc-sub">Teams' backend didn't answer. It may need a moment after Teams starts.</p>
+          <p>{t().chat.loadFailed}</p>
+          <p className="tc-sub">{t().chat.loadFailedSub}</p>
           <div className="tc-empty-actions">
-            <button className="tc-ghost" onClick={p.onRetry}><RotateCw size={14} /> Retry</button>
-            <button className="tc-ghost" onClick={p.onOpenInTeams}><ExternalLink size={14} /> Open in Teams</button>
+            <button className="tc-ghost" onClick={p.onRetry}><RotateCw size={14} /> {t().chat.retry}</button>
+            <button className="tc-ghost" onClick={p.onOpenInTeams}><ExternalLink size={14} /> {t().chat.openInTeams}</button>
           </div>
         </div>
       ) : p.ready && p.empty && !myPending.length ? (
         <div className="tc-empty">
-          <p>No messages in this chat yet.</p>
-          <button className="tc-ghost" onClick={p.onOpenInTeams}>Open in Teams</button>
+          <p>{t().chat.empty}</p>
+          <button className="tc-ghost" onClick={p.onOpenInTeams}>{t().chat.openInTeams}</button>
         </div>
       ) : null}
     </>

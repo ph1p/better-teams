@@ -1,6 +1,7 @@
 // The file viewer modal: one for the whole app, opened with openViewer().
 //
 //   image      lightbox; click toggles fit / actual size
+//   text       plain text / code fetched and shown as is
 //   document   SharePoint's own viewer page in a frame (Office, PDF, video, …)
 //   other      type icon and the open / download actions
 //
@@ -10,8 +11,9 @@
 
 import { useEffect, useRef, useState, type JSX, type MouseEvent } from "react";
 import { ChevronLeft, ChevronRight, Download, ExternalLink, Link2, Check, LoaderCircle, X } from "lucide-react";
-import { closeViewer, KindIcon, saveImage, stepViewer, useViewer, type ViewerItem } from "../lib/files";
+import { closeViewer, KindIcon, saveImage, stepViewer, textSrc, useViewer, type ViewerItem } from "../lib/files";
 import { useCopied } from "../lib/clipboard";
+import { t } from "../../i18n";
 
 function onBackdrop(e: MouseEvent<HTMLDivElement>): void {
   const t = e.target as Element;
@@ -19,7 +21,7 @@ function onBackdrop(e: MouseEvent<HTMLDivElement>): void {
 }
 
 function meta(it: ViewerItem): string {
-  const parts = [it.ext ? it.ext.toUpperCase() : it.image ? "Image" : ""];
+  const parts = [it.ext ? it.ext.toUpperCase() : it.image ? t().app.image : ""];
   if (it.width && it.height) parts.push(`${it.width} × ${it.height}`);
   return parts.filter(Boolean).join(" · ");
 }
@@ -30,7 +32,7 @@ function ImageStage({ item }: { item: ViewerItem }): JSX.Element {
   return (
     <div className={"tc-viewer-stage image" + (zoom ? " zoomed" : "")}>
       {state === "loading" ? <LoaderCircle className="tc-viewer-spin" size={28} /> : null}
-      {state === "error" ? <NoPreview item={item} reason="The image could not be loaded." /> : (
+      {state === "error" ? <NoPreview item={item} reason={t().app.imageLoadFailed} /> : (
         <img
           src={item.image}
           alt={item.name}
@@ -38,7 +40,7 @@ function ImageStage({ item }: { item: ViewerItem }): JSX.Element {
           onLoad={() => setState("ok")}
           onError={() => setState("error")}
           onClick={() => setZoom((z) => !z)}
-          title={zoom ? "Fit to window" : "Actual size"}
+          title={zoom ? t().app.fitToWindow : t().app.actualSize}
         />
       )}
     </div>
@@ -56,7 +58,7 @@ function FrameStage({ item }: { item: ViewerItem }): JSX.Element {
     document.addEventListener("securitypolicyviolation", onCsp);
     return () => document.removeEventListener("securitypolicyviolation", onCsp);
   }, [item.embed]);
-  if (blocked) return <NoPreview item={item} reason="This file can't be previewed here." />;
+  if (blocked) return <NoPreview item={item} reason={t().app.cantPreview} />;
   return (
     <div className="tc-viewer-stage frame">
       {loaded ? null : <LoaderCircle className="tc-viewer-spin" size={28} />}
@@ -72,15 +74,54 @@ function FrameStage({ item }: { item: ViewerItem }): JSX.Element {
   );
 }
 
+const TEXT_MAX = 2_000_000;
+
+function TextStage({ item, src }: { item: ViewerItem; src: string }): JSX.Element {
+  const [text, setText] = useState<string | null | undefined>(undefined); // null: failed
+  useEffect(() => {
+    const ctl = new AbortController();
+    void (async () => {
+      try {
+        const r = await fetch(src, { credentials: "include", signal: ctl.signal });
+        // A sign-in or error page instead of the file counts as a failure.
+        if (!r.ok || /text\/html/.test(r.headers.get("content-type") || "") && !/^html?$/.test(item.ext)) throw new Error();
+        // Stream only the first TEXT_MAX bytes; a huge log is never downloaded whole.
+        const parts: BlobPart[] = [];
+        let size = 0;
+        let more = false;
+        const reader = r.body?.getReader();
+        while (reader) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          parts.push(value);
+          size += value.length;
+          if (size > TEXT_MAX) { more = true; void reader.cancel(); break; }
+        }
+        const body = await new Blob(parts).slice(0, TEXT_MAX).text();
+        setText(more ? body + "\n\n" + t().app.textTruncated : body);
+      } catch {
+        if (!ctl.signal.aborted) setText(null);
+      }
+    })();
+    return () => ctl.abort();
+  }, [src, item.ext]);
+  if (text === null) return <div className="tc-viewer-stage"><NoPreview item={item} reason={t().app.textLoadFailed} /></div>;
+  return (
+    <div className="tc-viewer-stage text">
+      {text === undefined ? <LoaderCircle className="tc-viewer-spin" size={28} /> : <pre>{text || t().app.emptyFile}</pre>}
+    </div>
+  );
+}
+
 function NoPreview({ item, reason }: { item: ViewerItem; reason?: string }): JSX.Element {
   return (
     <div className="tc-viewer-none">
       <KindIcon kind={item.kind} className="tc-viewer-none-icon" size={40} strokeWidth={1.5} />
       <strong>{item.name}</strong>
-      <span>{reason || (item.url || item.download ? "No preview for this file type." : "Teams shared no link for this file. Open it in Teams.")}</span>
+      <span>{reason || (item.url || item.download ? t().app.noPreviewType : t().app.noLink)}</span>
       <div className="tc-viewer-none-acts">
-        {item.url ? <a className="tc-viewer-cta" href={item.url} target="_blank" rel="noreferrer noopener"><ExternalLink size={14} /> Open in browser</a> : null}
-        {item.download ? <a className="tc-viewer-cta ghost" href={item.download} target="_blank" rel="noreferrer noopener"><Download size={14} /> Download</a> : null}
+        {item.url ? <a className="tc-viewer-cta" href={item.url} target="_blank" rel="noreferrer noopener"><ExternalLink size={14} /> {t().common.openInBrowser}</a> : null}
+        {item.download ? <a className="tc-viewer-cta ghost" href={item.download} target="_blank" rel="noreferrer noopener"><Download size={14} /> {t().app.download}</a> : null}
       </div>
     </div>
   );
@@ -117,6 +158,7 @@ export function FileViewer(): JSX.Element | null {
 
   if (!v) return null;
   const item = v.items[v.index];
+  const text = textSrc(item);
   const many = v.items.length > 1;
   const save = (): void => {
     setSaving(true);
@@ -129,36 +171,37 @@ export function FileViewer(): JSX.Element | null {
         <KindIcon kind={item.kind} className="tc-viewer-icon" size={16} />
         <div className="tc-viewer-title">
           <strong title={item.name}>{item.name}</strong>
-          <small>{[meta(item), many ? `${v.index + 1} of ${v.items.length}` : ""].filter(Boolean).join(" · ")}</small>
+          <small>{[meta(item), many ? t().app.nOfM(v.index + 1, v.items.length) : ""].filter(Boolean).join(" · ")}</small>
         </div>
         <div className="tc-viewer-acts">
           {item.download ? (
-            <a className="tc-viewer-btn" href={item.download} target="_blank" rel="noreferrer noopener" title="Download"><Download size={17} /></a>
+            <a className="tc-viewer-btn" href={item.download} target="_blank" rel="noreferrer noopener" title={t().app.download}><Download size={17} /></a>
           ) : item.image ? (
-            <button className="tc-viewer-btn" onClick={save} disabled={saving} title="Save image">
+            <button className="tc-viewer-btn" onClick={save} disabled={saving} title={t().app.saveImage}>
               {saving ? <LoaderCircle className="tc-viewer-spin inline" size={17} /> : <Download size={17} />}
             </button>
           ) : null}
           {item.url ? (
             <>
-              <button className="tc-viewer-btn" onClick={() => copy(item.url!)} title="Copy link">{copied ? <Check size={17} /> : <Link2 size={17} />}</button>
-              <a className="tc-viewer-btn" href={item.url} target="_blank" rel="noreferrer noopener" title="Open in browser"><ExternalLink size={17} /></a>
+              <button className="tc-viewer-btn" onClick={() => copy(item.url!)} title={t().app.copyLink}>{copied ? <Check size={17} /> : <Link2 size={17} />}</button>
+              <a className="tc-viewer-btn" href={item.url} target="_blank" rel="noreferrer noopener" title={t().common.openInBrowser}><ExternalLink size={17} /></a>
             </>
           ) : null}
           <span className="tc-viewer-sep" />
-          <button ref={closeBtn} className="tc-viewer-btn" onClick={closeViewer} title="Close (Esc)"><X size={18} /></button>
+          <button ref={closeBtn} className="tc-viewer-btn" onClick={closeViewer} title={t().app.closeEsc}><X size={18} /></button>
         </div>
       </header>
 
       {/* key: reset zoom/loading state per item */}
       {item.image ? <ImageStage key={v.index + item.image} item={item} />
+        : text ? <TextStage key={v.index + text} item={item} src={text} />
         : item.embed ? <FrameStage key={v.index + item.embed} item={item} />
         : <div className="tc-viewer-stage"><NoPreview item={item} /></div>}
 
       {many ? (
         <>
-          <button className="tc-viewer-nav prev" onClick={() => stepViewer(-1)} title="Previous (←)"><ChevronLeft size={22} /></button>
-          <button className="tc-viewer-nav next" onClick={() => stepViewer(1)} title="Next (→)"><ChevronRight size={22} /></button>
+          <button className="tc-viewer-nav prev" onClick={() => stepViewer(-1)} title={t().app.previous}><ChevronLeft size={22} /></button>
+          <button className="tc-viewer-nav next" onClick={() => stepViewer(1)} title={t().app.next}><ChevronRight size={22} /></button>
         </>
       ) : null}
     </div>

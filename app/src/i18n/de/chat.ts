@@ -1,0 +1,101 @@
+import type { Messages } from "../en";
+
+// The open conversation: header, options menu, members, timeline, messages.
+export const chat: Messages["chat"] = {
+  // Header
+  name: "Chatname",
+  meetingChat: "Besprechungschat",
+  onlyYou: "Nur du",
+  teamsApp: "Teams-App",
+  people: (n) => `${n} Personen`,
+  search: "In diesem Chat suchen",
+  notesKey: "Notizen (⌥N)",
+  joinRunning: "Am laufenden Anruf teilnehmen",
+  join: "Teilnehmen",
+  meetNow: "Jetzt in diesem Kanal besprechen",
+  groupAudioCall: (n) => `Gruppen-Audioanruf (${n} Personen)`,
+  groupVideoCall: (n) => `Gruppen-Videoanruf (${n} Personen)`,
+  appNoteTitle: "App-Chat.",
+  appNote: (title, dev) =>
+    `${title} ist eine Teams-App${dev ? ` von ${dev}` : ""}, keine Person. Sie postet Updates und beantwortet Befehle; anrufen kannst du sie nicht.`,
+  matches: (n) => `${n} Treffer`,
+  closeSearch: "Suche schließen",
+
+  // Options menu
+  options: "Chatoptionen",
+  rename: "Umbenennen",
+  members: "Mitglieder",
+  leave: "Chat verlassen",
+  leaveConfirm: "Zum Verlassen erneut klicken",
+  channelNotifications: "Kanalbenachrichtigungen",
+  presetAll: "Alle neuen Beiträge",
+  presetMentions: "Erwähnungen und Antworten",
+  presetOff: "Aus",
+  presetSet: (label) => `Kanalbenachrichtigungen: ${label}.`,
+  presetFailed: (reason) => `Benachrichtigungen konnten nicht geändert werden (${reason})`,
+  presetCustom: "Du hast in Teams eigene Einstellungen; eine Auswahl hier ersetzt sie.",
+
+  // Members panel
+  membersOf: (title) => `Mitglieder von ${title}`,
+  closeMembers: "Mitglieder schließen",
+  youSuffix: " (du)",
+  removeFromChat: "Aus dem Chat entfernen",
+  removeConfirm: "Zum Entfernen erneut klicken",
+  removePersonConfirm: (name) => `Entfernen von ${name} bestätigen`,
+  dontAdd: (name) => `${name} nicht hinzufügen`,
+  addMore: "Weitere hinzufügen",
+  addPlaceholder: "Personen per Name oder E-Mail hinzufügen",
+  historyLabel: "Zu teilender Chatverlauf",
+  historyNone: "Verlauf nicht einschließen",
+  historyDay: "Verlauf des letzten Tages einschließen",
+  historyWeek: "Verlauf der letzten 7 Tage einschließen",
+  historyAll: "Gesamten Verlauf einschließen",
+  addOne: (first) => `${first} hinzufügen`,
+  addMany: (n) => `${n} Personen hinzufügen`,
+
+  // Timeline
+  sending: "wird gesendet…",
+  uploading: "Wird hochgeladen…",
+  live: "Live",
+  olderPost: "Antworten auf einen älteren Beitrag",
+  earlierReplies: (n) => `${n} ${n === 1 ? "frühere Antwort" : "frühere Antworten"}`,
+  threadPeople: (n) => ` · ${n} Personen`,
+  collapse: "Einklappen",
+  reply: "Antworten",
+  joinCall: "Am Anruf teilnehmen",
+  noMatch: (q) => `Keine Nachrichten zu „${q}“.`,
+  loading: "Wird geladen…",
+  loadFailed: "Diese Unterhaltung konnte nicht geladen werden.",
+  loadFailedSub: "Das Teams-Backend hat nicht geantwortet. Nach dem Start von Teams braucht es manchmal einen Moment.",
+  retry: "Erneut versuchen",
+  openInTeams: "In Teams öffnen",
+  empty: "In diesem Chat gibt es noch keine Nachrichten.",
+
+  // Typing
+  someone: "Jemand",
+  typingTwo: (a, b) => `${a} und ${b}`,
+  typingMore: (a, b, n) => `${a}, ${b} und ${n} ${n === 1 ? "weitere Person" : "weitere"}`,
+  isTyping: (who, many) => `${who} ${many ? "schreiben" : "schreibt"}`,
+
+  // Message
+  deleted: "Nachricht gelöscht",
+  undo: "Rückgängig",
+  removeQuote: "Zitat entfernen",
+  edited: " (bearbeitet)",
+  removeReaction: (key) => `Deine Reaktion ${key} entfernen`,
+  react: (key) => `Mit ${key} reagieren`,
+  addReaction: "Reaktion hinzufügen",
+  copied: "Kopiert",
+  copyText: "Text kopieren",
+  replyInThread: "Im Thread antworten",
+  replyQuote: "Mit Zitat antworten",
+  edit: "Bearbeiten",
+  delete: "Löschen",
+  importance: { high: "wichtig", urgent: "dringend" },
+
+  // Attachments
+  removeFile: "Datei entfernen",
+  removeFileConfirm: (name) => `Entfernen von ${name} bestätigen`,
+  preview: (name) => `Vorschau: ${name}`,
+  file: "Datei",
+};

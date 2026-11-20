@@ -7,6 +7,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { FileRef } from "../../types";
+import { t } from "../../i18n";
 
 type FileKind = "image" | "video" | "audio" | "pdf" | "word" | "excel" | "powerpoint" | "code" | "archive" | "text" | "other";
 
@@ -107,6 +108,18 @@ export async function saveImage(item: ViewerItem): Promise<boolean> {
   }
 }
 
+const TEXTY = new Set<FileKind>(["text", "code"]);
+
+/**
+ * Where to fetch a plain-text file's content for the viewer, if anywhere:
+ * SharePoint's download link, or a local blob (a file still being sent).
+ * The share link `url` is SharePoint's HTML page, not the content.
+ */
+export function textSrc(it: ViewerItem): string | undefined {
+  if (!TEXTY.has(it.kind)) return undefined;
+  return it.download || (it.url?.startsWith("blob:") ? it.url : undefined);
+}
+
 export function fileItem(f: FileRef): ViewerItem {
   const kind = fileKind(f.ext);
   const image = kind === "image" && f.preview ? f.preview.url : undefined;
@@ -117,8 +130,9 @@ export function fileItem(f: FileRef): ViewerItem {
     image,
     width: f.preview?.width,
     height: f.preview?.height,
-    // Images show the AMS picture; everything else SharePoint's viewer.
-    embed: image ? undefined : f.embed,
+    // Images show the AMS picture, plain text its own content (SharePoint's
+    // viewer renders .txt as a blank page); everything else SharePoint's viewer.
+    embed: image || TEXTY.has(kind) ? undefined : f.embed,
     url: f.url || undefined,
     download: f.download,
   };
@@ -128,7 +142,7 @@ export function fileItem(f: FileRef): ViewerItem {
 export function imageItem(src: string, alt: string): ViewerItem {
   const full = src.replace(/\/views\/imgt\w*(?=$|[?#])/, "/views/imgo");
   // No `url`: AMS needs Teams' cookies, an external browser would get a 401.
-  return { name: alt && !/^image$/i.test(alt) ? alt : "Image", ext: "", kind: "image", image: full };
+  return { name: alt && !/^image$/i.test(alt) ? alt : t().app.image, ext: "", kind: "image", image: full };
 }
 
 /** The type icon on its kind-colored tile. */

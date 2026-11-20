@@ -1,0 +1,32 @@
+import type { Messages } from "../en";
+
+export const common: Messages["common"] = {
+  save: "Speichern",
+  cancel: "Abbrechen",
+  close: "Schließen",
+  clear: "Löschen",
+  remove: "Entfernen",
+  you: "Du",
+  mute: "Stummschalten",
+  unmute: "Stummschaltung aufheben",
+  muted: "Stummgeschaltet",
+  app: "App",
+  notes: "Notizen",
+  send: "Senden",
+  audioCall: "Audioanruf",
+  videoCall: "Videoanruf",
+  openInBrowser: "Im Browser öffnen",
+  removeNamed: (name) => `${name} entfernen`,
+  unknown: "Unbekannt",
+  status: {
+    Available: "Verfügbar",
+    Busy: "Beschäftigt",
+    DoNotDisturb: "Nicht stören",
+    BeRightBack: "Bin gleich zurück",
+    Away: "Abwesend",
+    Offline: "Offline",
+    Unknown: "Status unbekannt",
+  },
+  language: "Sprache",
+  languageAuto: (name: string) => `Automatisch (${name})`,
+};

@@ -6,6 +6,7 @@ import App from "./ui/App";
 import { CSS } from "./styles";
 import { installAuthCapture, installCdl } from "./services";
 import { initHighlighter } from "./highlight";
+import { t } from "./i18n";
 
 const ROOT_ID = "tc-root";
 const STYLE_ID = "tc-style";
@@ -69,13 +70,11 @@ function mount(): NonNullable<Window["__teamsCalmApp"]> {
   const pill = document.createElement("button");
   pill.id = PILL_ID;
   pill.type = "button";
-  pill.textContent = "Calm down";
-  pill.title = "Calm down: back to the calm view (⌥⌘T)";
   Object.assign(pill.style, {
     position: "fixed", zIndex: "2147483000", height: "26px", padding: "0 12px",
     border: "0", borderRadius: "13px", background: "#4f6bed", color: "#fff",
     font: "600 12px/26px -apple-system, system-ui, sans-serif", cursor: "pointer",
-    boxShadow: "0 1px 4px rgba(0,0,0,.25)", display: "none",
+    boxShadow: "0 1px 4px rgba(0,0,0,.25)", display: "none", whiteSpace: "nowrap",
   } as Partial<CSSStyleDeclaration>);
   pill.style.setProperty("-webkit-app-region", "no-drag");
   const placePill = (): void => {
@@ -97,6 +96,9 @@ function mount(): NonNullable<Window["__teamsCalmApp"]> {
     visible = false;
     if (!pill.isConnected) document.body.appendChild(pill);
     placePill();
+    const quips = t().app.pill;
+    pill.textContent = quips[Math.floor(Math.random() * quips.length)];
+    pill.title = t().app.pillTitle;
     pill.style.display = "block";
   };
   const show = (): void => {

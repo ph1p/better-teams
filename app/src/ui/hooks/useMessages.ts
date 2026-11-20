@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import {
-  deleteMessage, editMessage, fetchOlderRemote, listMessages, primeRemote, setReaction, undoDelete,
+  deleteMessage, editMessage, fetchOlderRemote, listMessages, primeRemote, removeFiles, setReaction, undoDelete,
 } from "../../teamsData";
 import { openNativeChat } from "../../send";
 import { chat as chatSvc } from "../../services";
@@ -10,6 +10,7 @@ import { isIdle, onTeamsChange } from "../lib/live";
 import { INITIAL_REMOTE, POLL_MS } from "../lib/constants";
 import type { Flash } from "../lib/toast";
 import type { Chat, Message as Msg } from "../../types";
+import { t } from "../../i18n";
 
 // Plain text without whitespace or "@", for matching a draft to its synced copy.
 const bare = (s: string): string => s.replace(/[\s@]+/g, "");
@@ -59,6 +60,7 @@ export interface Messages {
   refetch: () => void;
   react: (cid: string, messageId: string, key: string, add: boolean) => Promise<void>;
   remove: (cid: string, messageId: string) => Promise<void>;
+  removeFile: (cid: string, messageId: string, index: number) => Promise<void>;
   undo: (cid: string, messageId: string) => Promise<void>;
   edit: (cid: string, messageId: string, text: string, quoteHtml?: string) => Promise<void>;
 }
@@ -71,6 +73,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
   const [older, setOlder] = useState<OldBucket>({ id: null, list: [] });
   // Ids currently rendered, so loadOlder can tell a page that adds nothing.
   const shownIds = useRef<Set<string>>(new Set());
+  const oldestId = useRef("");
   const [pending, setPending] = useState<Pending[]>([]);
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
@@ -193,15 +196,17 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     const prevH = el ? el.scrollHeight : 0;
     const prevTop = el ? el.scrollTop : 0;
     try {
-      // Older pages can overlap what the local cache already shows; keep paging
-      // (bounded) until one brings something new, or the view stays stuck at top.
+      // Older pages can overlap what the local cache already shows; keep
+      // paging (bounded) until one brings something new, or the view stays
+      // stuck at top. An empty page means "nothing yet": stop, retry on the
+      // next scroll.
       let page: Msg[] | null;
       let hops = 0;
       do {
-        page = await fetchOlderRemote(cid!, selIsChannel);
+        page = await fetchOlderRemote(cid!, selIsChannel, oldestId.current || undefined);
         if (cid !== sel) return; // switched chat mid-fetch
         if (!page) { noMore.current = true; return; }
-      } while (page.length && page.every((m) => shownIds.current.has(m.id)) && ++hops < 10);
+      } while (page.length && page.every((m) => shownIds.current.has(m.id)) && ++hops < 20);
       if (!page.length) return;
       setOlder((o) => {
         const base = o.id === cid ? o.list : [];
@@ -230,15 +235,20 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
   };
 
   // Sticky day label: the date of the last `.tc-day` divider scrolled past the
-  // top of the list, so the day stays pinned while reading within it.
+  // top of the list, so the day stays pinned while reading within it. It steps
+  // aside while the next divider is close below, so two dates never stack.
   const [stickyDay, setStickyDay] = useState("");
   const updateStickyDay = (el: HTMLDivElement): void => {
     const days = el.querySelectorAll<HTMLElement>(".tc-day");
     let label = "";
     const top = el.scrollTop;
     for (const d of days) {
-      if (d.offsetTop - el.offsetTop <= top + 4) label = d.textContent || "";
-      else break;
+      const y = d.offsetTop - el.offsetTop;
+      if (y <= top + 4) label = d.textContent || "";
+      else {
+        if (y - top < 120) label = "";
+        break;
+      }
     }
     setStickyDay(label);
   };
@@ -286,7 +296,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
       // Force a re-fetch so the view returns to the server's truth.
       setMsgs((s) => ({ ...s, loaded: false }));
       lastMsgSig.current = "";
-      flash("Reaction failed (" + res.reason + ")");
+      flash(t().app.reactionFailed(res.reason));
     }
   }
 
@@ -302,14 +312,26 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
   async function remove(cid: string, messageId: string): Promise<void> {
     patchMsg(messageId, (m) => ({ ...m, deleted: true }));
     const res = await deleteMessage(cid, messageId);
-    if (!res.ok) { refetch(); flash("Delete failed (" + res.reason + ")"); }
+    if (!res.ok) { refetch(); flash(t().app.deleteFailed(res.reason)); }
   }
 
   // Undo a soft-delete: refetch to pull back the restored content.
   async function undo(cid: string, messageId: string): Promise<void> {
     const res = await undoDelete(cid, messageId);
     if (res.ok) refetch();
-    else flash("Undo failed (" + res.reason + ")");
+    else flash(t().app.undoFailed(res.reason));
+  }
+
+  // Take one file off a sent message. With no text and no files left, the
+  // message would be empty, so it is deleted instead (undo stays available).
+  async function removeFile(cid: string, messageId: string, index: number): Promise<void> {
+    const m = msgs.list.find((x) => x.id === messageId) || older.list.find((x) => x.id === messageId);
+    if (!m) return;
+    const keep = m.files.filter((_, i) => i !== index);
+    if (!keep.length && !htmlToText(m.content).trim()) return remove(cid, messageId);
+    patchMsg(messageId, (x) => ({ ...x, files: keep }));
+    const res = await removeFiles(cid, messageId, keep);
+    if (!res.ok) { refetch(); flash(t().app.removeFileFailed(res.reason)); }
   }
 
   // Edit my message. `text` is the reply body; `quoteHtml` ("" if removed) is a
@@ -320,7 +342,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     const content = (quoteHtml || "") + "<p>" + esc.replace(/\n/g, "<br>") + "</p>";
     patchMsg(messageId, (m) => ({ ...m, content, edited: true }));
     const res = await editMessage(cid, messageId, text, quoteHtml);
-    if (!res.ok) { refetch(); flash("Edit failed (" + res.reason + ")"); }
+    if (!res.ok) { refetch(); flash(t().app.editFailed(res.reason)); }
   }
 
   const shown = useMemo(() => {
@@ -337,6 +359,13 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     return all;
   }, [msgs, older, sel, selIsChannel]);
   shownIds.current = useMemo(() => new Set(shown.map((m) => m.id)), [shown]);
+  // Oldest message on screen by time (channels sort by thread, not time):
+  // where the next older page starts.
+  oldestId.current = useMemo(() => {
+    let o: Msg | undefined;
+    for (const m of shown) if (!o || m.time < o.time) o = m;
+    return o?.id || "";
+  }, [shown]);
 
   const ready = msgs.loaded && msgs.id === sel;
   return {
@@ -349,6 +378,6 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     failed: ready && !!msgs.failed,
     scroller, onScroll, stickyDay, atBottom, scrollToBottom,
     stickToBottom: () => { stick.current = true; },
-    loadOlder, noMore, refetch, react, remove, undo, edit,
+    loadOlder, noMore, refetch, react, remove, removeFile, undo, edit,
   };
 }

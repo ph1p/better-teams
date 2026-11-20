@@ -19,9 +19,24 @@ const SEND_BUTTON =
   '[data-tid="sendMessageCommands-send"], [data-tid="newMessageCommands-send"], button[name="send"]';
 
 // Thread id the native composer currently targets, or "" if unknown.
-function nativeThreadId(): string {
+export function nativeThreadId(): string {
   const b = document.querySelector("button[data-track-thread-id]");
   return (b && b.getAttribute("data-track-thread-id")) || "";
+}
+
+// The overlay itself switches Teams' chat (sends, calls, new chats). While it
+// does, and for a moment after, a native chat change is ours, not the user's
+// (a notification click, a click in Teams), so it must not be followed.
+let driving = 0;
+let drivenAt = 0;
+async function drive<T>(fn: () => Promise<T>): Promise<T> {
+  driving++;
+  try { return await fn(); } finally { driving--; drivenAt = Date.now(); }
+}
+
+/** True while (or just after) the overlay drives Teams' native chat. */
+export function nativeDriven(): boolean {
+  return driving > 0 || Date.now() - drivenAt < 2000;
 }
 
 async function waitFor<T>(fn: () => T, ms = 2500, step = 100): Promise<T> {
@@ -37,7 +52,11 @@ async function waitFor<T>(fn: () => T, ms = 2500, step = 100): Promise<T> {
 // row. The native list is virtualized (collapsed folders render no rows), so
 // this only works for rows Teams currently renders — favorites and expanded
 // folders. Rows carry the conversation id in data-fui-tree-item-value.
-export async function openNativeChat(conversationId: string, title?: string): Promise<boolean> {
+export function openNativeChat(conversationId: string, title?: string): Promise<boolean> {
+  return drive(() => clickNativeChat(conversationId, title));
+}
+
+async function clickNativeChat(conversationId: string, title?: string): Promise<boolean> {
   if (nativeThreadId() === conversationId) return true;
   const rows = [...document.querySelectorAll('[role="treeitem"]')] as HTMLElement[];
   const row =
@@ -238,7 +257,11 @@ async function settledThreadId(ms = 3000, quiet = 700): Promise<string> {
  * matches the person's UPN or object id is clicked. Never sends.
  * Resolves with the chat Teams shows: its id, or draft=true for a new chat.
  */
-export async function openNativeNewChat(people: PickPerson[]): Promise<NewChatResult> {
+export function openNativeNewChat(people: PickPerson[]): Promise<NewChatResult> {
+  return drive(() => pickNewChat(people));
+}
+
+async function pickNewChat(people: PickPerson[]): Promise<NewChatResult> {
   const list = people.filter((p) => (p.upn || p.oid || "").trim());
   if (!list.length) return { ok: false, reason: "no one to add" };
   const btn = nativeButton(NEW_MESSAGE_BTN);
@@ -279,7 +302,11 @@ export async function openNativeDirect(upn: string, oid?: string): Promise<NewCh
  * `people` (by UPN), so text never goes to a different set of people.
  * Resolves with the new chat's id ("" if Teams has not switched yet).
  */
-export async function sendNativeDraft(people: PickPerson[], text: string): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
+export function sendNativeDraft(people: PickPerson[], text: string): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
+  return drive(() => sendDraft(people, text));
+}
+
+async function sendDraft(people: PickPerson[], text: string): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
   if (!text || !text.trim()) return { ok: false, reason: "empty" };
   const want = people.map((p) => (p.upn || "").trim().toLowerCase()).filter(Boolean).sort();
   const chipsOk = (): boolean => {

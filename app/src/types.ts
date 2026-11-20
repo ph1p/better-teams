@@ -33,6 +33,8 @@ export interface FileRef {
   embed?: string;
   /** SharePoint direct download. */
   download?: string;
+  /** The message's raw properties.files entry, written back when another file is removed. */
+  raw?: unknown;
 }
 
 /** The last-message preview shown on a chat row. */
@@ -59,6 +61,12 @@ export interface Chat {
   pinned: boolean;
   /** Hidden from the chat list (Teams' "Hide"); search still finds it. */
   hidden: boolean;
+  /** Notifications muted (Teams' "Mute"). Chats only; channels have presets. */
+  muted: boolean;
+  /** A group chat (not 1:1): can be renamed, has a roster you can change and leave. */
+  group: boolean;
+  /** We left this conversation (or were removed). */
+  left: boolean;
   /** Last-activity time, ms since epoch. */
   time: number;
   unread: boolean;

@@ -4,8 +4,9 @@ import { isAppMri } from "../apps";
 import { getAll, myMri, open } from "./idb";
 import { profile } from "./profiles";
 import { arr, get, mriOf, obj, str, toMs, type Dict } from "./raw";
+import { withPending } from "./groups";
 import { effectiveHidden, effectiveHorizon, effectiveMarked, flushPendingHorizons } from "./readState";
-import { lastByConv } from "./state";
+import { isOneToOneId, lastByConv } from "./state";
 
 // Teams conversation types we show, mapped to our sections.
 const KIND: Record<string, ChatKind> = {
@@ -122,7 +123,7 @@ export async function listChats(): Promise<Chat[]> {
     const hiddenAt = Number(props.unpinnedTime) || 0;
     const hidden = effectiveHidden(str(c.id), hiddenAt > 0 && time <= hiddenAt);
 
-    chats.push({
+    chats.push(withPending(str(c.id), {
       ...(liveCallRoot(tp) ? { liveCall: liveCallRoot(tp) } : {}),
       id: str(c.id),
       kind,
@@ -137,6 +138,12 @@ export async function listChats(): Promise<Chat[]> {
       favorite: favs.has(str(c.id)),
       pinned: props.ispinned === "true" || props.ispinned === true,
       hidden,
+      // The worker's setMuteChat writes the conversation property alerts = String(!mute).
+      muted: kind !== "channel" && (props.alerts === "false" || props.alerts === false),
+      // Everything of kind chat that isn't 1:1 is a group chat.
+      group: kind === "chat" && !isOneToOneId(str(c.id))
+        && tp.uniquerosterthread !== "true" && tp.uniquerosterthread !== true,
+      left,
       time,
       unread: !left && (effectiveMarked(str(c.id), props) || (!lastFromMe && horizon > 0 && time > horizon)),
       last: {
@@ -144,7 +151,7 @@ export async function listChats(): Promise<Chat[]> {
         content: str(lm.content),
         type: str(lm.messagetype),
       },
-    });
+    }));
   }
   chats.sort((a, b) => b.time - a.time);
   return chats;

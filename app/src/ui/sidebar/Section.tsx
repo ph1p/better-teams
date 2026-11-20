@@ -4,6 +4,7 @@ import { Row } from "./Row";
 import { RECENT_MS, SECTION_CAP, SECTION_MIN } from "../lib/constants";
 import { usePref } from "../lib/prefs";
 import type { Chat } from "../../types";
+import { t } from "../../i18n";
 
 interface SectionProps {
   // Stable key for the persisted collapsed state ("dms", "channels", ...).
@@ -49,7 +50,7 @@ export function Section({
   for (const c of shown) {
     if (groupByTeam && c.team !== team) {
       team = c.team;
-      body.push(<div key={"t:" + c.team} className="tc-team-label">{c.team || "Other"}</div>);
+      body.push(<div key={"t:" + c.team} className="tc-team-label">{c.team || t().sidebar.otherTeam}</div>);
     }
     body.push(
       <Row key={c.id} chat={c} compact={compact} showTeam={!groupByTeam} selected={c.id === sel}
@@ -64,13 +65,13 @@ export function Section({
           {open ? <ChevronDown size={13} className="tc-caret" /> : <ChevronRight size={13} className="tc-caret" />}
           <span className="tc-sec-title">{title}</span>
           {/* One number only, and only when it says something: unread count. */}
-          {unread ? <span className="tc-sec-count" title={`${unread} unread`}>{unread}</span> : null}
+          {unread ? <span className="tc-sec-count" title={t().sidebar.unreadCount(unread)}>{unread}</span> : null}
         </button>
       ) : null}
       {body}
       {open && capped && (all || hidden > 0) ? (
         <button className="tc-more" onClick={() => setAll((a) => !a)}>
-          {all ? "Show less" : `Show ${hidden} older`}
+          {all ? t().sidebar.showLess : t().sidebar.showOlder(hidden)}
         </button>
       ) : null}
     </div>

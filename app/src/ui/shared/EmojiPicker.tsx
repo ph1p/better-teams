@@ -4,6 +4,7 @@
 // no network, no dependency. Closes on outside click / Escape (handled by the
 // caller, which conditionally renders it).
 import { useMemo, useRef, useState, type JSX } from "react";
+import { t } from "../../i18n";
 
 // [emoji, space-separated keywords]. Kept compact but covering the common set.
 // Extend freely — this is plain data.
@@ -80,7 +81,7 @@ export function EmojiPicker({ onPick, className }: EmojiPickerProps): JSX.Elemen
         ref={input}
         autoFocus
         className="tc-emoji-search"
-        placeholder="Search emoji"
+        placeholder={t().composer.searchEmoji}
         value={q}
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={(e) => {
@@ -93,7 +94,7 @@ export function EmojiPicker({ onPick, className }: EmojiPickerProps): JSX.Elemen
             {e}
           </button>
         ))}
-        {!list.length ? <div className="tc-emoji-empty">No emoji</div> : null}
+        {!list.length ? <div className="tc-emoji-empty">{t().composer.noEmoji}</div> : null}
       </div>
     </div>
   );

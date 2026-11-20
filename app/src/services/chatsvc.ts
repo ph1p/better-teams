@@ -75,6 +75,15 @@ export function putReaction(cid: string, mid: string, key: string, add: boolean)
   });
 }
 
+/** Replace one message property, e.g. "files" (a JSON string, like Teams stores it). */
+export function putMessageProperty(cid: string, mid: string, name: string, value: string): Promise<Res> {
+  return call("ic3", `${msg(cid, mid)}/properties?name=${encodeURIComponent(name)}`, {
+    method: "PUT",
+    headers: WRITE,
+    body: { [name]: value },
+  });
+}
+
 /** Set one conversation property (consumptionhorizon, consumptionHorizonBookmark, …). */
 export function putConversationProperty(cid: string, name: string, value: string): Promise<Res> {
   return call("ic3", `${conv(cid)}/properties?name=${encodeURIComponent(name)}`, {

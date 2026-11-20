@@ -2,10 +2,10 @@
 // untyped external data: they enter as `unknown` and are narrowed here, so no
 // other module ever touches an `any`.
 import type { WriteResult } from "../types";
-import type { Res } from "../services";
 
-// Service-layer result -> the UI's WriteResult.
-export const toWrite = (r: Res): WriteResult => (r.ok ? { ok: true } : { ok: false, reason: r.reason });
+// Service-layer result (REST or CDL) -> the UI's WriteResult.
+export const toWrite = (r: { ok: true } | { ok: false; reason: string }, via?: string): WriteResult =>
+  r.ok ? (via ? { ok: true, via } : { ok: true }) : { ok: false, reason: r.reason };
 
 export type Dict = Record<string, unknown>;
 

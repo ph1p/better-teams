@@ -39,6 +39,10 @@ teams-calm doctor     # check requirements
 teams-calm help       # all commands
 ```
 
+The overlay follows Teams' language (English or German); the status menu
+under your avatar can pin one. Clicking a macOS notification opens that chat
+in the overlay too, not only in Teams underneath.
+
 ## Uninstall
 
 ```sh
@@ -100,7 +104,8 @@ scripts/
 app/src/
   mount.tsx                entry: mounts the overlay into a Teams window
   teamsData.ts, data/      read/write layer over Teams' IndexedDB + chat service
-  send.ts, services/       sending, typing, presence, auth, CDL
+  send.ts, services/       sending, typing, presence, auth, CDL, group management
+  i18n/                    en/de strings; follows Teams' language
   ui/                      React components
   mock/                    browser-only stand-ins for mock mode
 docs/                      notes on the Teams APIs used

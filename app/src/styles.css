@@ -43,6 +43,11 @@
   --tc-mine: var(--color-tc-mine);
   --tc-radius: var(--radius-tc);
   --tc-font: var(--font-tc);
+  /* Destructive actions: soft red on hover, solid red once armed. */
+  --tc-danger: #dc2626;
+  --tc-danger-hover: #b91c1c;
+  --tc-danger-fg: #ef4444;
+  --tc-danger-soft: rgba(239,68,68,.12);
 }
 #tc-root, #tc-root * { box-sizing: border-box; }
 /* Keyboard focus: a single consistent accent ring on every interactive element,
@@ -117,6 +122,22 @@
 #tc-root .tc-av-ring.is-offline.sm .tc-av { box-shadow: 0 0 0 1px var(--tc-bg), 0 0 0 1.75px var(--tc-ring); }
 /* Clickable avatar hover: keep the ring, add accent outside it. */
 #tc-root .tc-av-ring .tc-av-btn:hover { box-shadow: 0 0 0 1.5px var(--tc-bg), 0 0 0 3px var(--tc-ring), 0 0 0 5px var(--tc-accent); }
+/* Group chat: two faces stacked diagonally in one avatar's footprint. The
+   back face is masked where the front one sits (plus a gap), so the cutout
+   works on any row background: hover, selected, header. --s is the box,
+   --f the face, --g the gap. */
+#tc-root .tc-av-group { --s: 34px; --f: 24px; --g: 2px; position: relative; flex: 0 0 auto;
+  width: var(--s); height: var(--s); margin: -1px; }
+#tc-root .tc-av-group .tc-av { position: absolute; width: var(--f); height: var(--f); font-size: 10px; }
+#tc-root .tc-av-group .front { bottom: 0; left: 0; }
+/* Back face: initials would be cut by the mask, so show only its colour. */
+#tc-root .tc-av-group .back { top: 0; right: 0; color: transparent;
+  --m: radial-gradient(circle at calc(var(--f) - var(--s) + var(--f) / 2) calc(var(--s) - var(--f) / 2),
+    transparent calc(var(--f) / 2 + var(--g) - .5px), #000 calc(var(--f) / 2 + var(--g)));
+  -webkit-mask: var(--m); mask: var(--m); }
+/* Compact rows: a bit past the 22px single avatar so two faces stay legible. */
+#tc-root .tc-av-group.sm { --s: 26px; --f: 18px; --g: 1.5px; margin: -2px; }
+#tc-root .tc-av-group.sm .tc-av { font-size: 8px; }
 #tc-root .tc-row-body { @apply flex-1; min-width: 0; }
 #tc-root .tc-row-top { @apply flex justify-between gap-2; }
 #tc-root .tc-name { @apply overflow-hidden whitespace-nowrap; font-weight: 600;
@@ -453,10 +474,31 @@
 #tc-root .tc-card-text { @apply flex flex-col min-w-0; }
 #tc-root .tc-card-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #tc-root .tc-card-ext { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; color: var(--tc-fg2); }
-#tc-root .tc-card-out { @apply grid place-items-center; flex: 0 0 auto; width: 28px; height: 28px; margin-right: 6px;
-  border-radius: 7px; color: var(--tc-fg2); opacity: 0; transition: opacity .12s, background .12s; }
-#tc-root .tc-card:hover .tc-card-out, #tc-root .tc-card-out:focus-visible { opacity: 1; }
+/* Card actions (open in browser, remove): one quiet group at the right edge,
+   shown on hover. Same size and shape, so the row never jumps. */
+#tc-root .tc-card-acts { @apply flex items-center; flex: 0 0 auto; gap: 2px; margin-right: 6px; }
+#tc-root .tc-card-out, #tc-root .tc-x-btn { @apply inline-flex items-center justify-center gap-1 cursor-pointer;
+  flex: 0 0 auto; min-width: 26px; height: 26px; padding: 0; border: 0; border-radius: 7px; background: transparent;
+  color: var(--tc-fg2); font: 600 12px var(--tc-font); text-decoration: none; opacity: 0;
+  transition: opacity .12s, background .12s, color .12s, padding .12s; }
+#tc-root .tc-card:hover .tc-card-out, #tc-root .tc-card:hover .tc-attach-x, #tc-root .tc-thumb-wrap:hover .tc-attach-x,
+#tc-root .tc-card-out:focus-visible { opacity: 1; outline: 2px solid var(--tc-accent); outline-offset: 1px; }
 #tc-root .tc-card-out:hover { background: var(--tc-hover); color: var(--tc-accent); }
+/* .tc-x-btn: a hover-revealed remove button (files, chat members). Armed, it
+   becomes a compact red "Remove" pill; a second click acts (lib/arm.ts). */
+#tc-root .tc-x-btn.armed { opacity: 1; }
+#tc-root .tc-x-btn:focus-visible { opacity: 1; outline: 2px solid var(--tc-accent); outline-offset: 1px; }
+#tc-root .tc-x-btn:hover { background: var(--tc-danger-soft); color: var(--tc-danger-fg); }
+#tc-root .tc-x-btn.armed { padding: 0 9px 0 7px; background: var(--tc-danger); color: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+#tc-root .tc-x-btn.armed:hover { background: var(--tc-danger-hover); color: #fff; }
+
+/* Remove a file from your own message: on images, a floating button in the corner */
+#tc-root .tc-thumb-wrap { @apply relative; max-width: 100%; }
+#tc-root .tc-thumb-wrap .tc-attach-x { position: absolute; top: 6px; right: 6px;
+  background: rgba(0,0,0,.55); color: #fff; backdrop-filter: blur(4px); }
+#tc-root .tc-thumb-wrap .tc-attach-x:hover { background: rgba(0,0,0,.75); color: #fca5a5; }
+#tc-root .tc-thumb-wrap .tc-attach-x.armed { background: var(--tc-danger); color: #fff; }
 
 /* File type colors (card icon, viewer header, "no preview" icon) */
 #tc-root .tc-card-icon, #tc-root .tc-viewer-icon, #tc-root .tc-viewer-none-icon { @apply grid place-items-center;
@@ -573,8 +615,17 @@
   box-shadow: -8px 0 24px rgba(0,0,0,.18); z-index: 10; animation: tc-slide-in .16s ease; }
 @keyframes tc-slide-in { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
 #tc-root .tc-profile-head { @apply flex justify-end; padding: 10px 12px 0; }
-/* Notes drawer: reuses the profile drawer shell. */
-#tc-root .tc-notes-head { @apply flex items-center gap-2; padding: 10px 12px 8px 16px; }
+/* Notes drawer: reuses the profile drawer shell. It stays open for long
+   stretches, so on a wide window it docks: the chat shrinks beside it instead
+   of running (header actions, composer) underneath. */
+@media (min-width: 960px) {
+  #tc-root:has(> .tc-notes) { grid-template-columns: 300px 1fr 320px; }
+  #tc-root .tc-notes { position: static; grid-column: 3; grid-row: 1; box-shadow: none; animation: none; }
+}
+/* Notes drawer parts. */
+#tc-root .tc-notes-head { @apply flex items-center gap-2; height: 52px; flex: 0 0 auto; padding: 0 12px 0 16px;
+  margin-bottom: 12px; border-bottom: 1px solid var(--tc-line); -webkit-app-region: drag; }
+#tc-root .tc-notes-head button { -webkit-app-region: no-drag; }
 #tc-root .tc-notes-title { @apply flex-1; font-size: 15px; font-weight: 700; }
 #tc-root .tc-notes-area { @apply flex-1 outline-none resize-none; margin: 0 12px 12px; padding: 10px 12px;
   border: 1px solid var(--tc-line); border-radius: 8px; background: var(--tc-bg); color: var(--tc-fg);
@@ -702,6 +753,7 @@
    The last message is in the row's tooltip. */
 #tc-root .tc-row.compact { padding: 5px 8px; gap: 9px; min-height: 32px; }
 #tc-root .tc-row.compact .tc-av { width: 22px; height: 22px; font-size: 9.5px; }
+#tc-root .tc-row.compact .tc-av-group .tc-av { width: var(--f); height: var(--f); font-size: 8px; }
 #tc-root .tc-row.compact .tc-hash { border-radius: 6px; }
 #tc-root .tc-row.compact .tc-name { font-weight: 450; color: var(--tc-fg); }
 #tc-root .tc-row.compact.unread .tc-name { font-weight: 650; }
@@ -740,10 +792,7 @@
 #tc-root .tc-me-menu { @apply absolute; left: 8px; right: 8px; bottom: calc(100% - 2px); z-index: 20;
   padding: 4px; background: var(--tc-bg); border: 1px solid var(--tc-line); border-radius: 10px;
   box-shadow: 0 6px 24px rgba(0,0,0,.22); }
-#tc-root .tc-me-menu-sec { padding: 6px 10px 4px; font-size: 11.5px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: .04em; color: var(--tc-fg2); }
 #tc-root .tc-me-menu-label { @apply flex-1 min-w-0 truncate; }
-#tc-root .tc-me-menu-sep { height: 1px; margin: 4px 6px; background: var(--tc-line); }
 #tc-root .tc-me-kb { font-size: 12px; color: var(--tc-fg2); }
 #tc-root .tc-me-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto;
   background: var(--tc-ring); }
@@ -766,8 +815,12 @@
 #tc-root .tc-viewer { @apply fixed flex flex-col; inset: 0; z-index: 30; color: #f3f4f6;
   background: rgba(12,14,18,.86); backdrop-filter: blur(10px); animation: tc-viewer-in .16s ease; }
 @keyframes tc-viewer-in { from { opacity: 0; } to { opacity: 1; } }
-#tc-root .tc-viewer-bar { @apply flex items-center gap-3; flex: 0 0 auto; padding: 10px 14px;
-  background: linear-gradient(rgba(0,0,0,.35), transparent); }
+/* The bar runs where the window's title bar is: it clears the macOS traffic
+   lights (top-left, same inset as the sidebar head) and moves the window like
+   the rest of the frameless title area; its controls opt out again. */
+#tc-root .tc-viewer-bar { @apply flex items-center gap-3; flex: 0 0 auto; min-height: 52px; padding: 8px 14px 8px 94px;
+  background: linear-gradient(rgba(0,0,0,.35), transparent); -webkit-app-region: drag; user-select: none; }
+#tc-root .tc-viewer-bar .tc-viewer-acts { -webkit-app-region: no-drag; }
 #tc-root .tc-viewer .tc-viewer-icon { width: 30px; height: 30px; background: color-mix(in srgb, var(--k) 26%, transparent);
   color: color-mix(in srgb, var(--k) 60%, #fff); }
 #tc-root .tc-viewer-title { @apply flex flex-col min-w-0; flex: 1 1 auto; }
@@ -790,6 +843,10 @@
 #tc-root .tc-viewer-stage img.loading, #tc-root .tc-viewer-stage iframe.loading { opacity: 0; }
 #tc-root .tc-viewer-stage.frame iframe { width: min(1100px, 100%); height: 100%; border: 0; border-radius: 8px;
   background: #fff; box-shadow: 0 12px 48px rgba(0,0,0,.5); transition: opacity .15s; }
+#tc-root .tc-viewer-stage.text pre { width: min(1100px, 100%); height: 100%; margin: 0; overflow: auto;
+  padding: 20px 24px; border-radius: 8px; background: #1e1f22; color: #e5e7eb; box-shadow: 0 12px 48px rgba(0,0,0,.5);
+  font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere;
+  tab-size: 4; user-select: text; cursor: text; }
 #tc-root .tc-viewer-spin { position: absolute; left: 50%; top: 50%; margin: -14px 0 0 -14px;
   color: rgba(255,255,255,.7); animation: tc-spin .9s linear infinite; }
 #tc-root .tc-viewer-spin.inline { position: static; margin: 0; }
@@ -810,3 +867,54 @@
 #tc-root .tc-viewer-nav:hover { background: rgba(255,255,255,.22); }
 #tc-root .tc-viewer-nav.prev { left: 12px; }
 #tc-root .tc-viewer-nav.next { right: 12px; }
+
+/* Chat options ("…" in the header): menu extras on top of .tc-menu */
+#tc-root .tc-main { position: relative; }
+#tc-root .tc-opts-menu { min-width: 220px; }
+#tc-root .tc-menu-item:disabled { opacity: .5; cursor: default; }
+#tc-root .tc-menu-item.danger:hover, #tc-root .tc-menu-item.danger:hover svg { color: var(--tc-danger-fg); }
+#tc-root .tc-menu-item.danger.armed { background: var(--tc-danger); color: #fff; }
+#tc-root .tc-menu-item.danger.armed svg { color: #fff; }
+#tc-root .tc-menu-grow { flex: 1 1 auto; }
+#tc-root .tc-menu-count { color: var(--tc-fg2); font-size: 12px; }
+#tc-root .tc-menu-check { color: var(--tc-accent) !important; }
+#tc-root .tc-menu-sep { height: 1px; margin: 4px 6px; background: var(--tc-line); }
+#tc-root .tc-menu-label { padding: 6px 10px 4px; color: var(--tc-fg2); font-size: 11.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em; }
+#tc-root .tc-menu-note { padding: 4px 10px 6px; color: var(--tc-fg2); font-size: 12px; max-width: 240px; }
+
+/* Rename: the header title becomes an input */
+#tc-root .tc-head-rename { width: min(360px, 100%); outline: none; border: 1px solid var(--tc-accent);
+  border-radius: 7px; background: var(--tc-bg); color: var(--tc-fg); font: 600 15px var(--tc-font); padding: 3px 8px; }
+#tc-root .tc-head-muted { color: var(--tc-fg2); flex: 0 0 auto; }
+
+/* Members panel: a card under the header's right edge */
+#tc-root .tc-members { @apply absolute flex flex-col; top: 58px; right: 14px; z-index: 15;
+  width: min(340px, calc(100% - 28px)); max-height: min(560px, calc(100% - 80px));
+  background: var(--tc-bg); border: 1px solid var(--tc-line); border-radius: 12px;
+  box-shadow: 0 10px 32px rgba(0,0,0,.24); animation: tc-slide-in .14s ease; }
+#tc-root .tc-members-head { @apply flex items-center gap-2; padding: 8px 8px 6px 14px; }
+#tc-root .tc-members-head strong { font-size: 14px; }
+#tc-root .tc-members-n { color: var(--tc-fg2); font-size: 12.5px; flex: 1 1 auto; }
+#tc-root .tc-members-add { padding: 0 12px 8px; border-bottom: 1px solid var(--tc-line); }
+#tc-root .tc-members-add .tc-newchat-hits { max-height: 200px; }
+#tc-root .tc-members-go { @apply flex items-center gap-2; margin-top: 8px; }
+#tc-root .tc-members-go select { flex: 1 1 auto; min-width: 0; border: 1px solid var(--tc-line); border-radius: 8px;
+  background: var(--tc-bg); color: var(--tc-fg); font: 12.5px var(--tc-font); padding: 6px 6px; }
+#tc-root .tc-members-go .tc-newchat-go { @apply inline-flex items-center gap-1.5; white-space: nowrap; }
+#tc-root .tc-members-list { @apply overflow-y-auto; margin: 0; padding: 6px; list-style: none; }
+#tc-root .tc-member { @apply flex items-center gap-2.5; padding: 6px; border-radius: 8px; }
+#tc-root .tc-member:hover { background: var(--tc-hover); }
+#tc-root .tc-member-text { @apply flex flex-col min-w-0; flex: 1 1 auto; }
+#tc-root .tc-member-name { @apply truncate; font-size: 13.5px; }
+#tc-root .tc-member-you { color: var(--tc-fg2); }
+#tc-root .tc-member-sub { @apply truncate; color: var(--tc-fg2); font-size: 11.5px; }
+#tc-root .tc-member:hover .tc-member-x { opacity: 1; }
+
+/* Muted chat in the sidebar: a bell-off after the name, quieter unread */
+#tc-root .tc-row-muted { color: var(--tc-fg2); flex: 0 0 auto; opacity: .8; }
+
+/* Language picker row in the status menu */
+#tc-root .tc-me-lang { cursor: default; }
+#tc-root .tc-me-lang select { margin-left: auto; max-width: 150px; border: 1px solid var(--tc-line); border-radius: 7px;
+  background: var(--tc-bg); color: var(--tc-fg); font: 12.5px var(--tc-font); padding: 3px 4px; }

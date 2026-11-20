@@ -7,7 +7,11 @@
 // string ops only, and richText.tsx renders structure as React elements.
 
 import { profile, profilePhotoUrl } from "../../teamsData";
-import type { Message } from "../../types";
+import type { Chat, Message } from "../../types";
+import { locale, t } from "../../i18n";
+
+/** A chat's display name. The data layer keeps "Notes" untranslated; the UI shows it in the current language. */
+export const chatTitle = (c: Chat): string => (c.kind === "notes" ? t().common.notes : c.title);
 
 export function initials(name: string): string {
   const parts = (name || "?").replace(/[^\p{L}\p{N}\s]/gu, "").trim().split(/\s+/);
@@ -21,19 +25,37 @@ export function hue(name: string): number {
   return h % 360;
 }
 
+// Intl formatters are costly to build and these run for every row and
+// message on each poll, so they are built once per locale.
+function formatters(loc: string) {
+  return {
+    loc,
+    clock: new Intl.DateTimeFormat(loc, { hour: "2-digit", minute: "2-digit" }),
+    weekday: new Intl.DateTimeFormat(loc, { weekday: "short" }),
+    dayMonth: new Intl.DateTimeFormat(loc, { day: "2-digit", month: "2-digit" }),
+    long: new Intl.DateTimeFormat(loc, { weekday: "long", day: "numeric", month: "long" }),
+    longYear: new Intl.DateTimeFormat(loc, { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
+    full: new Intl.DateTimeFormat(loc, { dateStyle: "medium", timeStyle: "medium" }),
+    rel: new Intl.RelativeTimeFormat(loc, { numeric: "auto" }),
+  };
+}
+let fmts = formatters(locale());
+const fmt = (): ReturnType<typeof formatters> => (fmts.loc === locale() ? fmts : (fmts = formatters(locale())));
+
 export function fmtTime(ts: number): string {
   if (!ts) return "";
   const d = new Date(ts);
   const now = new Date();
-  if (d.toDateString() === now.toDateString())
-    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  if (d.toDateString() === now.toDateString()) return fmt().clock.format(d);
   const days = (now.getTime() - d.getTime()) / 86400000;
-  if (days < 7) return d.toLocaleDateString(undefined, { weekday: "short" });
-  return d.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" });
+  if (days < 7) return fmt().weekday.format(d);
+  return fmt().dayMonth.format(d);
 }
 
-export const fmtClock = (ts: number): string =>
-  ts ? new Date(ts).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "";
+export const fmtClock = (ts: number): string => (ts ? fmt().clock.format(ts) : "");
+
+/** Full date and time, for tooltips. */
+export const fmtFull = (ts: number): string => (ts ? fmt().full.format(ts) : "");
 
 export function fmtDay(ts: number): string {
   const d = new Date(ts);
@@ -41,14 +63,11 @@ export function fmtDay(ts: number): string {
   const yest = new Date(now);
   yest.setDate(now.getDate() - 1);
   // Locale-aware "today"/"yesterday" so labels match the dates around them.
-  const rel = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-  const cap = (t: string): string => t.charAt(0).toUpperCase() + t.slice(1);
-  if (d.toDateString() === now.toDateString()) return cap(rel.format(0, "day"));
-  if (d.toDateString() === yest.toDateString()) return cap(rel.format(-1, "day"));
-  return d.toLocaleDateString(undefined, {
-    weekday: "long", day: "numeric", month: "long",
-    year: d.getFullYear() === now.getFullYear() ? undefined : "numeric",
-  });
+  const f = fmt();
+  const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+  if (d.toDateString() === now.toDateString()) return cap(f.rel.format(0, "day"));
+  if (d.toDateString() === yest.toDateString()) return cap(f.rel.format(-1, "day"));
+  return (d.getFullYear() === now.getFullYear() ? f.long : f.longYear).format(d);
 }
 
 const ENTITIES: Record<string, string> = {

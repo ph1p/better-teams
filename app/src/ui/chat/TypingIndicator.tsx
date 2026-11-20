@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import { useEffect, useState, type JSX } from "react";
 import { typing } from "../../services";
 import type { TypingUser } from "../../services/typing";
@@ -10,7 +11,7 @@ const MAX_FACES = 3;
 const LINGER_MS = 220;
 
 function firstName(mri: string): string {
-  return (profile(mri).displayName || "").split(/[\s,]+/)[0] || "Someone";
+  return (profile(mri).displayName || "").split(/[\s,]+/)[0] || t().chat.someone;
 }
 
 // Teams' localized label when it has one, else "Ann", "Ann and Bo",
@@ -19,9 +20,10 @@ function label(users: TypingUser[]): string {
   const native = users[0]?.typingUsersLabel;
   if (native) return native.replace(/[.…]+$/, "");
   const names = users.map((u) => firstName(u.id));
-  const who = names.length <= 2 ? names.join(" and ")
-    : `${names.slice(0, 2).join(", ")} and ${names.length - 2} other${names.length > 3 ? "s" : ""}`;
-  return `${who} ${names.length > 1 ? "are" : "is"} typing`;
+  const who = names.length === 1 ? names[0]
+    : names.length === 2 ? t().chat.typingTwo(names[0], names[1])
+    : t().chat.typingMore(names[0], names[1], names.length - 2);
+  return t().chat.isTyping(who, names.length > 1);
 }
 
 // Who is typing in the open chat: the typers' faces, an animated dots bubble
@@ -39,8 +41,8 @@ export function TypingIndicator({ chatId }: { chatId: string }): JSX.Element | n
   // Keep the last typers on screen while the pill fades out.
   useEffect(() => {
     if (users.length) { setShown(users); return; }
-    const t = setTimeout(() => setShown([]), LINGER_MS);
-    return () => clearTimeout(t);
+    const h = setTimeout(() => setShown([]), LINGER_MS);
+    return () => clearTimeout(h);
   }, [users]);
 
   if (!shown.length) return null;

@@ -1,6 +1,7 @@
 import { useEffect, useRef, type JSX } from "react";
 import { X } from "lucide-react";
 import { usePref } from "../lib/prefs";
+import { t } from "../../i18n";
 
 interface NotesPanelProps {
   onClose: () => void;
@@ -32,13 +33,13 @@ export function NotesPanel({ onClose }: NotesPanelProps): JSX.Element {
   return (
     <aside className="tc-profile tc-notes">
       <div className="tc-notes-head">
-        <span className="tc-notes-title">Notes</span>
-        <button className="tc-profile-close" onClick={onClose} title="Close (⌥N)" aria-label="Close notes"><X size={16} /></button>
+        <span className="tc-notes-title">{t().common.notes}</span>
+        <button className="tc-profile-close" onClick={onClose} title={t().app.closeNotesTitle} aria-label={t().app.closeNotes}><X size={16} /></button>
       </div>
       <textarea
         ref={area}
         className="tc-notes-area"
-        placeholder="Jot anything down. Saved on this Mac only."
+        placeholder={t().app.notesPlaceholder}
         value={text}
         spellCheck
         onChange={(e) => setText(e.target.value)}

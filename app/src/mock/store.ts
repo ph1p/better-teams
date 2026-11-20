@@ -7,6 +7,7 @@ import type { Chat, FileRef, Message, Profile, Reaction } from "../types";
 import { APPS, CHATS, CHATTER, ME, PEOPLE, PRESENCE, REPLIES, type SeedChat } from "./fixtures";
 import { isAppMri } from "../apps";
 import { extOf } from "../data/raw";
+import { isOneToOneId } from "../data/state";
 
 /** How many recent messages the first load shows; older ones page in on scroll. */
 const WINDOW = 30;
@@ -14,11 +15,17 @@ const PAGE = 20;
 
 interface MockChat {
   seed: SeedChat;
+  /** A named group chat: can be renamed, and members added or removed. */
+  group: boolean;
   messages: Message[];
   /** Read horizon, ms: anything newer from someone else is unread. */
   readMs: number;
   marked: boolean;
   hidden: boolean;
+  muted?: boolean;
+  left?: boolean;
+  /** Channel notification preset (channels only). */
+  preset?: string;
   favorite: boolean;
   pinned: boolean;
   liveCall?: string;
@@ -99,6 +106,7 @@ for (const seed of CHATS) {
   }
   chats.set(seed.id, {
     seed, messages,
+    group: seed.kind === "chat" && !isOneToOneId(seed.id),
     readMs: at(seed.readAgo ?? 0) + 1,
     marked: false,
     hidden: !!seed.hidden,
@@ -198,6 +206,9 @@ export function listChats(): Chat[] {
       favorite: c.favorite,
       pinned: c.pinned,
       hidden: c.hidden,
+      muted: !!c.muted,
+      group: c.group,
+      left: !!c.left,
       time,
       unread: c.marked || (!lastFromMe && time > c.readMs),
       last: {
@@ -264,6 +275,14 @@ export function edit(convId: string, messageId: string, html: string): boolean {
   return true;
 }
 
+export function setFiles(convId: string, messageId: string, files: FileRef[]): boolean {
+  const hit = find(convId, messageId);
+  if (!hit || !hit.m.mine) return false;
+  hit.m.files = files;
+  emit(convId, "MessageUpdate", messageId);
+  return true;
+}
+
 export function setDeleted(convId: string, messageId: string, deleted: boolean): boolean {
   const hit = find(convId, messageId);
   if (!hit || !hit.m.mine) return false;
@@ -304,15 +323,48 @@ export function setHidden(convId: string, hidden: boolean): boolean {
   return true;
 }
 
+/** Group chat management, as the worker's resolvers do it. */
+export function setTopic(convId: string, topic: string): boolean {
+  const c = chats.get(convId);
+  if (!c?.group) return false;
+  c.seed.topic = topic;
+  poke();
+  return true;
+}
+
+export function setMembers(convId: string, add: string[], remove: string[]): boolean {
+  const c = chats.get(convId);
+  if (!c?.group) return false;
+  c.seed.members = [...new Set([...c.seed.members.filter((m) => !remove.includes(m)), ...add])];
+  if (remove.includes(ME)) { c.left = true; c.hidden = true; }
+  poke();
+  return true;
+}
+
+export function setMuted(convId: string, muted: boolean): boolean {
+  const c = chats.get(convId);
+  if (!c || c.seed.kind === "channel") return false;
+  c.muted = muted;
+  poke();
+  return true;
+}
+
+export function channelPreset(convId: string, preset?: string): string | null {
+  const c = chats.get(convId);
+  if (!c || c.seed.kind !== "channel") return null;
+  if (preset) c.preset = preset;
+  return c.preset || "ALL_NEW_MSGS";
+}
+
 /** The 1:1 or group chat with exactly these people, created if there is none yet. */
 export function chatWith(mris: string[]): string {
   const want = [...new Set(mris.filter((m) => m && m !== ME))].sort().join(",");
   for (const c of chats.values()) {
-    if (c.seed.kind === "chat" && !c.seed.topic && [...c.seed.members].sort().join(",") === want) return c.seed.id;
+    if (c.seed.kind === "chat" && !c.group && [...c.seed.members].sort().join(",") === want) return c.seed.id;
   }
   const id = `19:mock-${Date.now().toString(36)}@unq.gbl.spaces`;
   const seed: SeedChat = { id, kind: "chat", members: want.split(","), messages: [] };
-  chats.set(id, { seed, messages: [], readMs: Date.now(), marked: false, hidden: false, favorite: false, pinned: false, floor: 0, cursor: 0 });
+  chats.set(id, { seed, group: false, messages: [], readMs: Date.now(), marked: false, hidden: false, favorite: false, pinned: false, floor: 0, cursor: 0 });
   return id;
 }
 

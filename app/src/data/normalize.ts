@@ -63,6 +63,7 @@ function parseFiles(raw: unknown): FileRef[] {
           name,
           url: str(info.shareUrl) || str(info.fileUrl) || str(get(f, "objectUrl")) || str(get(f, "openUrl")),
           ext,
+          raw: f,
         };
         const pv = obj(get(f, "filePreview"));
         // Only AMS previews: they load with the page's cookies.

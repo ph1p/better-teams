@@ -181,6 +181,20 @@ function envelope(ctx: Ctx, requestId: string, operationName: string, query: str
 export type CdlRes<T> = { ok: true; data: T } | { ok: false; reason: string };
 
 /**
+ * Pick one mutation/query result field. A missing field, or one whose
+ * __typename matches `bad` (Teams' `...Error` types), turns into a failure.
+ */
+export function check<T>(r: CdlRes<Record<string, unknown>>, field: string, bad?: RegExp): CdlRes<T> {
+  if (!r.ok) return r;
+  const v = r.data[field] as { __typename?: string; errorCode?: string; errorMessage?: string } | null | undefined;
+  if (!v) return { ok: false, reason: `no ${field}` };
+  if (bad && v.__typename && bad.test(v.__typename)) {
+    return { ok: false, reason: `${v.__typename}${v.errorCode ? ": " + v.errorCode : ""}${v.errorMessage ? " " + v.errorMessage : ""}` };
+  }
+  return { ok: true, data: v as T };
+}
+
+/**
  * Run one GraphQL query or mutation through Teams' worker. `query` must be the
  * document Teams itself sends for `operationName` (see docs/cdl-catalog.json).
  * Never throws.

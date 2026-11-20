@@ -5,9 +5,10 @@ import {
 } from "lucide-react";
 import { profile } from "../../teamsData";
 import { avatarUri, hue, initials } from "../lib/format";
-import { STATUS_COLOR, usePresence } from "../lib/presence";
+import { STATUS_COLOR, statusLabel, usePresence } from "../lib/presence";
 import type { CSSProperties } from "react";
 import type { Chat } from "../../types";
+import { t } from "../../i18n";
 
 interface ProfilePanelProps {
   mri: string;
@@ -29,7 +30,7 @@ export function ProfilePanel({ mri, chats, sel, onPick, onClose, onMessage, onCa
   const status = statusOf(mri);
   const ring = status !== "Unknown";
   const p = profile(mri);
-  const name = p.displayName || "Unknown";
+  const name = p.displayName || t().common.unknown;
   const rows: Array<[IconComp, string]> = ([
     [MailIcon, p.email],
     [Briefcase, p.jobTitle],
@@ -39,10 +40,10 @@ export function ProfilePanel({ mri, chats, sel, onPick, onClose, onMessage, onCa
   return (
     <aside className="tc-profile">
       <div className="tc-profile-head">
-        <button className="tc-profile-close" onClick={onClose} title="Close" aria-label="Close"><X size={16} /></button>
+        <button className="tc-profile-close" onClick={onClose} title={t().common.close} aria-label={t().common.close}><X size={16} /></button>
       </div>
       <div className="tc-profile-id">
-        <div className={"tc-profile-av-ring" + (ring ? " on is-" + status.toLowerCase() : "")} style={ring ? ({ "--tc-ring": STATUS_COLOR[status] } as CSSProperties) : undefined} title={ring ? status : undefined}>
+        <div className={"tc-profile-av-ring" + (ring ? " on is-" + status.toLowerCase() : "")} style={ring ? ({ "--tc-ring": STATUS_COLOR[status] } as CSSProperties) : undefined} title={ring ? statusLabel(status) : undefined}>
           <div className="tc-profile-av" style={{ background: `hsl(${hue(name)} 45% 52%)` }}>
             {avatarUri(mri) ? <img src={avatarUri(mri)} alt="" /> : initials(name)}
           </div>
@@ -66,16 +67,16 @@ export function ProfilePanel({ mri, chats, sel, onPick, onClose, onMessage, onCa
             <button
               className="tc-profile-dm"
               onClick={() => (dm ? onPick(dm.id) : onMessage?.())}
-              title={dm ? "Open the direct chat" : "Start a direct chat in Teams"}
+              title={dm ? t().app.openDm : t().app.startDm}
             >
               <MessageSquare size={15} />
-              <span>Message directly</span>
+              <span>{t().app.messageDirectly}</span>
               {dm && dm.unread ? <span className="tc-unread" /> : null}
             </button>
-            <button className="tc-profile-call" onClick={() => onCall?.("audio")} title="Audio call in Teams" aria-label="Audio call">
+            <button className="tc-profile-call" onClick={() => onCall?.("audio")} title={t().app.audioCallTitle} aria-label={t().common.audioCall}>
               <Phone size={16} />
             </button>
-            <button className="tc-profile-call" onClick={() => onCall?.("video")} title="Video call in Teams" aria-label="Video call">
+            <button className="tc-profile-call" onClick={() => onCall?.("video")} title={t().app.videoCallTitle} aria-label={t().common.videoCall}>
               <Video size={16} />
             </button>
           </div>
@@ -86,13 +87,13 @@ export function ProfilePanel({ mri, chats, sel, onPick, onClose, onMessage, onCa
         {(() => {
           // Group the remaining shared chats: multi-person group chats, then
           // channels. The 1:1 DM is excluded (it's the button above).
-          const groups = chats.filter((c) => c.kind === "chat" && (c.members || []).length > 1);
+          const groups = chats.filter((c) => c.group);
           const channels = chats.filter((c) => c.isChannel);
           const sections: Array<[string, IconComp, Chat[]]> = ([
-            ["Group chats", Users, groups],
-            ["Channels", Hash, channels],
+            [t().app.groupChats, Users, groups],
+            [t().app.channels, Hash, channels],
           ] as Array<[string, IconComp, Chat[]]>).filter(([, , rows]) => rows.length);
-          if (!sections.length) return <div className="tc-profile-empty">No shared group chats or channels.</div>;
+          if (!sections.length) return <div className="tc-profile-empty">{t().app.noShared}</div>;
           return sections.map(([title, SecIcon, rows]) => (
             <div key={title} className="tc-profile-group">
               <div className="tc-profile-sec">

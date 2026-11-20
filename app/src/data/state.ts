@@ -27,6 +27,10 @@ export const lastByConv = new Map<string, chat.MsgRef>();
 // stay on the chatsvc REST path.
 export const isChannelId = (id: string): boolean => /@thread\.(tacv2|skype)$/.test(id);
 
+// 1:1 chats live under "<a>_<b>@unq.gbl.spaces" (or are threads flagged
+// uniquerosterthread, see listChats).
+export const isOneToOneId = (id: string): boolean => /@unq\.gbl\.spaces$/.test(id);
+
 // Uncached chats poll every few seconds but their IndexedDB stays empty, so
 // cache the remote result briefly to avoid hammering chatsvc on every tick.
 // Kept just under the UI poll interval (4s) so a new message shows within one
