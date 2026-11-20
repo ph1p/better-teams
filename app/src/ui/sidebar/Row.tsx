@@ -1,5 +1,5 @@
 import type { JSX, MouseEvent } from "react";
-import { Hash, CalendarDays, NotebookPen } from "lucide-react";
+import { Hash, CalendarDays, NotebookPen, Video } from "lucide-react";
 import { Avatar } from "../shared/Avatar";
 import { avatarUri, fmtTime, oneLine } from "../lib/format";
 import { usePresence } from "../lib/presence";
@@ -58,6 +58,11 @@ export function Row({ chat, selected, compact, showTeam = true, onClick, onOpenP
           </div>
         )}
       </div>
+      {chat.liveCall ? (
+        <span className="tc-row-live" title="Call in progress" aria-label="Call in progress">
+          <span className="tc-live-dot" />{compact ? null : <Video size={12} />}
+        </span>
+      ) : null}
       {chat.unread ? <span className="tc-unread" aria-label="Unread" /> : null}
     </div>
   );

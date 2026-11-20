@@ -251,7 +251,7 @@ function toReact(node: Node): ReactNode {
     return kids.length ? <Fragment key={key}>{kids}</Fragment> : null;
   }
   const T = tag;
-  const props: { key: string; className?: string; "data-reply-id"?: string } = { key };
+  const props: { className?: string; "data-reply-id"?: string } = {};
   if (cls) props.className = cls;
   // Quoted reply: Teams marks it itemtype=".../Reply" itemid=<message id>.
   // Keep the id (the click jumps to the original) and style it apart.
@@ -259,7 +259,7 @@ function toReact(node: Node): ReactNode {
     props.className = "tc-quote tc-reply";
     if (node.attrs.itemid) props["data-reply-id"] = node.attrs.itemid;
   }
-  return <T {...props}>{kids}</T>;
+  return <T key={key} {...props}>{kids}</T>;
 }
 
 // Render a Teams HTML content string as safe React nodes.

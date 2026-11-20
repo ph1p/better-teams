@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 import {
-  SmilePlus, Pencil, Trash2, Undo2, Paperclip, X, Reply, Copy, Check,
+  SmilePlus, Pencil, Trash2, Undo2, Paperclip, X, Reply, Copy, Check, MessageSquareReply,
 } from "lucide-react";
-import { splitQuote } from "../../teamsData";
+import { splitQuote } from "../../quote";
 import { RichHtml } from "../../richText";
 import { Avatar } from "../shared/Avatar";
 import { Linkified } from "../shared/Linkified";
@@ -23,12 +23,14 @@ interface MessageProps {
   onOpenProfile: (mri: string) => void;
   onQuote: (m: Msg) => void;
   onJumpTo?: (mid: string) => void;
+  /** Channels only: answer in this message's thread. */
+  onThreadReply?: (m: Msg) => void;
 }
 
 // One rendered message: avatar + meta on the first of a group, content (rich
 // HTML or linkified text), files, reactions, and a hover toolbar (react / quote
 // / edit / delete). Edit swaps the content for a textarea with a quote chip.
-export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onEdit, onOpenProfile, onQuote, onJumpTo }: MessageProps): JSX.Element {
+export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onEdit, onOpenProfile, onQuote, onJumpTo, onThreadReply }: MessageProps): JSX.Element {
   const { statusOf } = usePresence();
   const [pick, setPick] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -167,6 +169,9 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onE
           <div className="tc-tool-row">
             <button className="tc-tool" title="Add reaction" onClick={() => setPick((p) => !p)}><SmilePlus size={16} /></button>
             <button className="tc-tool" title={copied ? "Copied" : "Copy text"} onClick={copyText}>{copied ? <Check size={15} /> : <Copy size={15} />}</button>
+            {channel && onThreadReply ? (
+              <button className="tc-tool" title="Reply in thread" onClick={() => onThreadReply(m)}><MessageSquareReply size={16} /></button>
+            ) : null}
             <button className="tc-tool" title="Reply with quote" onClick={() => onQuote(m)}><Reply size={16} /></button>
             {m.mine ? <button className="tc-tool" title="Edit" onClick={startEdit}><Pencil size={15} /></button> : null}
             {m.mine ? <button className="tc-tool" title="Delete" onClick={() => onDelete(cid, m.id)}><Trash2 size={15} /></button> : null}

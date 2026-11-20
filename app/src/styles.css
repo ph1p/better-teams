@@ -76,7 +76,7 @@
 #tc-root .tc-side { @apply flex flex-col min-h-0; background: var(--tc-bg2);
   border-right: 1px solid var(--tc-line); }
 #tc-root .tc-side-head { @apply flex items-center gap-2; padding: 14px 16px 10px; }
-#tc-root .tc-side-head h1 { @apply flex-1 m-0; font-size: 16px; font-weight: 700; }
+#tc-root .tc-side-head .tc-side-spacer { @apply flex-1; }
 #tc-root .tc-search { @apply relative; margin: 0 12px 8px; }
 #tc-root .tc-search input { @apply w-full outline-none; border: 1px solid var(--tc-line);
   background: var(--tc-bg); color: var(--tc-fg); border-radius: 8px;
@@ -138,7 +138,7 @@
 #tc-root .tc-msg:hover { background: color-mix(in srgb, var(--tc-hover) 55%, transparent); border-radius: 8px; }
 #tc-root .tc-msg + .tc-msg { margin-top: 0; }
 #tc-root .tc-msg.first { margin-top: 8px; }
-#tc-root .tc-day + .tc-msg.first, #tc-root .tc-thread-sep + .tc-msg.first { margin-top: 0; }
+#tc-root .tc-day + .tc-msg.first { margin-top: 0; }
 #tc-root .tc-msg.tc-flash { animation: tc-flash 1.4s ease; }
 @keyframes tc-flash {
   0% { background: color-mix(in srgb, var(--tc-accent) 32%, transparent); }
@@ -344,11 +344,50 @@
 #tc-root .tc-msgs-wrap { @apply relative flex flex-col flex-1; min-height: 0; }
 #tc-root .tc-day-sticky { @apply absolute flex justify-center; top: 6px; left: 0; right: 0;
   z-index: 8; pointer-events: none; }
-#tc-root .tc-day-sticky span { font-size: 11.5px; font-weight: 600; color: var(--tc-fg2);
+/* Fade band behind the pill so the text scrolling under it stays legible. */
+#tc-root .tc-day-sticky::before { content: ""; position: absolute; left: 0; right: 0; top: -6px;
+  height: 34px; background: linear-gradient(var(--tc-bg) 55%, transparent); }
+#tc-root .tc-day-sticky span { position: relative; font-size: 11.5px; font-weight: 600; color: var(--tc-fg2);
   background: var(--tc-bg); border: 1px solid var(--tc-line); border-radius: 999px;
   padding: 2px 10px; box-shadow: 0 2px 8px rgba(0,0,0,.1); }
-#tc-root .tc-thread-sep { height: 1px; background: var(--tc-line); margin: 12px 0 0 46px; }
-#tc-root .tc-msg.reply { padding-left: 46px; }
+/* Channel threads: one card per conversation, replies indented on a rail. */
+#tc-root .tc-thread { margin: 10px 0 14px; padding: 6px 8px 4px; border: 1px solid var(--tc-line);
+  border-radius: 12px; background: color-mix(in srgb, var(--tc-hover) 30%, transparent);
+  transition: border-color .15s, box-shadow .15s; }
+#tc-root .tc-thread.replying { border-color: var(--tc-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tc-accent) 40%, transparent); }
+#tc-root .tc-day + .tc-thread { margin-top: 4px; }
+/* Running channel meeting: green edge and a pulsing "Live" badge. */
+#tc-root .tc-thread { position: relative; }
+#tc-root .tc-thread.live { border-color: color-mix(in srgb, #22c55e 55%, var(--tc-line)); }
+#tc-root .tc-live-badge { position: absolute; top: 8px; right: 10px; @apply inline-flex items-center gap-1.5;
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; color: #16a34a;
+  background: color-mix(in srgb, #22c55e 14%, transparent); }
+#tc-root .tc-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e;
+  animation: tc-live-pulse 1.6s ease-in-out infinite; }
+@keyframes tc-live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+#tc-root .tc-call-end { @apply flex items-center gap-1.5; font-size: 12px; color: var(--tc-fg2); padding: 4px 0 2px 4px; }
+#tc-root .tc-thread > .tc-msg.first { margin-top: 0; }
+#tc-root .tc-thread-replies { margin: 4px 0 0 46px; padding-left: 10px;
+  border-left: 2px solid var(--tc-line); }
+#tc-root .tc-thread-replies > .tc-msg.first { margin-top: 4px; }
+#tc-root .tc-thread-replies > .tc-msg:first-child { margin-top: 0; }
+#tc-root .tc-thread-orphan { font-size: 12px; color: var(--tc-fg2); font-style: italic; padding: 2px 0 2px 4px; }
+#tc-root .tc-thread-more, #tc-root .tc-thread-reply { @apply inline-flex items-center gap-1.5 cursor-pointer;
+  border: 0; background: transparent; color: var(--tc-accent); font: inherit; font-size: 12.5px;
+  font-weight: 600; padding: 3px 6px; border-radius: 6px; }
+#tc-root .tc-thread-more:hover, #tc-root .tc-thread-reply:hover { background: var(--tc-hover); }
+#tc-root .tc-thread-people { color: var(--tc-fg2); font-weight: 400; }
+#tc-root .tc-thread-reply { margin: 2px 0 0 40px; color: var(--tc-fg2); font-weight: 500; }
+#tc-root .tc-thread-reply:hover { color: var(--tc-accent); }
+#tc-root .tc-thread-actions { @apply flex items-center gap-2; }
+#tc-root .tc-join { @apply inline-flex items-center gap-1.5 cursor-pointer;
+  border: 0; border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 12.5px; font-weight: 600;
+  background: #16a34a; color: #fff; }
+#tc-root .tc-join:hover { background: #15803d; }
+#tc-root .tc-row-live { @apply inline-flex items-center gap-1 shrink-0;
+  font-size: 10.5px; font-weight: 600; color: #16a34a; margin-left: 4px; }
+#tc-root .tc-thread-chip { border-color: color-mix(in srgb, var(--tc-accent) 45%, var(--tc-line)); }
 #tc-root .tc-msg.reply .tc-av.sm { width: 24px; height: 24px; font-size: 10px; }
 #tc-root .tc-msg.pending { opacity: .55; }
 #tc-root .tc-subject { font-weight: 700; font-size: 15px; margin: 2px 0; }
@@ -460,6 +499,18 @@
   box-shadow: -8px 0 24px rgba(0,0,0,.18); z-index: 10; animation: tc-slide-in .16s ease; }
 @keyframes tc-slide-in { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
 #tc-root .tc-profile-head { @apply flex justify-end; padding: 10px 12px 0; }
+/* Notes drawer: reuses the profile drawer shell. */
+#tc-root .tc-notes-head { @apply flex items-center gap-2; padding: 10px 12px 8px 16px; }
+#tc-root .tc-notes-title { @apply flex-1; font-size: 15px; font-weight: 700; }
+#tc-root .tc-notes-area { @apply flex-1 outline-none resize-none; margin: 0 12px 12px; padding: 10px 12px;
+  border: 1px solid var(--tc-line); border-radius: 8px; background: var(--tc-bg); color: var(--tc-fg);
+  font-family: inherit; font-size: 13.5px; line-height: 1.55; }
+#tc-root .tc-notes-area:focus { border-color: var(--tc-accent); }
+/* Self-chat slot: pinned under the chat list, above the me bar. */
+#tc-root .tc-self-slot { flex: 0 0 auto; padding: 6px 8px; border-top: 1px solid var(--tc-line); }
+/* Same inset + rounded shape as list rows; the me bar below brings its own border. */
+#tc-root .tc-self-slot + .tc-me { border-top: 0; padding-top: 2px; }
+#tc-root .tc-self-slot .tc-row.sel .tc-hash { background: var(--tc-accent); color: #fff; }
 #tc-root .tc-profile-close { @apply grid place-items-center cursor-pointer; border: 0;
   background: transparent; color: var(--tc-fg2); width: 28px; height: 28px; border-radius: 7px; }
 #tc-root .tc-profile-close:hover { background: var(--tc-hover); color: var(--tc-fg); }
@@ -539,9 +590,8 @@
 #tc-root .tc-menu-item:hover { background: var(--tc-hover); }
 #tc-root .tc-menu-item svg { color: var(--tc-fg2); flex: 0 0 auto; }
 
-/* Keep the sidebar title clear of the macOS traffic-light buttons (top-left). */
+/* Keep the sidebar head clear of the macOS traffic-light buttons (top-left). */
 #tc-root .tc-side-head { height: 40px; padding: 0 16px 0 94px; margin-bottom: 6px; }
-#tc-root .tc-side-head h1 { font-size: 15px; line-height: 1.4; white-space: nowrap; }
 
 /* Frameless window: the sidebar title bar and the chat header move the window.
    Anything clickable inside them opts out again. */

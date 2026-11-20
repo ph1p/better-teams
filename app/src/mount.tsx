@@ -69,8 +69,8 @@ function mount(): NonNullable<Window["__teamsCalmApp"]> {
   const pill = document.createElement("button");
   pill.id = PILL_ID;
   pill.type = "button";
-  pill.textContent = "Teams Calm";
-  pill.title = "Back to Teams Calm (⌥⌘T)";
+  pill.textContent = "Calm down";
+  pill.title = "Calm down: back to the calm view (⌥⌘T)";
   Object.assign(pill.style, {
     position: "fixed", zIndex: "2147483000", height: "26px", padding: "0 12px",
     border: "0", borderRadius: "13px", background: "#4f6bed", color: "#fff",

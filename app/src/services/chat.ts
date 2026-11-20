@@ -55,6 +55,10 @@ export interface SendInput {
   mentions?: MentionInput[];
   /** Set to edit an existing message instead of creating one. */
   edit?: { id: string; time: number };
+  /** Channel conversation: post through Teams' channel send pipeline. */
+  channel?: boolean;
+  /** Channel thread root id: reply in that thread instead of a new post. */
+  replyChainId?: string;
 }
 
 /** Send (or edit) a message: Teams' `autoSendMessage`, action Create/Update. */
@@ -78,7 +82,7 @@ export async function sendMessage(i: SendInput): Promise<CdlRes<{ id: string; or
     deeplinks: [],
     clientMessageId: i.clientMessageId,
     title: "",
-    replyChainId: null,
+    replyChainId: i.replyChainId ?? null,
     ...(i.edit ? { id: i.edit.id } : {}),
     importance: "Standard",
     messageType: "RichText/Html",
@@ -112,7 +116,8 @@ export async function sendMessage(i: SendInput): Promise<CdlRes<{ id: string; or
     originalSendPipelineTime: String(Date.now()),
     overrideImDisplayNameT1: null,
     meetingChatType: null,
-    sendPipelineThreadType: "Chats",
+    // Native compose: channel posts and replies use the "Channels" pipeline.
+    sendPipelineThreadType: i.channel ? "Channels" : "Chats",
     isNewBotSession: false,
     inMeetingPrivateChatContext: null,
   };
@@ -130,7 +135,7 @@ export async function sendMessage(i: SendInput): Promise<CdlRes<{ id: string; or
       originalConvId: i.convId,
       correlationId: uuid(),
       searchSessionId: uuid(),
-      sendFromChannel_ToBeRefactored: false,
+      sendFromChannel_ToBeRefactored: !!i.channel,
       offlineActionOptions: {
         queueId: `queue_${i.convId}`,
         actionId: `send_${i.clientMessageId}`,

@@ -25,6 +25,7 @@
 
 import type { Chat, ChatKind, FileRef, Message, Profile, Quote, Reaction, WriteResult } from "./types";
 import { buildMentionContent, type MentionPick } from "./mentions";
+import { buildQuoteHtml } from "./quote";
 import { chat, chatsvc, substrate, region, token, type Res } from "./services";
 
 // Service-layer result -> the UI's WriteResult.
@@ -181,6 +182,8 @@ function chatTitle(c: Dict, kind: ChatKind, others: string[]): string {
   if (kind === "notes") return "Notes";
   if (kind === "channel") {
     // The General channel often has no topic of its own.
+    // Private/shared channels are their own space: spaceThreadTopic is their name.
+    if (str(c.type) === "Space" && str(c.id) !== str(c.teamId)) return str(tp.spaceThreadTopic) || "Channel";
     return str(tp.topic) || str(tp.topicThreadTopic) || "General";
   }
   if (str(tp.topic)) return str(tp.topic);
@@ -216,6 +219,20 @@ async function favoriteIds(): Promise<Set<string>> {
   }
 }
 
+// Running call: Teams keeps "awareness_conversationLiveState:<rootId>" in the
+// thread properties (JSON: status, expiration in s). A call whose end event got
+// lost stays "Active" but expires, so expiration is checked too.
+function liveCallRoot(tp: Dict): string {
+  const now = Date.now();
+  for (const [k, v] of Object.entries(tp)) {
+    if (!k.startsWith("awareness_conversationLiveState:")) continue;
+    let j: Dict;
+    try { j = obj(typeof v === "string" ? JSON.parse(v) : v); } catch { continue; }
+    if (j.status === "Active" && Number(j.expiration) * 1000 > now) return k.slice(k.indexOf(":") + 1);
+  }
+  return "";
+}
+
 export async function listChats(): Promise<Chat[]> {
   void flushPendingHorizons();
   const db = await open("conversation");
@@ -227,13 +244,22 @@ export async function listChats(): Promise<Chat[]> {
 
   const chats: Chat[] = [];
   for (const c of rows) {
-    const kind = KIND[str(c.type)];
-    if (!kind || !c.id || !c.lastMessage) continue;
+    // Channels stored as "Space" rows: a team's General channel is the team's
+    // own row (id === teamId, topic "General"); private/shared channels are
+    // their own space (id !== teamId, threadSubType PrivateChannel/…), named by
+    // spaceThreadTopic. "lwgChannelLie-*" rows are Teams' optimistic
+    // placeholders for a channel being created; the real row follows.
     const tp = obj(c.threadProperties);
+    const isSpaceChannel = c.type === "Space" && !!c.id && !!c.teamId && !obj(c.properties).isLie;
+    const kind = isSpaceChannel ? "channel" : KIND[str(c.type)];
+    if (!kind || !c.id) continue;
     if (tp.isdeleted === "true" || tp.isdeleted === true) continue;
+    // A brand-new channel has no message yet; list it from its creation time.
+    if (!c.lastMessage && kind !== "channel") continue;
     const props = obj(c.properties);
     const lm = obj(c.lastMessage);
-    const time = toMs(c.lastMessageTimeUtc) || toMs(lm.originalarrivaltime) || toMs(lm.composetime);
+    const time = toMs(c.lastMessageTimeUtc) || toMs(lm.originalarrivaltime) || toMs(lm.composetime)
+      || (kind === "channel" ? toMs(tp.createdat) : 0);
     if (!time) continue;
     const lmTime = toMs(lm.originalarrivaltime) || time;
     if (lm.id) lastByConv.set(str(c.id), { id: String(lm.id), clientMessageId: str(lm.clientmessageid), time: lmTime });
@@ -260,6 +286,7 @@ export async function listChats(): Promise<Chat[]> {
     const hidden = effectiveHidden(str(c.id), hiddenAt > 0 && time <= hiddenAt);
 
     chats.push({
+      ...(liveCallRoot(tp) ? { liveCall: liveCallRoot(tp) } : {}),
       id: str(c.id),
       kind,
       title: chatTitle(c, kind, others),
@@ -288,6 +315,36 @@ export async function listChats(): Promise<Chat[]> {
 // --- Messages -------------------------------------------------------------
 
 const SKIP_TYPES = /ThreadActivity|Control|Event\//i;
+
+// A channel meeting posts its callStarted Event/Call as a thread root, the
+// meeting chat as replies to it, and a callEnded Event/Call reply when it
+// ends. Keep both (as short meeting lines): without the root every meeting
+// thread renders as replies to a missing post, and the end marks it not live.
+const CALL = /^Event\/Call$/i;
+const isCallEnd = (content: string): boolean => /<callEventType>\s*callEnded/i.test(content);
+const keepCall = (type: string, id: string, root: string | null, content: string): boolean =>
+  CALL.test(type) && !!root && (id === root || isCallEnd(content));
+const skipType = (type: string, id: string, root: string | null, content: string): boolean =>
+  SKIP_TYPES.test(type) && !keepCall(type, id, root, content);
+function fmtCallDuration(sec: number): string {
+  const m = Math.round(sec / 60);
+  return m < 60 ? `${Math.max(1, m)} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
+}
+function asCallRoot(n: Message, raw: Record<string, unknown>): Message {
+  if (!CALL.test(n.messageType)) return n;
+  const html = str(raw.content);
+  if (isCallEnd(html)) {
+    const secs = [...html.matchAll(/<duration>(\d+)<\/duration>/g)].map((x) => Number(x[1]));
+    const d = secs.length ? Math.max(...secs) : 0;
+    return { ...n, call: "end", from: n.from || "Meeting", content: "<p>Meeting ended" + (d ? " · " + fmtCallDuration(d) : "") + "</p>" };
+  }
+  // CDL nests the meeting object; IDB/REST keep it as a JSON string in properties.meeting.
+  let pm: unknown = get(raw.properties, "meeting");
+  if (typeof pm === "string") { try { pm = JSON.parse(pm); } catch { pm = undefined; } }
+  const title = str(get(raw.meeting, "meetingTitle")) || str(get(pm, "meetingtitle")) || str(get(raw.properties, "meetingtitle"));
+  const esc = title.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return { ...n, call: "start", from: n.from || "Meeting", content: "<p>Meeting" + (esc ? ": <b>" + esc + "</b>" : " started") + "</p>" };
+}
 
 function parseFiles(raw: unknown): FileRef[] {
   if (!raw) return [];
@@ -427,8 +484,8 @@ export async function listMessages(
     for (const raw of Object.values(messageMap)) {
       const m = obj(raw);
       if (m.content === undefined) continue;
-      if (SKIP_TYPES.test(str(m.messageType))) continue;
-      const n = normMessage(raw, rc);
+      if (skipType(str(m.messageType), String(m.id), rc ? String(rc.replyChainId) : null, str(m.content))) continue;
+      const n = asCallRoot(normMessage(raw, rc), m);
       if (hiddenDeleted(m, n)) continue;
       const prev = byId.get(n.id);
       const v = Number(m.version) || 0;
@@ -502,12 +559,12 @@ function parseRemotePage(j: unknown, channel: boolean): Message[] {
   for (const raw of arr(get(j, "messages"))) {
     const m = obj(raw);
     if (m.content === undefined) continue;
-    if (SKIP_TYPES.test(str(m.messagetype))) continue;
     // chatsvc carries rootMessageId per message, so channels can thread the same
     // way cached replychains do. Build a minimal rc from it; chats ignore it.
     const root = channel ? String(m.rootMessageId || m.id) : null;
+    if (skipType(str(m.messagetype), String(m.id), root, str(m.content))) continue;
     const rc: ChainCtx | null = root ? { replyChainId: root, originalArrivalTime: null } : null;
-    const n = normMessage(raw, rc);
+    const n = asCallRoot(normMessage(raw, rc), m);
     if (hiddenDeleted(m, n)) continue;
     byId.set(n.id, n);
   }
@@ -527,8 +584,8 @@ function parseRemotePage(j: unknown, channel: boolean): Message[] {
 function normCdlMessage(raw: unknown, channel = false): Message | null {
   const m = obj(raw);
   const messageType = str(m.messageType);
-  if (m.content === undefined || SKIP_TYPES.test(messageType)) return null;
   const id = String(m.id);
+  if (m.content === undefined || skipType(messageType, id, channel ? str(m.parentMessageId) : null, str(m.content))) return null;
   const time = toMs(m.originalArrivalTime);
   const fromMri = str(get(m.fromUser, "mri")) || str(m.fromUserId) || mriOf(m.from);
   const deleted = Number(m.deleteTime) > 0;
@@ -555,7 +612,7 @@ function normCdlMessage(raw: unknown, channel = false): Message | null {
       };
     })
     .filter((r) => r.key && r.count > 0);
-  return {
+  return asCallRoot({
     id,
     rootId: isReply ? parent : id,
     rootTime: isReply ? Number(parent) || time : time,
@@ -572,7 +629,7 @@ function normCdlMessage(raw: unknown, channel = false): Message | null {
     reactions,
     files: parseFiles(m.files),
     time,
-  };
+  }, m);
 }
 
 // conversationId -> worker cursor for the next older page (null: start of
@@ -665,36 +722,8 @@ async function primeOnce(conversationId: string, channel: boolean): Promise<Mess
   return parseRemotePage(j, channel);
 }
 
-// HTML-escape text for element content (used in quote preview/sender name).
-const esc2 = (s: string): string => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-// Build the native Skype Reply blockquote for a quote-reply. `quote` is
-// { id, from, text, fromMri }; returns "" when there is nothing to quote.
-export function buildQuoteHtml(quote: Quote | null): string {
-  if (!quote || !quote.id) return "";
-  const qid = String(quote.id).replace(/"/g, "&quot;");
-  const qmri = String(quote.fromMri || "").replace(/"/g, "&quot;");
-  const qfrom = esc2(quote.from || "");
-  const qprev = esc2(String(quote.text || "").slice(0, 1000));
-  return (
-    `<blockquote itemscope="" itemtype="http://schema.skype.com/Reply" itemid="${qid}">\r\n` +
-    `<strong itemprop="mri" itemid="${qmri}">${qfrom}</strong>` +
-    `<span itemprop="time" itemid="${qid}"></span>\r\n` +
-    `<p itemprop="preview">${qprev}</p>\r\n` +
-    `</blockquote>\r\n`
-  );
-}
-
-// Split a message's stored HTML into { quoteHtml, body }: the leading Skype
-// Reply blockquote (kept verbatim so an edit can preserve it) and the rest.
-// No quote → { quoteHtml: "", body: content }.
-export function splitQuote(content: string): { quoteHtml: string; body: string } {
-  const m = /^\s*(<blockquote[^>]*itemtype="http:\/\/schema\.skype\.com\/Reply"[\s\S]*?<\/blockquote>)\s*/i.exec(content || "");
-  if (!m) return { quoteHtml: "", body: content || "" };
-  return { quoteHtml: m[1], body: (content || "").slice(m[0].length) };
-}
-
-// Random 18-digit client message id, matching Teams' own clientmessageid shape.
+// cdl's error when the worker channel isn't learned yet: nothing was sent, so
+// falling back to REST is safe.
 const NOT_READY = "Teams worker channel not ready";
 
 // properties.mentions JSON (mentions.ts) -> Teams' MentionInput list.
@@ -722,7 +751,9 @@ export async function sendRemote(
   conversationId: string,
   text: string,
   quote: Quote | null,
-  mentions: readonly MentionPick[] = []
+  mentions: readonly MentionPick[] = [],
+  /** Channel thread to reply in (the root message id). Ignored for chats. */
+  rootId?: string
 ): Promise<WriteResult> {
   const body = (text || "").trim();
   if (!body) return { ok: false, reason: "empty" };
@@ -731,24 +762,36 @@ export async function sendRemote(
   // Native quote-reply: prepend the Skype Reply blockquote (captured format).
   const content = buildQuoteHtml(quote) + "<p>" + mc.html + "</p>";
   const clientMessageId = chat.newClientMessageId();
-  if (!isChannelId(conversationId)) {
-    const r = await chat.sendMessage({ convId: conversationId, content, clientMessageId, mentions: mentionInputs(mc.mentions) });
-    if (r.ok) {
-      remoteCache.delete(conversationId);
-      return { ok: true, via: "cdl" };
-    }
-    // Fall back only when the request never reached the worker; any later
-    // failure may already have sent, and a retry would post twice.
-    if (r.reason !== NOT_READY) return { ok: false, reason: r.reason };
+  const channel = isChannelId(conversationId);
+  const reply = !!rootId && channel;
+  // Chats, channel posts and thread replies all go through the CDL worker,
+  // which holds its own tokens; native compose for a reply sets
+  // convId=channel, replyChainId=root, sendFromChannel_ToBeRefactored.
+  const r = await chat.sendMessage({
+    convId: conversationId,
+    content,
+    clientMessageId,
+    mentions: mentionInputs(mc.mentions),
+    channel,
+    ...(reply ? { replyChainId: rootId } : {}),
+  });
+  if (r.ok) {
+    remoteCache.delete(conversationId);
+    return { ok: true, via: "cdl" };
   }
-  if (!token("ic3")) return { ok: false, reason: "no-token" };
+  // Fall back only when the request never reached the worker; any later
+  // failure may already have sent, and a retry would post twice.
+  if (r.reason !== NOT_READY) return { ok: false, reason: r.reason };
+  if (!token("ic3")) return { ok: false, reason: reply ? "no-token-thread" : "no-token" };
+  // chatsvc addresses a channel thread as "<channelId>;messageid=<rootId>".
+  const target = reply ? `${conversationId};messageid=${rootId}` : conversationId;
   const mri = myMri();
   const now = new Date().toISOString();
   const payload = {
     id: "-1",
     type: "Message",
     conversationid: conversationId,
-    conversationLink: "blah/" + conversationId,
+    conversationLink: "blah/" + target,
     from: mri,
     fromUserId: mri,
     composetime: now,
@@ -776,8 +819,8 @@ export async function sendRemote(
     },
     crossPostChannels: [] as string[],
   };
-  const r = await chatsvc.postMessage(conversationId, payload);
-  if (!r.ok) return toWrite(r);
+  const rest = await chatsvc.postMessage(target, payload);
+  if (!rest.ok) return toWrite(rest);
   // Our cached view is now stale; drop it so the next poll re-fetches.
   remoteCache.delete(conversationId);
   return { ok: true, via: "endpoint" };

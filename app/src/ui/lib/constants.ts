@@ -14,3 +14,7 @@ export const SECTION_CAP = 12;
 export const RECENT_MS = 7 * 24 * 60 * 60 * 1000;
 // Most people a group call deep link rings; bigger chats get no call button.
 export const MAX_CALL = 20;
+/** Channel threads show this many newest replies until expanded. */
+export const THREAD_TAIL = 3;
+/** A channel meeting without an end event counts as live this long after it started. */
+export const LIVE_CALL_MS = 12 * 60 * 60 * 1000;

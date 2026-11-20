@@ -53,6 +53,8 @@ export interface Chat {
   time: number;
   unread: boolean;
   last: LastMessage;
+  /** Root message id of a call running in this conversation right now, if any. */
+  liveCall?: string;
 }
 
 /** A normalized message ready to render. */
@@ -77,6 +79,8 @@ export interface Message {
   files: FileRef[];
   /** Message time, ms since epoch. */
   time: number;
+  /** Channel meeting event: the thread root ("start") or its end marker. */
+  call?: "start" | "end";
 }
 
 /** A person's profile card, as cached by Teams. Fields absent in cache are "". */

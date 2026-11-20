@@ -1,27 +1,31 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX, type MouseEvent } from "react";
 import {
   deleteMessage, editMessage, fetchOlderRemote, listChats, listMessages, loadProfiles,
-  markRead, markUnread, myMri, setChatHidden, primeRemote, profile, searchPeople, sendRemote, setReaction, splitQuote, undoDelete,
+  markRead, markUnread, myMri, setChatHidden, primeRemote, profile, searchPeople, sendRemote, setReaction, undoDelete,
   type PeopleHit,
 } from "../teamsData";
-import { openNativeChat, openNativeNewChat, sendMessage, sendNativeDraft, startNativeCall, type PickPerson } from "../send";
+import { splitQuote } from "../quote";
+import { openNativeChat, openNativeNewChat, sendMessage, sendNativeDraft, startNativeCall, joinNativeMeeting, startNativeChannelMeeting, type PickPerson } from "../send";
 import { chat as chatSvc, typing } from "../services";
 import {
   Send, Search, Hash, MailOpen, Mail, ExternalLink, X, Reply, Phone, Video, RotateCw,
-  ArrowDown, Smile, Eye, EyeOff, CheckCheck, SquarePen, Rows2, Rows3,
+  ArrowDown, Smile, Eye, EyeOff, CheckCheck, SquarePen, Rows2, Rows3, StickyNote,
+  MessageSquareReply, ChevronsUpDown,
 } from "lucide-react";
 import { EmojiPicker } from "./shared/EmojiPicker";
 import { Avatar } from "./shared/Avatar";
 import { Section } from "./sidebar/Section";
+import { Row } from "./sidebar/Row";
 import { MeBar } from "./sidebar/MeBar";
 import { NewChat, type NewChatOutcome } from "./sidebar/NewChat";
 import { Message } from "./chat/Message";
 import { ProfilePanel } from "./profile/ProfilePanel";
-import { avatarUri, fmtDay, htmlToText, messageText, oneLine } from "./lib/format";
+import { NotesPanel } from "./notes/NotesPanel";
+import { avatarUri, fmtClock, fmtDay, htmlToText, messageText, oneLine } from "./lib/format";
 import { isIdle, onTeamsChange } from "./lib/live";
 import { STATUS_LABEL, usePresence } from "./lib/presence";
 import { usePref } from "./lib/prefs";
-import { GROUP_GAP_MS, INITIAL_REMOTE, MAX_CALL, POLL_MS } from "./lib/constants";
+import { GROUP_GAP_MS, INITIAL_REMOTE, MAX_CALL, LIVE_CALL_MS, POLL_MS, THREAD_TAIL } from "./lib/constants";
 import type { Chat, Message as Msg, Quote } from "../types";
 import type { MentionPick } from "../mentions";
 
@@ -37,7 +41,7 @@ interface SideSection {
 
 // An optimistic message shown immediately after sending, before Teams syncs the
 // real one back.
-interface Pending { key: number; chatId: string; text: string; time: number; }
+interface Pending { key: number; chatId: string; text: string; time: number; /** Channel thread it replies in. */ rootId?: string; }
 // Right-click chat menu position + target.
 interface Menu { x: number; y: number; chat: Chat; }
 // Recent/older message buckets for the open chat (older is the paged-up history).
@@ -47,7 +51,7 @@ interface OldBucket { id: string | null; list: Msg[]; }
 // Cheap change signature so polling doesn't re-render (and jump) when idle.
 const sig = (list: Msg[]): string =>
   list.map((m) => `${m.id}:${m.time}:${m.edited}:${m.deleted}:${m.reactions.map((r) => r.key + r.count + (r.mine ? "*" : "")).join()}`).join("|");
-const chatSig = (list: Chat[]): string => list.map((c) => `${c.id}:${c.time}:${c.unread}:${c.hidden}:${c.title}`).join("|");
+const chatSig = (list: Chat[]): string => list.map((c) => `${c.id}:${c.time}:${c.unread}:${c.hidden}:${c.title}:${c.liveCall || ""}`).join("|");
 
 export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   const { statusOf } = usePresence();
@@ -69,6 +73,9 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   const [keep, setKeep] = useState<Set<string>>(() => new Set());
   const [toast, setToast] = useState("");
   const [profileMri, setProfileMri] = useState<string | null>(null);
+  // Notes drawer (local scratchpad). Open on first run, then
+  // remembers whether it was left open or closed.
+  const [notesOpen, setNotesOpen] = usePref<boolean>("notesOpen", true);
   // Right-click chat menu: {x, y, chat} or null.
   const [menu, setMenu] = useState<Menu | null>(null);
   // In-conversation message search: open flag + query string.
@@ -77,6 +84,14 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   // A message being quote-replied to, shown as a chip above the composer: null
   // or { id, from, text }. Cleared on send or chat switch.
   const [quote, setQuote] = useState<Quote | null>(null);
+  // Channel thread the composer answers in ({ rootId, from, text }), or null
+  // for a new top-level post. Cleared on send or chat switch.
+  const [threadTo, setThreadTo] = useState<{ rootId: string; from: string; text: string } | null>(null);
+  // Channel threads whose older replies are expanded (by root id).
+  const [openThreads, setOpenThreads] = useState<ReadonlySet<string>>(new Set());
+  // message id -> thread root id for the rendered channel, so jump-to can
+  // expand a collapsed thread before scrolling.
+  const msgRoot = useRef<Map<string, string>>(new Map());
   // @mention picks for the open chat's draft: the members the user has inserted.
   // Keyed per chat, like drafts. Entries whose `@Name` text is gone are dropped
   // at send time (buildMentionContent only emits still-present names).
@@ -168,6 +183,8 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     setMsgSearch("");
     setMsgSearchOpen(false);
     setQuote(null);
+    setThreadTo(null);
+    setOpenThreads(new Set());
     // Capture a backward-paging cursor so scroll-up works even for chats whose
     // recent messages come from the local cache. Merge any remote-only messages.
     (async () => {
@@ -326,8 +343,10 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
       // the filter's own count.
       return list.length ? [{ id: "unread", title: "", rows: list, capped: false }] : [];
     }
-    const pinned = (c: Chat): boolean => c.favorite || c.pinned;
-    const rest = list.filter((c) => !pinned(c));
+    // The self-chat (Notes) lives in its own slot at the bottom of the sidebar,
+    // never in a section.
+    const pinned = (c: Chat): boolean => c.kind !== "notes" && (c.favorite || c.pinned);
+    const rest = list.filter((c) => !pinned(c) && c.kind !== "notes");
     // Channels grouped by team; teams ordered by their latest activity, so the
     // busy team sits on top. Within a team, newest first (list order).
     const channels = rest.filter((c) => c.kind === "channel");
@@ -336,13 +355,21 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     channels.sort((a, b) => teamRank.get(a.team)! - teamRank.get(b.team)!);
     return ([
       { id: "fav", title: "Favorites", rows: list.filter(pinned) },
-      { id: "dms", title: "Direct messages", rows: rest.filter((c) => c.kind === "notes" || (c.kind === "chat" && c.members.length <= 1)) },
+      { id: "dms", title: "Direct messages", rows: rest.filter((c) => c.kind === "chat" && c.members.length <= 1) },
       { id: "groups", title: "Groups", rows: rest.filter((c) => c.kind === "chat" && c.members.length > 1) },
       { id: "channels", title: "Channels", rows: channels, groupByTeam: true },
       { id: "meetings", title: "Meetings", rows: rest.filter((c) => c.kind === "meeting"), defaultCollapsed: true },
     ] as SideSection[]).filter((s) => s.rows.length);
   }, [chats, query, unreadOnly, keep]);
-  const flat = useMemo(() => sections.flatMap((s) => s.rows), [sections]);
+  const selfChat = useMemo(() => chats.find((c) => c.kind === "notes"), [chats]);
+  // Bottom slot shows the self-chat only in the normal (sectioned) view; search
+  // and the Unread filter list it inline like any other chat.
+  const selfSlot = !query.trim() && !unreadOnly ? selfChat : undefined;
+  // Keyboard order follows the screen: sections, then the bottom slot.
+  const flat = useMemo(
+    () => [...sections.flatMap((s) => s.rows), ...(selfSlot ? [selfSlot] : [])],
+    [sections, selfSlot],
+  );
   const unreadCount = useMemo(() => chats.filter((c) => c.unread && !c.hidden).length, [chats]);
 
   const chatsRef = useRef<Chat[]>([]);
@@ -384,7 +411,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   }, [sel, pick]);
 
   // Keyboard: ⌘K search, ⌥↑/⌥↓ previous/next chat, ⌥⇧↑/⌥⇧↓ previous/next
-  // unread chat, ⌥U Unread filter, Esc leaves search.
+  // unread chat, ⌥U Unread filter, ⌥N notes drawer, Esc leaves search.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (isIdle()) return;
@@ -401,6 +428,11 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
       } else if (e.key === "Escape" && msgSearchOpen) {
         setMsgSearch("");
         setMsgSearchOpen(false);
+      } else if (e.altKey && !e.metaKey && !e.shiftKey && e.code === "KeyN") {
+        e.preventDefault();
+        e.stopPropagation();
+        setProfileMri(null);
+        setNotesOpen((o) => !o);
       } else if (e.altKey && !e.metaKey && e.code === "KeyU") {
         e.preventDefault();
         e.stopPropagation();
@@ -426,7 +458,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [flat, sel, pick, msgSearchOpen, unreadOnly, setUnreadFilter]);
+  }, [flat, sel, pick, msgSearchOpen, unreadOnly, setUnreadFilter, setNotesOpen]);
 
   const draft = (sel && drafts[sel]) || "";
   const setDraft = (v: string): void => setDrafts((d) => ({ ...d, [sel!]: v }));
@@ -580,23 +612,26 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     if (!text || !selChat) return;
     const chat = selChat;
     const q = quote;
+    const thread = chat.isChannel ? threadTo : null;
     const picks = mentionPicks[chat.id] || [];
     const key = Date.now() + Math.random();
     setDrafts((d) => ({ ...d, [chat.id]: "" }));
     typing.resetTyping(chat.id);
     setQuote(null);
+    setThreadTo(null);
     setMentionPicks((mp) => ({ ...mp, [chat.id]: [] }));
     setAtOpen(false);
-    setPending((p) => [...p, { key, chatId: chat.id, text, time: Date.now() }]);
+    setPending((p) => [...p, { key, chatId: chat.id, text, time: Date.now(), rootId: thread?.rootId }]);
     stick.current = true;
     // Prefer the direct chatsvc endpoint (works for any chat, cached or not).
     // Fall back to driving Teams' native composer only when no token is captured.
-    let r = await sendRemote(chat.id, text, q, picks);
+    let r = await sendRemote(chat.id, text, q, picks, thread?.rootId);
     if (!r.ok && r.reason === "no-token") r = await sendMessage(chat.id, chat.title, text);
     if (!r.ok) {
       setPending((p) => p.filter((x) => x.key !== key));
       setDrafts((d) => ({ ...d, [chat.id]: d[chat.id] || text }));
       setMentionPicks((mp) => ({ ...mp, [chat.id]: picks }));
+      if (thread) setThreadTo((t) => t || thread);
       const why = ({
         "chat-not-open": "Teams has no visible row for this chat. Open it once in Teams (⌥⌘T), then retry.",
         "wrong-chat": "Teams switched to another chat. Not sent.",
@@ -604,6 +639,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
         "fetch-failed": "Couldn't reach Teams' backend. Not sent.",
         "http-401": "Teams' token expired. Open any chat in Teams to refresh, then retry.",
         "http-403": "Teams' backend refused the send (403). Not sent.",
+        "no-token-thread": "Teams isn't ready to send yet. Retry in a moment.",
       } as Record<string, string>)[r.reason] || "Send failed: " + r.reason;
       flash(why, 5000);
     }
@@ -808,10 +844,41 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     if (!res.ok) flash("Couldn't start the call (" + res.reason + ")", 4000);
   }, [flash]);
 
+  // Join the selected conversation's running call through Teams' own Join
+  // button (send.ts joinNativeMeeting); the call-window guard hides the overlay.
+  const joinCall = useCallback(async (rootId: string): Promise<void> => {
+    const c = chatsRef.current.find((x) => x.id === sel);
+    if (!c) return;
+    const res = await joinNativeMeeting(c.id, c.title, rootId);
+    if (!res.ok) flash("Couldn't join the call (" + res.reason + ")", 4000);
+  }, [sel, flash]);
+
+  // Start a meeting in the selected channel (Teams' "Meet now").
+  const meetNow = useCallback(async (): Promise<void> => {
+    const c = chatsRef.current.find((x) => x.id === sel);
+    if (!c) return;
+    const res = await startNativeChannelMeeting(c.id, c.title);
+    if (!res.ok) flash("Couldn't start the meeting (" + res.reason + ")", 4000);
+  }, [sel, flash]);
+
   // Start a quote-reply: remember the target message and focus the composer.
   const onQuote = useCallback((m: Msg): void => {
     setQuote({ id: m.id, from: m.from || (m.mine ? "You" : "Unknown"), text: oneLine(splitQuote(m.content).body).slice(0, 280), time: m.time, fromMri: m.fromMri });
     requestAnimationFrame(() => composer.current?.focus());
+  }, []);
+
+  // Answer in a channel thread: the composer posts into m's thread until sent
+  // or cancelled. Replies target their thread's root.
+  const onThreadReply = useCallback((m: Msg): void => {
+    setThreadTo({ rootId: m.rootId || m.id, from: m.from || (m.mine ? "You" : "Unknown"), text: oneLine(splitQuote(m.content).body).slice(0, 200) });
+    requestAnimationFrame(() => composer.current?.focus());
+  }, []);
+  const toggleThread = useCallback((rootId: string): void => {
+    setOpenThreads((s) => {
+      const n = new Set(s);
+      if (n.has(rootId)) n.delete(rootId); else n.add(rootId);
+      return n;
+    });
   }, []);
 
   // Jump to a quoted message: scroll it into view and flash a highlight. If it's
@@ -827,6 +894,13 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
       return true;
     };
     if (tryScroll()) return;
+    // Hidden in a collapsed channel thread: expand it, then scroll.
+    const root = msgRoot.current.get(target);
+    if (root) {
+      setOpenThreads((s) => new Set(s).add(root));
+      requestAnimationFrame(() => requestAnimationFrame(() => { tryScroll(); }));
+      return;
+    }
     // Not loaded: page older up to a few times, then scroll.
     let n = 0;
     const pump = async (): Promise<void> => {
@@ -944,29 +1018,127 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     : shown;
 
   const body: JSX.Element[] = [];
-  let prev: Msg | null = null;
-  for (const m of visible) {
-    if (!prev || new Date(prev.time).toDateString() !== new Date(m.time).toDateString()) {
-      body.push(
-        <div key={"d" + m.id} className="tc-day"><span>{fmtDay(m.time)}</span></div>
-      );
-      prev = null;
+  const renderMsg = (m: Msg, first: boolean): JSX.Element => (
+    <Message key={m.id} m={m} first={first} channel={selIsChannel} cid={sel!} onReact={reactToMsg} onDelete={deleteMsg}
+      onUndo={undoDeleteMsg} onEdit={editMsg} onOpenProfile={openProfile} onQuote={onQuote} onJumpTo={onJumpTo}
+      onThreadReply={selIsChannel ? onThreadReply : undefined} />
+  );
+  // Same sender within a few minutes continues the previous message's group.
+  const continues = (prev: Msg | null, m: Msg): boolean =>
+    !!prev && prev.fromMri === m.fromMri && m.time - prev.time <= GROUP_GAP_MS;
+  const renderPending = (p: Pending): JSX.Element => (
+    <div key={p.key} className="tc-msg first pending">
+      <Avatar name="You" />
+      <div className="tc-msg-body">
+        <div className="tc-msg-meta">
+          <span className="who">You</span>
+          <span className="when">sending…</span>
+        </div>
+        <div className="tc-msg-content">{p.text}</div>
+      </div>
+    </div>
+  );
+  // A meeting's end marker renders as one quiet line, not a message.
+  const renderReply = (m: Msg, first: boolean): JSX.Element =>
+    m.call === "end" ? (
+      <div key={m.id} className="tc-call-end"><Video size={13} /> {messageText(m)} · {fmtClock(m.time)}</div>
+    ) : renderMsg(m, first);
+  // Pending thread replies render inside their thread; the rest at the bottom.
+  const threadPending = new Set<number>();
+  if (selIsChannel) {
+    // Channels: one card per thread (root post + its replies, already sorted
+    // by root time). Long threads show only the newest replies until expanded.
+    // Group by rootId, not adjacency: a root's rootTime (its arrival time) and
+    // its replies' rootTime (derived from the root id) can differ by a few ms,
+    // which would sort them apart and orphan the replies.
+    const byRoot = new Map<string, Msg[]>();
+    for (const m of visible) {
+      const g = byRoot.get(m.rootId);
+      if (g) g.push(m);
+      else byRoot.set(m.rootId, [m]);
     }
-    const first =
-      !prev ||
-      prev.fromMri !== m.fromMri ||
-      m.time - prev.time > GROUP_GAP_MS ||
-      (selIsChannel && (prev.rootId !== m.rootId || !m.isReply));
-    if (selIsChannel && !m.isReply && prev) body.push(<div key={"s" + m.id} className="tc-thread-sep" />);
-    body.push(<Message key={m.id} m={m} first={first} channel={selIsChannel} cid={sel!} onReact={reactToMsg} onDelete={deleteMsg} onUndo={undoDeleteMsg} onEdit={editMsg} onOpenProfile={openProfile} onQuote={onQuote} onJumpTo={onJumpTo} />);
-    prev = m;
+    const threads = [...byRoot].map(([root, ms]) => {
+      ms.sort((a, b) => Number(a.isReply) - Number(b.isReply) || a.time - b.time);
+      const head = ms[0];
+      return { root, msgs: ms, at: head.isReply ? Math.min(...ms.map((m) => m.rootTime || m.time)) : head.time };
+    });
+    threads.sort((a, b) => a.at - b.at);
+    msgRoot.current = new Map(visible.map((m) => [m.id, m.rootId]));
+    let lastDay = "";
+    for (const t of threads) {
+      const head = t.msgs[0];
+      const at = t.at;
+      const day = new Date(at).toDateString();
+      if (day !== lastDay) {
+        body.push(<div key={"d" + t.root} className="tc-day"><span>{fmtDay(at)}</span></div>);
+        lastDay = day;
+      }
+      const rootMsg = head.isReply ? null : head;
+      const replies = rootMsg ? t.msgs.slice(1) : t.msgs;
+      const expanded = !!mq || openThreads.has(t.root);
+      const hidden = expanded ? 0 : Math.max(0, replies.length - THREAD_TAIL);
+      const tail = replies.slice(hidden);
+      const people = new Set(replies.filter((m) => !m.call).map((m) => m.fromMri)).size;
+      const mine = myPending.filter((p) => p.rootId === t.root);
+      for (const p of mine) threadPending.add(p.key);
+      // Live: Teams' own live state on the conversation (Chat.liveCall) names
+      // the running call's root. Without the chat row, fall back to the posts:
+      // a start without an end marker, younger than LIVE_CALL_MS.
+      const live = selChat ? selChat.liveCall === t.root
+        : rootMsg?.call === "start" && !t.msgs.some((m) => m.call === "end") && Date.now() - rootMsg.time < LIVE_CALL_MS;
+      body.push(
+        <div key={"t" + t.root} className={"tc-thread" + (threadTo?.rootId === t.root ? " replying" : "") + (live ? " live" : "")}>
+          {live ? <span className="tc-live-badge"><span className="tc-live-dot" /> Live</span> : null}
+          {rootMsg ? renderMsg(rootMsg, true) : <div className="tc-thread-orphan">Replies to an older post</div>}
+          {replies.length || mine.length ? (
+            <div className="tc-thread-replies">
+              {hidden ? (
+                <button className="tc-thread-more" onClick={() => toggleThread(t.root)}>
+                  <ChevronsUpDown size={13} /> {hidden} earlier {hidden === 1 ? "reply" : "replies"}
+                  {people > 1 ? <span className="tc-thread-people"> · {people} people</span> : null}
+                </button>
+              ) : null}
+              {tail.map((m, i) => renderReply(m, !continues(i ? tail[i - 1] : null, m)))}
+              {mine.map(renderPending)}
+              {!mq && openThreads.has(t.root) && replies.length > THREAD_TAIL ? (
+                <button className="tc-thread-more" onClick={() => toggleThread(t.root)}>
+                  <ChevronsUpDown size={13} /> Collapse
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="tc-thread-actions">
+            <button className="tc-thread-reply" onClick={() => onThreadReply(rootMsg || head)}>
+              <MessageSquareReply size={14} /> Reply
+            </button>
+            {live ? (
+              <button className="tc-join" onClick={() => void joinCall(t.root)}>
+                <Video size={14} /> Join call
+              </button>
+            ) : null}
+          </div>
+        </div>
+      );
+    }
+  } else {
+    let prev: Msg | null = null;
+    for (const m of visible) {
+      if (!prev || new Date(prev.time).toDateString() !== new Date(m.time).toDateString()) {
+        body.push(
+          <div key={"d" + m.id} className="tc-day"><span>{fmtDay(m.time)}</span></div>
+        );
+        prev = null;
+      }
+      body.push(renderMsg(m, !continues(prev, m)));
+      prev = m;
+    }
   }
 
   return (
     <>
       <aside className="tc-side">
         <div className="tc-side-head">
-          <h1>Teams Calm</h1>
+          <div className="tc-side-spacer" />
           <button className="tc-side-btn" onClick={() => setCompact((c) => !c)}
             title={compact ? "Show message previews" : "Compact list"} aria-label={compact ? "Show message previews" : "Compact list"}>
             {compact ? <Rows2 size={16} /> : <Rows3 size={16} />}
@@ -1030,6 +1202,12 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
             </div>
           ) : null}
         </div>
+        {selfSlot ? (
+          <div className="tc-self-slot">
+            <Row chat={selfSlot} compact selected={selfSlot.id === sel} onClick={() => pick(selfSlot.id)}
+              onOpenProfile={openProfile} onMenu={openMenu} />
+          </div>
+        ) : null}
         <MeBar onSwitchToTeams={onHide} onError={(m) => flash(m, 4000)} />
       </aside>
 
@@ -1054,6 +1232,24 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
               >
                 <Search size={15} />
               </button>
+              <button
+                className={"tc-ghost tc-icon-only" + (notesOpen ? " on" : "")}
+                onClick={() => { setProfileMri(null); setNotesOpen((o) => !o); }}
+                title="Notes (⌥N)"
+                aria-label="Notes"
+                aria-pressed={notesOpen}
+              >
+                <StickyNote size={15} />
+              </button>
+              {selChat?.liveCall ? (
+                <button className="tc-join" onClick={() => void joinCall(selChat.liveCall!)} title="Join the running call">
+                  <Video size={14} /> Join
+                </button>
+              ) : selIsChannel ? (
+                <button className="tc-ghost tc-icon-only" onClick={() => void meetNow()} title="Meet now in this channel" aria-label="Meet now in this channel">
+                  <Video size={15} />
+                </button>
+              ) : null}
               {callable ? (
                 <>
                   <button className="tc-ghost tc-icon-only" onClick={() => void startCall(selChat.members, "audio", selChat)} title={callLabel("Audio call")} aria-label={callLabel("Audio call")}>
@@ -1092,18 +1288,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                 <div className="tc-empty"><p className="tc-sub">No messages match “{msgSearch}”.</p></div>
               ) : null}
               {body}
-              {myPending.map((p) => (
-                <div key={p.key} className="tc-msg first pending">
-                  <Avatar name="You" />
-                  <div className="tc-msg-body">
-                    <div className="tc-msg-meta">
-                      <span className="who">You</span>
-                      <span className="when">sending…</span>
-                    </div>
-                    <div className="tc-msg-content">{p.text}</div>
-                  </div>
-                </div>
-              ))}
+              {myPending.filter((p) => !threadPending.has(p.key)).map(renderPending)}
               {msgs.id === sel && !msgs.loaded && !myPending.length ? (
                 <div className="tc-empty"><p className="tc-sub">Loading…</p></div>
               ) : null}
@@ -1131,6 +1316,16 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                 <button className="tc-scroll-newest" onClick={scrollToBottom} title="Jump to newest" aria-label="Jump to newest">
                   <ArrowDown size={16} />
                 </button>
+              ) : null}
+              {threadTo && selChat.isChannel ? (
+                <div className="tc-quote-chip tc-thread-chip">
+                  <MessageSquareReply size={13} className="tc-quote-chip-icon" />
+                  <div className="tc-quote-chip-body">
+                    <span className="tc-quote-chip-from">Reply in thread · {threadTo.from}</span>
+                    <span className="tc-quote-chip-text">{threadTo.text || "…"}</span>
+                  </div>
+                  <button className="tc-quote-chip-x" onClick={() => setThreadTo(null)} title="Post as new conversation (Esc)" aria-label="Cancel thread reply"><X size={13} /></button>
+                </div>
               ) : null}
               {quote ? (
                 <div className="tc-quote-chip">
@@ -1175,7 +1370,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                 <textarea
                   ref={composer}
                   rows={1}
-                  placeholder={"Message " + (selChat.isChannel ? "#" : "") + selChat.title}
+                  placeholder={threadTo && selChat.isChannel ? "Reply in thread…" : selChat.isChannel ? "Start a new post in #" + selChat.title : "Message " + selChat.title}
                   value={draft}
                   onChange={(e) => onDraftChange(e.target.value)}
                   onKeyDown={(e) => {
@@ -1186,6 +1381,11 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                         return;
                       }
                       if (e.key === "Escape") { e.preventDefault(); setAtOpen(false); return; }
+                    }
+                    if (e.key === "Escape" && (threadTo || quote)) {
+                      e.preventDefault();
+                      if (quote) setQuote(null); else setThreadTo(null);
+                      return;
                     }
                     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                       e.preventDefault();
@@ -1232,6 +1432,12 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
           onClose={() => setProfileMri(null)}
           onMessage={() => { void startDirect(profileMri); setProfileMri(null); }}
           onCall={(kind) => { void startCall([profileMri], kind); setProfileMri(null); }}
+        />
+      ) : null}
+
+      {notesOpen && !profileMri ? (
+        <NotesPanel
+          onClose={() => setNotesOpen(false)}
         />
       ) : null}
 

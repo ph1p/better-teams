@@ -100,6 +100,45 @@ export async function startNativeCall(conversationId: string, title: string, kin
 // the existing one (its thread id appears), or an empty draft (no thread id)
 // that Teams creates on the first send. Picking yourself jumps to 48:notes.
 // Seen live 2026-11-19.
+// Join a running meeting the way the stock UI does: open the conversation in
+// Teams and press the "Join" button on that call's meeting card. Each card is
+// labelled #meeting-object-label<rootId>, so the right call is targeted even
+// with several cards on screen. No deep link (it would replace the Teams page).
+const MEETING_JOIN = '[data-testid="meeting-object-join"]';
+
+export async function joinNativeMeeting(conversationId: string, title: string, rootId: string): Promise<WriteResult> {
+  if (!(await openNativeChat(conversationId, title))) return { ok: false, reason: "chat not open in Teams" };
+  const find = (): HTMLElement | null => {
+    const card = document.getElementById("meeting-object-label" + rootId);
+    const own = card?.querySelector<HTMLElement>(MEETING_JOIN);
+    if (own) return own;
+    // Fallback: exactly one join button on screen is unambiguous.
+    const all = [...document.querySelectorAll<HTMLElement>(MEETING_JOIN)].filter((b) => !b.closest("#tc-root"));
+    return all.length === 1 ? all[0] : null;
+  };
+  const btn = await waitFor(find, 4000);
+  if (!btn) return { ok: false, reason: "no Join button in Teams" };
+  if (nativeThreadId() !== conversationId) return { ok: false, reason: "Teams switched chats" };
+  btn.click();
+  return { ok: true, via: "native" };
+}
+
+// Start a channel meeting ("Meet now") with the channel header's own button.
+// Teams then shows its pre-join screen; the call-window guard hides the overlay.
+const CHANNEL_MEET = '[data-tid="channel-meet-header-main-btn"]';
+
+export async function startNativeChannelMeeting(conversationId: string, title: string): Promise<WriteResult> {
+  if (!(await openNativeChat(conversationId, title))) return { ok: false, reason: "channel not open in Teams" };
+  const btn = await waitFor(() => nativeButton(CHANNEL_MEET), 4000);
+  if (!btn) return { ok: false, reason: "no Meet button in Teams" };
+  if (btn.hasAttribute("disabled") || btn.getAttribute("aria-disabled") === "true") {
+    return { ok: false, reason: "Teams has meetings disabled for this channel" };
+  }
+  if (nativeThreadId() !== conversationId) return { ok: false, reason: "Teams switched chats" };
+  btn.click();
+  return { ok: true, via: "native" };
+}
+
 const NEW_MESSAGE_BTN = '[data-testid^="simple-collab-left-rail-header-new-message"]';
 const PEOPLE_PICKER = '[data-tid="people-picker-search"]';
 const PICKER_OPTION = '[role="option"][data-tid^="people-picker-entry-"]';
