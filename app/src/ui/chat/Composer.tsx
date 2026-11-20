@@ -1,11 +1,13 @@
 import { useEffect, useLayoutEffect, useMemo, useState, type JSX } from "react";
-import { ArrowDown, MessageSquareReply, Reply, Send, Smile, X } from "lucide-react";
+import { ArrowDown, MessageSquareReply, Reply, Send, Smile, SquareCode, X } from "lucide-react";
 import { myMri, profile, searchPeople } from "../../teamsData";
 import { typing } from "../../services";
 import { EmojiPicker } from "../shared/EmojiPicker";
 import { Avatar } from "../shared/Avatar";
 import { avatarUri } from "../lib/format";
 import { useDismiss } from "../lib/dismiss";
+import { codeBlock, handleFormatKey } from "../lib/editKeys";
+import { TypingIndicator } from "./TypingIndicator";
 import type { ComposerState } from "../hooks/useComposerState";
 import type { Chat } from "../../types";
 import type { MentionPick } from "../../mentions";
@@ -19,7 +21,8 @@ interface ComposerProps {
 }
 
 // The message box of the open chat: typing indicator, thread / quote chips,
-// emoji picker and @mention autocomplete (chat members + org directory).
+// emoji picker, @mention autocomplete (chat members + org directory) and
+// markdown-lite formatting (see src/markdown.ts, ui/lib/editKeys.ts).
 export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps): JSX.Element {
   const { composer, draft, setDraft, quote, setQuote, threadTo, setThreadTo } = cs;
   // @-autocomplete popup: open flag + current filter query (text after the @).
@@ -129,16 +132,6 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
     return () => { live = false; clearTimeout(h); };
   }, [atOpen, atQuery]);
 
-  // Who is typing in the open chat (worker subscription; chats only, like send).
-  const [typingLabel, setTypingLabel] = useState("");
-  useEffect(() => {
-    setTypingLabel("");
-    if (chat.isChannel) return;
-    return typing.watchTyping(chat.id, (users) => {
-      setTypingLabel(users.length ? users[0].typingUsersLabel || "Someone is typing" : "");
-    });
-  }, [chat.id, chat.isChannel]);
-
   // Auto-grow the composer.
   useLayoutEffect(() => {
     const el = composer.current;
@@ -159,7 +152,7 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
   return (
     <div className="tc-composer">
       {/* Floats above the box so typing never shifts the layout. */}
-      {typingLabel ? <div className="tc-typing" aria-live="polite">{typingLabel}…</div> : null}
+      {chat.isChannel ? null : <TypingIndicator chatId={chat.id} />}
       {!atBottom ? (
         <button className="tc-scroll-newest" onClick={onScrollToBottom} title="Jump to newest" aria-label="Jump to newest">
           <ArrowDown size={16} />
@@ -215,6 +208,15 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
         >
           <Smile size={18} />
         </button>
+        <button
+          className="tc-emoji-btn"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => { if (composer.current) codeBlock(composer.current); }}
+          title={"Code block (\u2318\u21e7C)\n**bold** \u2318B · *italic* \u2318I · `code` \u2318E · ~~strike~~ \u2318\u21e7X\n```lang for highlighted code · - lists · > quotes"}
+          aria-label="Insert code block"
+        >
+          <SquareCode size={18} />
+        </button>
         <textarea
           ref={composer}
           rows={1}
@@ -230,6 +232,7 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
               }
               if (e.key === "Escape") { e.preventDefault(); setAtOpen(false); return; }
             }
+            if (handleFormatKey(e)) return;
             if (e.key === "Escape" && (threadTo || quote)) {
               e.preventDefault();
               if (quote) setQuote(null); else setThreadTo(null);
@@ -245,7 +248,7 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
           className="tc-send"
           disabled={!draft.trim()}
           onClick={send}
-          title="Send (Enter)"
+          title="Send (Enter) · Shift+Enter for a new line"
           aria-label="Send"
         >
           <Send size={16} />

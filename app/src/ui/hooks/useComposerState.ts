@@ -46,7 +46,7 @@ export function useComposerState(sel: string | null, selChat: Chat | undefined, 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   // @mention picks for the open chat's draft: the members the user has inserted.
   // Keyed per chat, like drafts. Entries whose `@Name` text is gone are dropped
-  // at send time (buildMentionContent only emits still-present names).
+  // at send time (formatMessage only emits still-present names).
   const [mentionPicks, setMentionPicks] = useState<Record<string, MentionPick[]>>({});
   // A message being quote-replied to, shown as a chip above the composer: null
   // or { id, from, text }. Cleared on send or chat switch.

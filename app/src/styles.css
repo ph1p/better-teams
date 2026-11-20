@@ -140,7 +140,7 @@
   border-bottom: 1px solid var(--tc-line); padding: 0 18px; }
 #tc-root .tc-main-head .tc-name { font-size: 15px; }
 /* Message column + composer centre at ~820px on wide windows (line length). */
-#tc-root .tc-msgs { @apply flex-1 overflow-y-auto; padding: 16px max(18px, calc((100% - 820px) / 2)) 8px; }
+#tc-root .tc-msgs { @apply flex-1 overflow-y-auto; padding: 16px max(18px, calc((100% - 820px) / 2)) 14px; }
 /* Vertical rhythm: continuations sit tight (3px); a new sender group gets a
    little air above it, so conversations read as turns. */
 #tc-root .tc-msg { @apply flex gap-2.5 relative; padding: 3px 0; }
@@ -225,10 +225,31 @@
 #tc-root .tc-send:disabled { opacity: .4; cursor: default; }
 #tc-root .tc-composer-hint { @apply flex justify-between gap-3; margin: 6px 4px 0;
   font-size: 11px; color: var(--tc-fg2); }
-/* Typing indicator floats just above the composer box: no layout shift. */
-#tc-root .tc-composer > .tc-typing { @apply absolute truncate pointer-events-none; bottom: 100%;
-  left: max(18px, calc((100% - 820px) / 2)); right: 60px; padding: 0 4px 2px;
-  font-size: 11.5px; font-style: italic; color: var(--tc-fg2); }
+/* Typing indicator sits on the composer box's top border: no layout shift. */
+#tc-root .tc-composer > .tc-typing { @apply absolute flex items-center pointer-events-none;
+  bottom: calc(100% - 13px); left: calc(max(18px, calc((100% - 820px) / 2)) + 12px); max-width: calc(100% - 96px);
+  gap: 7px; padding: 3px 10px 3px 4px; border-radius: 999px;
+  background: var(--tc-bg);
+  border: 1px solid var(--tc-line); box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  font-size: 11.5px; color: var(--tc-fg2); animation: tc-typing-in .18s ease-out both; }
+#tc-root .tc-composer > .tc-typing.out { animation: tc-typing-out .22s ease-in both; }
+#tc-root .tc-typing-faces { @apply flex; }
+#tc-root .tc-typing-faces .tc-av { width: 18px; height: 18px; font-size: 8px;
+  box-shadow: 0 0 0 1.5px var(--tc-bg); }
+#tc-root .tc-typing-faces .tc-av + .tc-av { margin-left: -6px; }
+#tc-root .tc-typing-dots { @apply inline-flex items-center; gap: 3px; height: 16px; padding: 0 6px;
+  border-radius: 8px; background: var(--tc-bg3); }
+#tc-root .tc-typing-dots i { width: 4px; height: 4px; border-radius: 50%; background: var(--tc-fg2);
+  animation: tc-typing-dot 1.2s ease-in-out infinite; }
+#tc-root .tc-typing-dots i:nth-child(2) { animation-delay: .15s; }
+#tc-root .tc-typing-dots i:nth-child(3) { animation-delay: .3s; }
+#tc-root .tc-typing-text { @apply truncate; font-weight: 500; }
+@keyframes tc-typing-dot {
+  0%, 60%, 100% { opacity: .35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+@keyframes tc-typing-in { from { opacity: 0; transform: translateY(4px); } }
+@keyframes tc-typing-out { to { opacity: 0; transform: translateY(4px); } }
 
 /* Emoji toggle button in the composer */
 #tc-root .tc-emoji-btn { @apply grid place-items-center cursor-pointer self-center; flex: 0 0 auto;
