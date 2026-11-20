@@ -11,7 +11,7 @@ calls, meetings and files still work natively. Toggle with **Option+Cmd+T**.
 ## Requirements
 
 - macOS with the **new** Microsoft Teams in `/Applications` (tested on 26289.x)
-- Node.js 20+ and npm (`teams-calm dev` needs Node 22+)
+- Node.js 20+ and pnpm (`corepack enable pnpm`; `teams-calm dev` needs Node 22+)
 - An administrator password: the Teams app bundle is owned by root
 
 Check everything with `./teams-calm doctor`.
@@ -23,7 +23,7 @@ git clone <this repo> teams-calm && cd teams-calm
 ./install.sh               # or ./install.sh --no-start
 ```
 
-The installer checks the requirements, installs dependencies with `npm ci`,
+The installer checks the requirements, installs dependencies with `pnpm install`,
 links a `teams-calm` launcher into `~/.local/bin`, builds the overlay, patches
 Teams and relaunches it. It is safe to re-run, e.g. after `git pull`.
 
@@ -63,7 +63,7 @@ delete it to remove everything.
 ## Develop
 
 ```sh
-teams-calm dev      # or: cd app && npm run dev
+teams-calm dev      # or: cd app && pnpm run dev
 ```
 
 Relaunches Teams with a DevTools port, runs `vite build --watch` and re-injects
@@ -71,12 +71,12 @@ the overlay into every Teams window on each save (~1s, UI state resets).
 Ctrl-C relaunches Teams without the port. Run `teams-calm` afterwards to bake
 your changes into the patch.
 
-Type-check with `cd app && npm run typecheck`.
+Type-check with `cd app && pnpm run typecheck`.
 
 ### Mock mode (no Teams)
 
 ```sh
-cd app && npm run mock    # http://localhost:5199
+cd app && pnpm run mock    # http://localhost:5199
 ```
 
 Runs the overlay in a normal browser on a Vite dev server with hot reload,

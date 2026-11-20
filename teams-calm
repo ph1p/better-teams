@@ -110,7 +110,7 @@ need_teams() {
 need_node() {
   local min="${1:-$NODE_MIN}"
   command -v node >/dev/null 2>&1 || die "Node.js $min+ is required (https://nodejs.org or 'brew install node')."
-  command -v npm >/dev/null 2>&1 || die "npm is required (it ships with Node.js)."
+  command -v pnpm >/dev/null 2>&1 || die "pnpm is required ('corepack enable pnpm' or 'brew install pnpm')."
   [ "$(node_major)" -ge "$min" ] || die "Node.js $min+ is required, found $(node --version)."
 }
 
@@ -132,12 +132,12 @@ stop_stale_dev() {
   [ "$found" = 0 ] || { say "Stopped a dev session left over from earlier."; sleep 1; }
 }
 
-# Install npm dependencies when missing or older than the lockfile.
+# Install dependencies when missing or older than the lockfile.
 ensure_deps() {
-  local stamp="$DIR/app/node_modules/.package-lock.json"
-  if [ ! -f "$stamp" ] || [ "$DIR/app/package-lock.json" -nt "$stamp" ]; then
+  local stamp="$DIR/app/node_modules/.modules.yaml"
+  if [ ! -f "$stamp" ] || [ "$DIR/app/pnpm-lock.yaml" -nt "$stamp" ]; then
     say "Installing overlay dependencies..."
-    ( cd "$DIR/app" && npm ci --no-audit --no-fund --loglevel=error )
+    ( cd "$DIR/app" && pnpm install --frozen-lockfile --reporter=silent )
   fi
 }
 
@@ -152,7 +152,7 @@ doctor() {
     if [ "$(node_major)" -ge "$NODE_MIN" ]; then ok "Node $(node --version)"; else fail "Node $(node --version); need $NODE_MIN+"; fi
     [ "$(node_major)" -ge "$NODE_DEV_MIN" ] || note "dev mode needs Node $NODE_DEV_MIN+"
   else fail "Node.js not found (need $NODE_MIN+)"; fi
-  command -v npm >/dev/null 2>&1 && ok "npm $(npm --version)" || fail "npm not found"
+  command -v pnpm >/dev/null 2>&1 && ok "pnpm $(pnpm --version)" || fail "pnpm not found"
   if [ -d "$TEAMS_APP" ]; then
     case "$(teams_version)" in
       "$TESTED".*) ok "Teams $(teams_version)" ;;
@@ -160,7 +160,7 @@ doctor() {
     esac
     [ -f "$TARGET" ] && ok "client-bindings/bundle.js present" || fail "client-bindings/bundle.js missing: unsupported Teams build"
   else fail "new Microsoft Teams not found at $TEAMS_APP"; fi
-  [ -f "$DIR/app/node_modules/.package-lock.json" ] && ok "dependencies installed" || note "dependencies not installed yet (installed on first run)"
+  [ -f "$DIR/app/node_modules/.modules.yaml" ] && ok "dependencies installed" || note "dependencies not installed yet (installed on first run)"
   if [ -L "$BIN_LINK" ]; then ok "launcher $BIN_LINK"; else note "no launcher in ~/.local/bin (run ./install.sh)"; fi
   case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) note "~/.local/bin is not on PATH" ;; esac
   return $bad
@@ -201,7 +201,7 @@ build() {
   need_node
   ensure_deps
   if [ ! -f "$BUNDLE" ] || [ -n "$(find "$DIR/app/src" "$DIR/app/vite.config.js" -newer "$BUNDLE" 2>/dev/null | head -1)" ]; then
-    say "Building overlay..."; ( cd "$DIR/app" && npm run --silent build )
+    say "Building overlay..."; ( cd "$DIR/app" && pnpm run --silent build )
   fi
   if [ ! -f "$PAYLOAD" ] || [ "$BUNDLE" -nt "$PAYLOAD" ] || [ "$DIR/scripts/build-host-patch.mjs" -nt "$PAYLOAD" ]; then
     node "$DIR/scripts/build-host-patch.mjs" "$BUNDLE" "$PAYLOAD" >/dev/null

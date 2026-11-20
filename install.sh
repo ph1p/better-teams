@@ -29,13 +29,13 @@ die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 [ "$(uname -s)" = Darwin ] || die "Teams Calm runs on macOS only."
 [ -d "/Applications/Microsoft Teams.app" ] || die "new Microsoft Teams not found in /Applications."
 command -v node >/dev/null 2>&1 || die "Node.js $NODE_MIN+ is required (https://nodejs.org or 'brew install node')."
-command -v npm >/dev/null 2>&1 || die "npm is required (it ships with Node.js)."
+command -v pnpm >/dev/null 2>&1 || die "pnpm is required ('corepack enable pnpm' or 'brew install pnpm')."
 major="$(node -p 'process.versions.node.split(".")[0]')"
 [ "$major" -ge "$NODE_MIN" ] || die "Node.js $NODE_MIN+ is required, found $(node --version)."
 [ "$major" -ge 22 ] || echo "note: 'teams-calm dev' needs Node 22+; everything else works."
 
 echo "Installing overlay dependencies..."
-( cd "$DIR/app" && npm ci --no-audit --no-fund --loglevel=error )
+( cd "$DIR/app" && pnpm install --frozen-lockfile --reporter=silent )
 
 mkdir -p "$BIN"
 if [ -e "$LINK" ] && [ ! -L "$LINK" ]; then

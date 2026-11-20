@@ -13,14 +13,17 @@ jobs:
         working-directory: app
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: app/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: app/package-lock.json
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run build
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm run build
       - run: node ../scripts/build-host-patch.mjs dist/teams-calm-app.js dist/teams-calm-host.js
       - name: shell scripts parse
         run: for f in ../teams-calm ../install.sh ../uninstall.sh; do bash -n "$f"; done

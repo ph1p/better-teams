@@ -5,6 +5,7 @@
   "description": "A calmer, Slack-like overlay inside the new Microsoft Teams desktop app (macOS)",
   "license": "MIT",
   "type": "module",
+  "packageManager": "pnpm@12.6.0",
   "engines": {
     "node": ">=20"
   },
