@@ -5,6 +5,7 @@ import {
 import { openNativeChat } from "../../send";
 import { chat as chatSvc } from "../../services";
 import { htmlToText } from "../lib/format";
+import { formatMessage } from "../../markdown";
 import { isIdle, onTeamsChange } from "../lib/live";
 import { INITIAL_REMOTE, POLL_MS } from "../lib/constants";
 import type { Flash } from "../lib/toast";
@@ -12,6 +13,11 @@ import type { Chat, Message as Msg } from "../../types";
 
 // An optimistic message shown immediately after sending, before Teams syncs the
 // real one back.
+// Plain text without whitespace or "@", for matching a draft to its synced copy.
+const bare = (s: string): string => s.replace(/[\s@]+/g, "");
+const STALE_PENDING_MS = 15_000;
+const CLOCK_SKEW_MS = 5_000;
+
 export interface Pending { key: number; chatId: string; text: string; time: number; /** Channel thread it replies in. */ rootId?: string; }
 // Recent/older message buckets for the open chat (older is the paged-up history).
 interface MsgBucket { id: string | null; list: Msg[]; loaded: boolean; failed?: boolean; }
@@ -147,11 +153,22 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     };
   }, [sel, selIsChannel]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Drop optimistic messages once Teams has synced the real one.
+  // Drop optimistic messages once Teams has synced the real one. The draft is
+  // markdown and the synced copy HTML, so both go through the same renderer
+  // and compare as plain text without whitespace or "@"; a suffix match
+  // allows for the quote Teams puts in front of a reply.
   useEffect(() => {
     if (!pending.length) return;
-    const texts = new Set(msgs.list.filter((m) => m.mine).map((m) => htmlToText(m.content).trim()));
-    setPending((p) => p.filter((x) => !(x.chatId === msgs.id && texts.has(x.text.trim()))));
+    const mine = msgs.list.filter((m) => m.mine);
+    const texts = mine.map((m) => bare(htmlToText(m.content)));
+    const now = Date.now();
+    setPending((p) => p.filter((x) => {
+      if (x.chatId !== msgs.id) return true;
+      const s = bare(htmlToText(formatMessage(x.text).html));
+      if (s && texts.some((t) => t.endsWith(s))) return false;
+      // Unmatched (rewritten by Teams?): give up once a newer message of mine has synced.
+      return !(now - x.time > STALE_PENDING_MS && mine.some((m) => m.time >= x.time - CLOCK_SKEW_MS));
+    }));
   }, [msgs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep the view pinned to the bottom only if the user was already there.
