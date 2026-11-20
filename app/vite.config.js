@@ -1,6 +1,11 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+
+const SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), "src");
+const MOCK = path.join(SRC, "mock");
 
 // Builds the whole app (React included) into ONE self-contained IIFE file with
 // no external imports, so it can be injected as a single string over CDP into
@@ -18,21 +23,43 @@ const buildId = () => ({
   },
 });
 
-export default defineConfig({
-  plugins: [tailwindcss(), react(), buildId()],
-  define: { "process.env.NODE_ENV": '"production"', __BUILD__: JSON.stringify(BUILD_PLACEHOLDER) },
-  build: {
-    outDir: "dist",
-    cssCodeSplit: false,
-    lib: {
-      entry: "src/mount.tsx",
-      name: "TeamsCalmApp",
-      formats: ["iife"],
-      fileName: () => "teams-calm-app.js",
-    },
-    rollupOptions: {
-      output: { inlineDynamicImports: true },
-    },
-    minify: "esbuild",
+// `vite --mode mock`: run the app in a plain browser tab. Every module that
+// talks to Teams (its IndexedDB, worker or DOM) resolves to its stand-in under
+// src/mock/ instead; the mocks themselves still import the real files (types).
+const MOCKED = ["teamsData.ts", "send.ts", "services/chat.ts", "services/typing.ts", "services/presence.ts"];
+const mockTeams = () => ({
+  name: "tc-mock-teams",
+  enforce: "pre",
+  async resolveId(source, importer, options) {
+    if (!importer || importer.startsWith(MOCK)) return null;
+    const hit = await this.resolve(source, importer, { ...options, skipSelf: true });
+    if (!hit) return null;
+    const rel = path.relative(SRC, hit.id).split(path.sep).join("/");
+    return MOCKED.includes(rel) ? path.join(MOCK, rel) : null;
   },
 });
+
+export default defineConfig(({ mode }) => mode === "mock"
+  ? {
+      plugins: [mockTeams(), tailwindcss(), react()],
+      define: { __BUILD__: JSON.stringify("mock") },
+      server: { port: 5199, open: true },
+    }
+  : {
+      plugins: [tailwindcss(), react(), buildId()],
+      define: { "process.env.NODE_ENV": '"production"', __BUILD__: JSON.stringify(BUILD_PLACEHOLDER) },
+      build: {
+        outDir: "dist",
+        cssCodeSplit: false,
+        lib: {
+          entry: "src/mount.tsx",
+          name: "TeamsCalmApp",
+          formats: ["iife"],
+          fileName: () => "teams-calm-app.js",
+        },
+        rollupOptions: {
+          output: { inlineDynamicImports: true },
+        },
+        minify: "esbuild",
+      },
+    });

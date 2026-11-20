@@ -36,8 +36,23 @@ the overlay into every Teams window on each save (~1s, UI state resets).
 Ctrl-C relaunches Teams without the port. Run `teams-calm` afterwards to bake
 your changes into the patch.
 
-Code lives in `app/src` (entry: `mount.jsx`). Type-check with
+Code lives in `app/src` (entry: `mount.tsx`). Type-check with
 `cd app && npm run typecheck`.
+
+### Mock mode (no Teams)
+
+```sh
+cd app && npm run mock    # http://localhost:5199
+```
+
+Runs the overlay in a normal browser on a Vite dev server with hot reload,
+backed by fictional people and chats. The Teams-facing modules (`teamsData`,
+`send`, `services/{chat,typing,presence}`) are swapped at build time for
+stand-ins in `app/src/mock/` that keep state in memory: sending, editing,
+reactions, read state and paging work, colleagues "type" and reply, and new
+messages trickle in. Calls and meetings only log to the console. Reload to
+reset. `src/mock/parity.ts` fails the type-check if a mock drifts from the
+real module's exports.
 
 ## How it works
 

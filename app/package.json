@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "../teams-calm dev",
+    "mock": "vite --mode mock",
     "build": "vite build",
     "typecheck": "tsc --noEmit"
   },
