@@ -4,7 +4,7 @@ import type { FileRef, Quote, WriteResult } from "../types";
 import type { MentionPick } from "../mentions";
 import { formatMessage } from "../markdown";
 import { buildQuoteHtml } from "../quote";
-import { chat, chatsvc, token } from "../services";
+import { chat, chatsvc, whenToken } from "../services";
 import { myMri } from "./idb";
 import { profile } from "./profiles";
 import { arr, get, str, toWrite } from "./raw";
@@ -70,7 +70,7 @@ export async function sendRemote(
   // Fall back only when the request never reached the worker; any later
   // failure may already have sent, and a retry would post twice.
   if (r.reason !== NOT_READY) return { ok: false, reason: r.reason };
-  if (!token("ic3")) return { ok: false, reason: reply ? "no-token-thread" : "no-token" };
+  if (!(await whenToken("ic3", 0))) return { ok: false, reason: reply ? "no-token-thread" : "no-token" };
   // chatsvc addresses a channel thread as "<channelId>;messageid=<rootId>".
   const target = reply ? `${conversationId};messageid=${rootId}` : conversationId;
   const mri = myMri();

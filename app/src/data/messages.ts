@@ -74,8 +74,12 @@ async function fetchRemoteMessages(
   if (!r.ok) return null;
   const j: unknown = r.data;
   const out = parseRemotePage(j, channel).slice(-limit);
-  // Stash the backward-paging link so scroll-up can load older messages.
-  backwardLinks.set(conversationId, str(get(get(j, "_metadata"), "backwardLink")) || null);
+  // Stash the backward-paging link so scroll-up can load older messages. Keep
+  // one paging already advanced: resetting it each poll restarted scroll-up
+  // from the newest page.
+  if (!backwardLinks.has(conversationId)) {
+    backwardLinks.set(conversationId, str(get(get(j, "_metadata"), "backwardLink")) || null);
+  }
   remoteCache.set(conversationId, { at: Date.now(), msgs: out });
   return out;
 }
@@ -120,11 +124,13 @@ const backwardLinks = new Map<string, string | null>();
 // newest page through up to 300 locally cached messages, which took more hops
 // than one scroll allowed and left the view stuck at the top in real chats.
 // Returns older messages ([] = nothing yet, retry later), or null at the start
-// of history or when there is no way to page.
+// of history.
 export async function fetchOlderRemote(conversationId: string, channel = false, before?: string): Promise<Message[] | null> {
   // Scrolled up before the chat's priming finished: get a cursor first rather
   // than reporting "no history".
   if (!cdlCursors.has(conversationId) && !backwardLinks.has(conversationId)) await primeRemote(conversationId, channel);
+  // Priming failed (worker busy, request error): retry on the next scroll.
+  if (!cdlCursors.has(conversationId) && !backwardLinks.has(conversationId)) return [];
   if (cdlCursors.has(conversationId)) {
     const stored = cdlCursors.get(conversationId) ?? null;
     // Page from `before` once per oldest shown id, then walk the stored cursor.
@@ -158,7 +164,7 @@ export async function fetchOlderRemote(conversationId: string, channel = false, 
   // The link keeps the first page's size (30); bigger pages get past the
   // locally cached messages and runs of hidden ones in fewer hops.
   const r = await chatsvc.getMessagesByLink(link.replace(/([?&]pageSize=)\d+/, "$1100"));
-  if (!r.ok) return null;
+  if (!r.ok) return [];
   const j: unknown = r.data;
   // Advance (or clear) the link. A link that doesn't change, or no messages,
   // means we've reached the start of history.
@@ -174,7 +180,9 @@ export async function fetchOlderRemote(conversationId: string, channel = false, 
 // the caller can merge any messages the cache was missing. Skips the work when
 // a backward link is already known for this chat.
 export function primeRemote(conversationId: string, channel = false): Promise<Message[] | null> {
-  if (backwardLinks.has(conversationId) || cdlCursors.has(conversationId)) return Promise.resolve(null);
+  // The worker pages better than chatsvc: try it even if a poll already
+  // stored a backwardLink.
+  if (cdlCursors.has(conversationId)) return Promise.resolve(null);
   // One priming per chat at a time (chat open and an early scroll-up race).
   let p = priming.get(conversationId);
   if (!p) {
@@ -189,9 +197,21 @@ const priming = new Map<string, Promise<Message[] | null>>();
 async function primeOnce(conversationId: string, channel: boolean): Promise<Message[] | null> {
   const first = await cdlFirstPage(conversationId, channel);
   if (first) return first;
+  if (backwardLinks.has(conversationId)) return null;
   const r = await chatsvc.getMessages(conversationId, 30);
   if (!r.ok) return null;
   const j: unknown = r.data;
   backwardLinks.set(conversationId, str(get(get(j, "_metadata"), "backwardLink")) || null);
   return parseRemotePage(j, channel);
+}
+
+/**
+ * Forget a reached start of history when a chat is opened again. An empty page
+ * can also come from a worker that hasn't synced the chat yet; kept for the
+ * whole session, it left scroll-up dead until Teams restarted.
+ */
+export function resetPaging(conversationId: string): void {
+  if (cdlCursors.get(conversationId) === null) cdlCursors.delete(conversationId);
+  if (backwardLinks.get(conversationId) === null) backwardLinks.delete(conversationId);
+  pagedFrom.delete(conversationId);
 }

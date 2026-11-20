@@ -53,6 +53,8 @@ export async function fetchOlderRemote(conversationId: string, _channel = false,
   return later(store.older(conversationId), 300);
 }
 
+export function resetPaging(_conversationId: string): void {}
+
 export async function primeRemote(conversationId: string, _channel = false): Promise<Message[] | null> {
   store.resetPaging(conversationId);
   return [];

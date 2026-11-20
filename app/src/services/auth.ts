@@ -2,18 +2,30 @@
 //
 // Teams authenticates every backend call with a bearer for that backend's
 // audience (chatsvc = ic3, people search = SubstrateSearch, presence, graph, …).
-// We never mint or fetch tokens ourselves. We wrap the page's fetch and
-// XMLHttpRequest once and read the Authorization header off Teams' OWN outgoing
-// requests — passively: the request is never blocked, altered or re-sent. Each
-// bearer is filed under its audience (the JWT `aud` claim), so any service
-// module can ask for "the token Teams uses for X".
+// We never mint tokens ourselves. We wrap the page's fetch and XMLHttpRequest
+// once and read the Authorization header off Teams' OWN outgoing requests —
+// passively: the request is never blocked, altered or re-sent. Each bearer is
+// filed under its audience (the JWT `aud` claim), so any service module can ask
+// for "the token Teams uses for X".
 //
-// Tokens live in memory only, in this window. They are never logged, persisted
-// or sent anywhere except back to the same Microsoft backend they came from
-// (http.ts enforces that with an egress allowlist).
+// Teams makes most backend calls (chatsvc, mt, csa, presence) from its web
+// worker, which gets its tokens from the page over the CDL channel, not through
+// fetch; page capture alone never sees those bearers, or stops seeing ic3 once
+// the first one expires. For those audiences we ask the same page handler the
+// worker uses (cdlToken) when the vault has no live token or it is about to
+// expire.
 //
-// The vault hangs off a Symbol.for key on window so a hot re-injected overlay
-// build keeps the tokens the previous build already captured.
+// Tokens live in memory only, in this Teams instance. They are never logged,
+// persisted or sent anywhere except back to the same Microsoft backend they came
+// from (http.ts enforces that with an egress allowlist).
+//
+// The vault hangs off a Symbol.for key so a hot re-injected overlay build keeps
+// the tokens the previous build already captured. All Teams windows share the
+// tokens through the hidden host page they are opened from: a popped-out chat
+// window makes few backend calls of its own and, with tokens of its own, never
+// saw a chatsvc token and could not load messages.
+
+import { cdlToken } from "./cdl";
 
 export type Audience =
   | "ic3" // chatsvc / asyncgw (messages, conversations, AMS)
@@ -35,6 +47,7 @@ interface Vault {
   tokens: Map<Audience, Entry>;
   regions: { chatsvc?: string; mt?: string; ups?: string };
   waiters: Set<() => void>;
+  /** Which of this realm's request APIs are wrapped; never shared. */
   installed: { fetch?: boolean; xhr?: boolean };
 }
 
@@ -43,15 +56,26 @@ type VaultHost = { [KEY]?: Vault };
 
 // The realm this module runs in: `window` in the host/child page, the worker
 // global scope inside a web worker. globalThis resolves to whichever applies,
-// so the same capture code wraps fetch/XHR wherever it is placed. Each realm
-// keeps its own vault; a worker that cannot reach the page vault forwards a
-// captured header with ingestAuthHeader (see below).
+// so the same capture code wraps fetch/XHR wherever it is placed. A worker
+// cannot reach the page vault; it forwards a captured header with
+// ingestAuthHeader (see below).
 function g(): VaultHost {
   return globalThis as unknown as VaultHost;
 }
 
-function vault(): Vault {
-  const host = g();
+// The hidden host page every Teams window is opened from, reached as
+// `window.opener` (as in cdl.ts); null if this realm has none.
+function sharedHost(): VaultHost | null {
+  try {
+    const o = typeof window === "undefined" ? null : (window.opener as (Window & VaultHost) | null);
+    if (o && o !== window && o.location.origin === location.origin) return o;
+  } catch {
+    /* cross-origin opener; ignore */
+  }
+  return null;
+}
+
+function realmVault(host: VaultHost): Vault {
   let v = host[KEY];
   if (!v) {
     v = { tokens: new Map(), regions: {}, waiters: new Set(), installed: {} };
@@ -60,7 +84,27 @@ function vault(): Vault {
   return v;
 }
 
-// --- JWT claims (read only; never verified, never logged) --------------------
+function vault(): Vault {
+  const v = realmVault(g());
+  const host = sharedHost();
+  if (!host) return v;
+  const shared = realmVault(host);
+  if (v.tokens !== shared.tokens) {
+    // First use in this window: merge what it captured so far, then point its
+    // vault at the host's maps. Wraps an earlier build installed look the vault
+    // up by key on every request, so they file into the shared maps from now on.
+    for (const [k, e] of v.tokens) {
+      const s = shared.tokens.get(k);
+      if (!s || s.exp < e.exp) shared.tokens.set(k, e);
+    }
+    for (const [k, r] of Object.entries(v.regions) as [keyof Vault["regions"], string][]) shared.regions[k] ??= r;
+    for (const w of v.waiters) shared.waiters.add(w);
+    v.tokens = shared.tokens;
+    v.regions = shared.regions;
+    v.waiters = shared.waiters;
+  }
+  return v;
+}
 
 function claims(jwt: string): Record<string, unknown> {
   try {
@@ -97,7 +141,14 @@ function remember(authHeader: string, url: string): void {
   if (prev && prev.tok !== tok && prev.exp > exp && prev.exp - Date.now() > 60_000) return;
   v.tokens.set(kind, { tok, exp, at: Date.now(), aud });
   noteRegion(url);
-  for (const w of [...v.waiters]) w();
+  for (const w of [...v.waiters]) {
+    // A waiter from a window that has since closed must not stop the others.
+    try {
+      w();
+    } catch {
+      v.waiters.delete(w);
+    }
+  }
 }
 
 function noteRegion(url: string): void {
@@ -214,6 +265,43 @@ export function ingestAuthHeader(header: string, url = ""): void {
   }
 }
 
+// --- Refresh through Teams' page auth handler ----------------------------------
+
+// Resources Teams' own worker requests from the page (its CDL resource keys).
+const RESOURCE: Partial<Record<Audience, string>> = {
+  ic3: "https://ic3.teams.office.com",
+  mt: "https://api.spaces.skype.com",
+  chatsvcagg: "https://chatsvcagg.teams.microsoft.com",
+  presence: "https://presence.teams.microsoft.com",
+};
+
+// One request per audience at a time. A failed request, or one that brought no
+// token good for longer than RENEW_MS, backs off before the next try.
+const asking = new Map<Audience, Promise<void>>();
+const failedAt = new Map<Audience, number>();
+const RETRY_MS = 30_000;
+// Ask for a fresh token this long before the held one expires.
+const RENEW_MS = 5 * 60_000;
+
+function refresh(aud: Audience): Promise<void> | null {
+  const resource = RESOURCE[aud];
+  if (!resource) return null;
+  const busy = asking.get(aud);
+  if (busy) return busy;
+  if (Date.now() - (failedAt.get(aud) || 0) < RETRY_MS) return null;
+  const p = cdlToken(resource)
+    .then((tok) => {
+      const c = tok ? claims(tok) : {};
+      const fresh = typeof c.exp === "number" && c.exp * 1000 - Date.now() > RENEW_MS;
+      if (tok && classify(String(c.aud || ""), "") === aud) remember("Bearer " + tok, "");
+      if (!fresh) failedAt.set(aud, Date.now());
+    })
+    .catch(() => void failedAt.set(aud, Date.now()))
+    .finally(() => asking.delete(aud));
+  asking.set(aud, p);
+  return p;
+}
+
 // --- Read side ----------------------------------------------------------------
 
 const SKEW_MS = 60_000;
@@ -221,15 +309,25 @@ const SKEW_MS = 60_000;
 /** Current bearer for an audience, or "" if none captured / it expired. */
 export function token(aud: Audience): string {
   const e = vault().tokens.get(aud);
-  if (!e) return "";
-  if (e.exp && e.exp - SKEW_MS < Date.now()) return "";
+  const left = e ? (e.exp ? e.exp - Date.now() : Infinity) : 0;
+  if (left < RENEW_MS) void refresh(aud);
+  if (!e || left < SKEW_MS) return "";
   return e.tok;
 }
 
-/** Resolves with a bearer as soon as Teams uses one (or "" after `ms`). */
-export function whenToken(aud: Audience, ms = 10_000): Promise<string> {
+/**
+ * Resolves with a bearer as soon as one is available (or "" after `ms`). For
+ * audiences we can request ourselves, waits for that request even if `ms` is 0.
+ */
+export async function whenToken(aud: Audience, ms = 10_000): Promise<string> {
   const now = token(aud);
-  if (now) return Promise.resolve(now);
+  if (now) return now;
+  const asked = asking.get(aud);
+  if (asked) {
+    await asked;
+    const t = token(aud);
+    if (t || !ms) return t;
+  }
   const v = vault();
   return new Promise((resolve) => {
     const done = (t: string): void => {

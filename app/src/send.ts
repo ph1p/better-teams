@@ -59,10 +59,13 @@ export function openNativeChat(conversationId: string, title?: string): Promise<
 async function clickNativeChat(conversationId: string, title?: string): Promise<boolean> {
   if (nativeThreadId() === conversationId) return true;
   const rows = [...document.querySelectorAll('[role="treeitem"]')] as HTMLElement[];
+  // The title is a last resort and only when it names one row: every team has
+  // a "General", and clicking another team's switched native Teams there.
+  const byTitle = title ? rows.filter((r) => (r.innerText || "").trim().split("\n")[0].trim() === title.trim()) : [];
   const row =
     rows.find((r) => (r.getAttribute("data-fui-tree-item-value") || "").includes(conversationId)) ||
     rows.find((r) => (r.outerHTML || "").includes(conversationId)) ||
-    (title ? rows.find((r) => (r.innerText || "").trim().split("\n")[0].trim() === title.trim()) : undefined);
+    (byTitle.length === 1 ? byTitle[0] : undefined);
   if (!row) return false;
   row.scrollIntoView({ block: "center" });
   row.click();

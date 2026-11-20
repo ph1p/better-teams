@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import {
-  deleteMessage, editMessage, fetchOlderRemote, listMessages, primeRemote, removeFiles, setReaction, undoDelete,
+  deleteMessage, editMessage, fetchOlderRemote, listMessages, primeRemote, removeFiles, resetPaging, setReaction, undoDelete,
 } from "../../teamsData";
 import { openNativeChat } from "../../send";
 import { chat as chatSvc } from "../../services";
@@ -93,6 +93,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     stick.current = true;
     paging.current = false;
     noMore.current = false;
+    resetPaging(sel);
     setMsgs({ id: sel, list: [], loaded: false });
     setOlder({ id: sel, list: [] });
     // Capture a backward-paging cursor so scroll-up works even for chats whose

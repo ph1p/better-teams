@@ -11,13 +11,12 @@
 // for that backend (passively captured, auth.ts) and refuses any host outside
 // the Microsoft allowlist. Nothing is sent anywhere Teams would not send it.
 //
-// Coverage note (CDP capture, Nov 2026): mt (aud api.spaces.skype.com), csa
-// (chatsvcagg) and presence (ups) calls run inside Teams' web worker, so their
-// bearers never cross the page's fetch/XHR and cannot be captured here. Only
-// ic3 (chatsvc, asyncgw) and SubstrateSearch are reliably available in-page.
-// In dev (CDP port open), scripts/presence-bridge.mjs reads the workers' own request
-// headers and files them into this vault via __tcAuthIngest, so mt, chatsvcagg
-// and presence become available too. In prod they stay absent.
+// Coverage note (Nov 2026): mt (aud api.spaces.skype.com), csa (chatsvcagg),
+// presence (ups) and most chatsvc calls run inside Teams' web worker, so their
+// bearers never cross the page's fetch/XHR. auth.ts asks Teams' page auth
+// handler for those (the one the worker itself uses, via cdl.ts cdlToken).
+// SubstrateSearch is captured in-page only. In dev, scripts/presence-bridge.mjs
+// also files the workers' own request headers into the vault (__tcAuthIngest).
 
 export { cdl, cdlReady, cdlSubscribe, installCdl, whenCdl, type CdlRes } from "./cdl";
 export * as chat from "./chat";

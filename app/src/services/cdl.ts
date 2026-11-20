@@ -11,8 +11,14 @@
 // Teams' own traffic, which worker serves GraphQL and the envelope context
 // (rendererId, windowId, authenticationUser). Requests we send are identical in
 // form; replies are matched by requestId on a listener added to that worker.
-// No tokens are touched: the worker authenticates exactly as for Teams' UI.
-// Nothing leaves the page except through Teams' own worker.
+// GraphQL calls touch no tokens: the worker authenticates exactly as for
+// Teams' UI. Nothing leaves the page except through Teams' own worker.
+//
+// The same channel runs the other way for auth: the worker asks the page for
+// AAD tokens ({type:"auth", payload:{requestOperationtype:"aadGetToken"}}) and
+// the page answers through Worker.prototype.postMessage. cdlToken() asks that
+// page handler the same way, as if it were the worker, and takes the answer
+// out of the wrapper before it reaches the real worker (see cdlToken()).
 
 const KEY = Symbol.for("teams-calm.cdl");
 
@@ -38,7 +44,13 @@ interface State {
   route?: (d: unknown) => void;
   waiters: Set<() => void>;
   seq: number;
+  /** Answers to our own auth requests, keyed by requestId; see cdlToken(). */
+  auth?: Map<string, (r: AuthReply) => void>;
+  /** Version of the postMessage wrapper installed on the host page. */
+  wrap?: number;
 }
+
+type AuthReply = { status?: string; response?: { data?: { token?: unknown } } };
 
 type HostWin = Window & typeof globalThis & { [KEY]?: State };
 
@@ -117,22 +129,46 @@ function learn(s: State, w: Worker, msg: unknown): void {
   if (first) for (const f of [...s.waiters]) f();
 }
 
+// Our auth requests use this prefix, so the page's answers are told apart
+// from Teams' own by their first bytes.
+const AUTH_ID = "tc-auth-";
+const AUTH_HEAD = `{"requestId":"${AUTH_ID}`;
+const WRAP = 2;
+
+// True if `msg` answers one of our auth requests; it is then consumed here and
+// must not reach the worker (which would drop it and log it to telemetry).
+function takeAuth(s: State, msg: unknown): boolean {
+  if (typeof msg !== "string" || !msg.startsWith(AUTH_HEAD)) return false;
+  const id = ID_RE.exec(msg)?.[1] || "";
+  const done = s.auth?.get(id);
+  if (done) {
+    s.auth!.delete(id);
+    done(JSON.parse(msg) as AuthReply);
+  }
+  return true;
+}
+
 /** Idempotent; safe from every (re-)injected build and every child window. */
 export function installCdl(): void {
   const s = state();
   // A re-injected build installs its own router on the already-known worker.
   if (s.ctx) listen(s, s.ctx.worker);
-  if (s.post) return;
+  // An older build's wrapper (dev hot reload) does not know takeAuth; wrap once
+  // more on top of it. `s.post` stays the true original for our own sends.
+  if ((s.wrap ?? (s.post ? 1 : 0)) >= WRAP) return;
   const P = hostWin().Worker.prototype;
-  const orig = P.postMessage as State["post"] & object;
-  s.post = orig;
+  const below = P.postMessage as (...a: unknown[]) => void;
+  const learns = !s.post;
+  s.post ??= below as State["post"];
+  s.wrap = WRAP;
   P.postMessage = function (this: Worker, msg: unknown, ...rest: unknown[]): void {
     try {
-      learn(s, this, msg);
+      if (takeAuth(s, msg)) return;
+      if (learns) learn(s, this, msg);
     } catch {
-      /* learning must never break Teams' own request */
+      /* our hooks must never break Teams' own messages */
     }
-    return (orig as (...a: unknown[]) => void).call(this, msg, ...rest);
+    return below.call(this, msg, ...rest);
   } as typeof P.postMessage;
 }
 
@@ -235,6 +271,52 @@ export async function cdl<T = Record<string, unknown>>(
     return { ok: false, reason: errs?.length ? JSON.stringify(errs[0]).slice(0, 200) : reply.status || "no data" };
   }
   return { ok: true, data: reply.response.data as T };
+}
+
+/**
+ * Ask Teams' page for an AAD access token for `resource` (e.g.
+ * "https://ic3.teams.office.com"), exactly as its worker does when its own
+ * token runs out: the page's CDL auth handler serves it from MSAL, renewing it
+ * silently when due. The request is dispatched on the worker object, so the
+ * page's own message handler takes it; it carries a rendererId of its own,
+ * because the page treats messages with its own rendererId as responses.
+ * The token stays in memory; the caller files it in the vault. Resolves "" on
+ * failure or after `ms`. Never throws.
+ */
+export async function cdlToken(resource: string, ms = 8_000): Promise<string> {
+  if (!(await whenCdl(Math.min(ms, 5_000)))) return "";
+  installCdl();
+  const s = state();
+  const ctx = s.ctx!;
+  const requestId = `${AUTH_ID}${++s.seq}`;
+  s.auth ??= new Map();
+  const reply = await new Promise<AuthReply | null>((resolve) => {
+    const t = setTimeout(() => {
+      s.auth!.delete(requestId);
+      resolve(null);
+    }, ms);
+    s.auth!.set(requestId, (r) => {
+      clearTimeout(t);
+      resolve(r);
+    });
+    try {
+      const req = {
+        rendererId: "teams-calm",
+        windowId: ctx.windowId,
+        requestId,
+        type: "auth",
+        payload: { requestOperationtype: "aadGetToken", context: { resource, options: {} } },
+      };
+      const W = hostWin() as HostWin;
+      ctx.worker.dispatchEvent(new W.MessageEvent("message", { data: JSON.stringify(req) }));
+    } catch {
+      clearTimeout(t);
+      s.auth!.delete(requestId);
+      resolve(null);
+    }
+  });
+  const tok = reply?.response?.data?.token;
+  return typeof tok === "string" ? tok : "";
 }
 
 /**
