@@ -9,7 +9,7 @@
 // gets the latest dev build too. The patched-in production overlay is replaced
 // the same way, so dev and patch can coexist.
 //
-// Usage: node dev.mjs <bundle.js>
+// Usage: node scripts/dev.mjs <bundle.js>
 
 import { readFileSync, watch, existsSync } from "node:fs";
 import { basename, dirname } from "node:path";
@@ -18,7 +18,7 @@ import { startPresenceBridge } from "./presence-bridge.mjs";
 const PORT = 9222;
 const bundlePath = process.argv[2];
 if (!bundlePath) {
-  console.error("Usage: node dev.mjs <bundle.js>");
+  console.error("Usage: node scripts/dev.mjs <bundle.js>");
   process.exit(1);
 }
 

@@ -1,24 +1,69 @@
 #!/usr/bin/env bash
-# Install Teams Calm: dependencies, `teams-calm` launcher on PATH, then build,
-# patch Teams (asks for sudo) and relaunch it with the overlay.
+# Install Teams Calm: check requirements, install dependencies, put the
+# `teams-calm` launcher on PATH, then build, patch Teams (asks for your
+# administrator password) and relaunch it with the overlay.
+#
+#   ./install.sh               install and start
+#   ./install.sh --no-start    install only; run `teams-calm` later
+#
+# Safe to re-run (e.g. after `git pull` or a Teams update).
 # Uninstall with ./uninstall.sh
 
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN="$HOME/.local/bin"
+LINK="$BIN/teams-calm"
+NODE_MIN=20
 
-command -v node >/dev/null 2>&1 || { echo "error: Node is required but not found on PATH." >&2; exit 1; }
-[ -d "/Applications/Microsoft Teams.app" ] || { echo "error: new Microsoft Teams not found in /Applications." >&2; exit 1; }
+start=1
+for a in "$@"; do
+  case "$a" in
+    --no-start|--no-launch) start=0 ;;
+    -h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "error: unknown option: $a" >&2; exit 1 ;;
+  esac
+done
+
+die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+
+[ "$(uname -s)" = Darwin ] || die "Teams Calm runs on macOS only."
+[ -d "/Applications/Microsoft Teams.app" ] || die "new Microsoft Teams not found in /Applications."
+command -v node >/dev/null 2>&1 || die "Node.js $NODE_MIN+ is required (https://nodejs.org or 'brew install node')."
+command -v npm >/dev/null 2>&1 || die "npm is required (it ships with Node.js)."
+major="$(node -p 'process.versions.node.split(".")[0]')"
+[ "$major" -ge "$NODE_MIN" ] || die "Node.js $NODE_MIN+ is required, found $(node --version)."
+[ "$major" -ge 22 ] || echo "note: 'teams-calm dev' needs Node 22+; everything else works."
 
 echo "Installing overlay dependencies..."
-( cd "$DIR/app" && npm install --silent )
+( cd "$DIR/app" && npm ci --no-audit --no-fund --loglevel=error )
 
 mkdir -p "$BIN"
-ln -sf "$DIR/teams-calm" "$BIN/teams-calm"
-echo "Launcher: $BIN/teams-calm -> $DIR/teams-calm"
+if [ -e "$LINK" ] && [ ! -L "$LINK" ]; then
+  die "$LINK exists and is not a symlink; move it away and re-run."
+fi
+ln -sfn "$DIR/teams-calm" "$LINK"
+echo "Launcher: $LINK -> $DIR/teams-calm"
+
 case ":$PATH:" in
   *":$BIN:"*) ;;
-  *) echo "NOTE: add $BIN to your PATH:  export PATH=\"\$HOME/.local/bin:\$PATH\"" ;;
+  *)
+    case "${SHELL##*/}" in
+      zsh)  rc="~/.zshrc" ;;
+      bash) rc="~/.bash_profile" ;;
+      fish) rc="" ;;
+      *)    rc="your shell profile" ;;
+    esac
+    if [ "${SHELL##*/}" = fish ]; then
+      echo "NOTE: $BIN is not on PATH. Run:  fish_add_path ~/.local/bin"
+    else
+      echo "NOTE: $BIN is not on PATH. Add this line to $rc:"
+      echo "        export PATH=\"\$HOME/.local/bin:\$PATH\""
+    fi
+    ;;
 esac
 
-"$DIR/teams-calm"
+if [ "$start" = 1 ]; then
+  "$DIR/teams-calm" start
+else
+  echo "Installed. Run 'teams-calm' to patch and start Teams."
+fi

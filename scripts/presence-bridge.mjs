@@ -247,7 +247,7 @@ export async function startPresenceBridge(logFn = () => {}, onStop = () => {}) {
   return stop;
 }
 
-// Allow running standalone: `node presence-bridge.mjs`
+// Allow running standalone: `node scripts/presence-bridge.mjs`
 if (import.meta.url === `file://${process.argv[1]}`) {
   const log = (...a) => console.log(`[presence ${new Date().toLocaleTimeString()}]`, ...a);
   const stop = await startPresenceBridge(log);

@@ -2,7 +2,12 @@
   "name": "teams-calm-app",
   "private": true,
   "version": "0.1.0",
+  "description": "A calmer, Slack-like overlay inside the new Microsoft Teams desktop app (macOS)",
+  "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "../teams-calm dev",
     "mock": "vite --mode mock",

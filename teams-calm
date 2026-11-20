@@ -15,30 +15,59 @@
 # local process can control your signed-in Teams session. Leaving `dev`
 # (Ctrl-C) relaunches Teams without the port.
 #
-# Usage:
-#   teams-calm          Build, patch Teams if needed, relaunch it.
-#   teams-calm dev      Hot-reload dev mode (debug port while running).
-#   teams-calm patch    Build + patch, no relaunch (takes effect on next launch).
-#   teams-calm unpatch  Restore Teams' original bundle.js.
-#   teams-calm off      Unpatch and relaunch plain Teams.
-#   teams-calm status   Show patch / debug-port state.
-#
-# Toggle the overlay with Opt+Cmd+T.
+# Toggle the overlay with Option+Cmd+T.
 
 set -euo pipefail
 
-# Resolve this script's real location even when invoked via a symlink in PATH.
+# Resolve this script's real location even when invoked via a (relative)
+# symlink, e.g. ~/.local/bin/teams-calm.
 SELF="$0"
-while [ -L "$SELF" ]; do SELF="$(readlink "$SELF")"; done
+while [ -L "$SELF" ]; do
+  link="$(readlink "$SELF")"
+  case "$link" in /*) SELF="$link" ;; *) SELF="$(dirname "$SELF")/$link" ;; esac
+done
 DIR="$(cd "$(dirname "$SELF")" && pwd)"
+SELF="$DIR/$(basename "$SELF")"
+
+VERSION="$(sed -n 's/^  "version": "\(.*\)",$/\1/p' "$DIR/app/package.json" 2>/dev/null | head -1)"
 PORT=9222
 APP="Microsoft Teams"
 TEAMS_APP="/Applications/$APP.app"
 TARGET="$TEAMS_APP/Contents/Resources/client-bindings/bundle.js"
+TESTED="26289"                       # Teams build line the patch was verified on
+NODE_MIN=20                          # vite 6 / tailwind 4
+NODE_DEV_MIN=22                      # dev mode uses Node's global WebSocket
+BIN_LINK="$HOME/.local/bin/teams-calm"
 BUNDLE="$DIR/app/dist/teams-calm-app.js"
 PAYLOAD="$DIR/app/dist/teams-calm-host.js"
 DEV_BUNDLE="$DIR/app/dist-dev/teams-calm-app.js"
 MARK='/*teams-calm:begin*/'
+
+usage() {
+  cat <<EOF
+teams-calm ${VERSION:-} — a calmer client inside the new Microsoft Teams (macOS)
+
+Usage: teams-calm [command]
+
+  start       Build, patch Teams if needed, restart it (default).
+  dev         Hot-reload dev mode (opens debug port $PORT while running).
+  build       Build the overlay only; Teams is not touched.
+  patch       Build + patch, no restart (takes effect on next Teams launch).
+  unpatch     Restore Teams' original files.
+  off         Unpatch and restart plain Teams if it is running.
+  status      Show Teams version, patch state and debug port.
+  doctor      Check requirements (macOS, Node, Teams, dependencies).
+  uninstall   Unpatch Teams and remove the launcher. --purge also deletes
+              node_modules and build output. The project folder stays.
+  help        Show this help.
+
+Toggle the overlay inside Teams with Option+Cmd+T.
+EOF
+}
+
+say()  { printf '%s\n' "$*"; }
+warn() { printf 'warning: %s\n' "$*" >&2; }
+die()  { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 # ---- root-only helpers (run via sudo by `patch` / `unpatch`) -----------------
 
@@ -46,15 +75,84 @@ MARK='/*teams-calm:begin*/'
 payload_offset() {
   local off
   off="$(LC_ALL=C grep -abo -F "$MARK" "$TARGET" 2>/dev/null | head -1 | cut -d: -f1 || true)"
-  [ -n "$off" ] && echo $((off - 1))
+  if [ -n "$off" ]; then echo $((off - 1)); fi
 }
 
-root_strip() {
-  local off; off="$(payload_offset)"
-  [ -z "$off" ] && return 0
-  local tmp; tmp="$(mktemp)"
-  head -c "$off" "$TARGET" > "$tmp"
-  cat "$tmp" > "$TARGET"; rm -f "$tmp"
+# Rewrite bundle.js as <original bytes> [+ payload] in one step. Writes through
+# `cat >` so the file keeps its owner, mode and inode.
+root_write() {
+  [ "$(id -u)" = 0 ] || die "must run as root"
+  [ -f "$TARGET" ] || die "$TARGET not found"
+  local payload="${1:-}" off
+  TMP_OUT="$(mktemp)"
+  trap 'rm -f "$TMP_OUT"' EXIT
+  local tmp="$TMP_OUT"
+  off="$(payload_offset)"
+  if [ -n "$off" ]; then head -c "$off" "$TARGET" > "$tmp"; else cat "$TARGET" > "$tmp"; fi
+  if [ -n "$payload" ]; then
+    LC_ALL=C grep -qF "$MARK" "$payload" || die "$payload is not a teams-calm payload"
+    cat "$payload" >> "$tmp"
+  fi
+  cat "$tmp" > "$TARGET"
+}
+
+# ---- checks ------------------------------------------------------------------
+
+teams_version() { defaults read "$TEAMS_APP/Contents/Info.plist" CFBundleShortVersionString 2>/dev/null || echo "?"; }
+node_major() { node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0; }
+
+need_teams() {
+  [ "$(uname -s)" = Darwin ] || die "macOS only."
+  [ -d "$TEAMS_APP" ] || die "new Microsoft Teams not found at $TEAMS_APP."
+  [ -f "$TARGET" ] || die "Teams has no client-bindings/bundle.js (version $(teams_version)); this Teams build is not supported."
+}
+
+need_node() {
+  local min="${1:-$NODE_MIN}"
+  command -v node >/dev/null 2>&1 || die "Node.js $min+ is required (https://nodejs.org or 'brew install node')."
+  command -v npm >/dev/null 2>&1 || die "npm is required (it ships with Node.js)."
+  [ "$(node_major)" -ge "$min" ] || die "Node.js $min+ is required, found $(node --version)."
+}
+
+warn_untested() {
+  case "$(teams_version)" in
+    "$TESTED".*) ;;
+    *) warn "Teams $(teams_version) is untested (verified on $TESTED.x). If the overlay misbehaves, run 'teams-calm off'." ;;
+  esac
+}
+
+# Install npm dependencies when missing or older than the lockfile.
+ensure_deps() {
+  local stamp="$DIR/app/node_modules/.package-lock.json"
+  if [ ! -f "$stamp" ] || [ "$DIR/app/package-lock.json" -nt "$stamp" ]; then
+    say "Installing overlay dependencies..."
+    ( cd "$DIR/app" && npm ci --no-audit --no-fund --loglevel=error )
+  fi
+}
+
+doctor() {
+  local bad=0
+  ok()   { printf '  ok    %s\n' "$*"; }
+  fail() { printf '  FAIL  %s\n' "$*"; bad=1; }
+  note() { printf '  note  %s\n' "$*"; }
+  say "teams-calm ${VERSION:-} in $DIR"
+  [ "$(uname -s)" = Darwin ] && ok "macOS $(sw_vers -productVersion 2>/dev/null)" || fail "macOS only"
+  if command -v node >/dev/null 2>&1; then
+    if [ "$(node_major)" -ge "$NODE_MIN" ]; then ok "Node $(node --version)"; else fail "Node $(node --version); need $NODE_MIN+"; fi
+    [ "$(node_major)" -ge "$NODE_DEV_MIN" ] || note "dev mode needs Node $NODE_DEV_MIN+"
+  else fail "Node.js not found (need $NODE_MIN+)"; fi
+  command -v npm >/dev/null 2>&1 && ok "npm $(npm --version)" || fail "npm not found"
+  if [ -d "$TEAMS_APP" ]; then
+    case "$(teams_version)" in
+      "$TESTED".*) ok "Teams $(teams_version)" ;;
+      *) note "Teams $(teams_version) is untested (verified on $TESTED.x)" ;;
+    esac
+    [ -f "$TARGET" ] && ok "client-bindings/bundle.js present" || fail "client-bindings/bundle.js missing: unsupported Teams build"
+  else fail "new Microsoft Teams not found at $TEAMS_APP"; fi
+  [ -f "$DIR/app/node_modules/.package-lock.json" ] && ok "dependencies installed" || note "dependencies not installed yet (installed on first run)"
+  if [ -L "$BIN_LINK" ]; then ok "launcher $BIN_LINK"; else note "no launcher in ~/.local/bin (run ./install.sh)"; fi
+  case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) note "~/.local/bin is not on PATH" ;; esac
+  return $bad
 }
 
 # ---- user-level helpers ------------------------------------------------------
@@ -63,106 +161,153 @@ is_patched() { LC_ALL=C grep -qF "$MARK" "$TARGET" 2>/dev/null; }
 
 # Patched payload equals the current build?
 patch_current() {
-  is_patched || return 1
+  is_patched && [ -f "$PAYLOAD" ] || return 1
   local off; off="$(payload_offset)"
   cmp -s <(tail -c +"$((off + 1))" "$TARGET") "$PAYLOAD"
 }
 
+teams_running() { pgrep -x MSTeams >/dev/null 2>&1; }
+
 quit_teams() {
+  teams_running || return 0
   osascript -e "quit app \"$APP\"" >/dev/null 2>&1 || true
-  for _ in $(seq 1 20); do
-    pgrep -x "MSTeams" >/dev/null 2>&1 || return 0
-    sleep 0.5
-  done
+  for _ in $(seq 1 30); do teams_running || return 0; sleep 0.5; done
+  warn "Teams did not quit within 15s; quit it manually, then start it again."
+  return 1
 }
 
 port_open() { curl -s --max-time 1 "http://localhost:$PORT/json/version" >/dev/null 2>&1; }
 
 wait_for_port() {
   for _ in $(seq 1 30); do port_open && return 0; sleep 0.5; done
-  echo "error: Teams did not open debug port $PORT within 15s" >&2
-  return 1
+  die "Teams did not open debug port $PORT within 15s"
 }
 
 launch_plain() { open -a "$APP"; }
 launch_debug() { WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=$PORT" open -a "$APP"; }
 
 build() {
-  if [ ! -f "$BUNDLE" ] || [ -n "$(find "$DIR/app/src" -newer "$BUNDLE" 2>/dev/null)" ]; then
-    echo "Building overlay..."; ( cd "$DIR/app" && npm run --silent build )
+  need_node
+  ensure_deps
+  if [ ! -f "$BUNDLE" ] || [ -n "$(find "$DIR/app/src" "$DIR/app/vite.config.js" -newer "$BUNDLE" 2>/dev/null | head -1)" ]; then
+    say "Building overlay..."; ( cd "$DIR/app" && npm run --silent build )
   fi
-  if [ ! -f "$PAYLOAD" ] || [ "$BUNDLE" -nt "$PAYLOAD" ] || [ "$DIR/build-host-patch.mjs" -nt "$PAYLOAD" ]; then
-    node "$DIR/build-host-patch.mjs" "$BUNDLE" "$PAYLOAD" >/dev/null
+  if [ ! -f "$PAYLOAD" ] || [ "$BUNDLE" -nt "$PAYLOAD" ] || [ "$DIR/scripts/build-host-patch.mjs" -nt "$PAYLOAD" ]; then
+    node "$DIR/scripts/build-host-patch.mjs" "$BUNDLE" "$PAYLOAD" >/dev/null
   fi
 }
 
-# Returns 0 if bundle.js was changed.
 patch() {
+  need_teams
   build
-  if patch_current; then echo "Teams is already patched with the current build."; return 1; fi
-  echo "Patching $TARGET (sudo)..."
-  sudo "$DIR/teams-calm" __root-patch "$PAYLOAD"
+  if patch_current; then say "Teams is already patched with the current build."; return 0; fi
+  warn_untested
+  say "Patching Teams (administrator password needed: the app is owned by root)..."
+  sudo "$SELF" __root-write "$PAYLOAD"
+  patch_current || die "patch did not apply; Teams left as it was."
 }
 
 unpatch() {
-  if ! is_patched; then echo "Teams is not patched."; return 1; fi
-  echo "Restoring original bundle.js (sudo)..."
-  sudo "$DIR/teams-calm" __root-unpatch
-  codesign --verify "$TEAMS_APP" 2>/dev/null && echo "Code signature valid again."
+  [ -f "$TARGET" ] || { say "Teams not found; nothing to restore."; return 0; }
+  if ! is_patched; then say "Teams is not patched."; return 0; fi
+  say "Restoring Teams' original files (administrator password needed)..."
+  sudo "$SELF" __root-write
+  is_patched && die "could not remove the patch from $TARGET"
+  if codesign --verify "$TEAMS_APP" 2>/dev/null; then say "Code signature valid again."
+  else warn "codesign still fails; reinstall Teams if it misbehaves."; fi
 }
 
-case "${1:-start}" in
+restart_plain() {
+  say "Restarting Teams..."
+  quit_teams && launch_plain
+}
+
+remove_launcher() {
+  [ -L "$BIN_LINK" ] || return 0
+  local to; to="$(readlink "$BIN_LINK")"
+  if [ "$to" = "$SELF" ] || [ "$to" = "$DIR/teams-calm" ]; then rm -f "$BIN_LINK"; say "Removed launcher $BIN_LINK"
+  else say "Left $BIN_LINK alone (points to $to)."; fi
+}
+
+cmd="${1:-start}"
+[ $# -gt 0 ] && shift
+case "$cmd" in
   start)
-    patch || true
-    if port_open; then echo "Teams has the debug port open; relaunching without it."; fi
-    echo "Relaunching Teams..."; quit_teams; launch_plain
-    echo "Done. Toggle the overlay with Option+Cmd+T."
+    patch
+    if port_open; then say "Teams has the debug port open; restarting without it."; fi
+    restart_plain
+    say "Done. Toggle the overlay with Option+Cmd+T."
+    ;;
+  build)
+    build; say "Built $PAYLOAD"
     ;;
   patch)
-    patch && echo "Patched. Restart Teams to load it."
+    patch; say "Patched. Restart Teams to load it."
     ;;
   unpatch)
-    unpatch || true
+    unpatch
     ;;
   off)
-    unpatch || true
-    echo "Relaunching plain Teams..."; quit_teams; launch_plain
+    unpatch
+    if teams_running; then restart_plain; else say "Teams starts without the overlay next time."; fi
     ;;
   dev)
-    echo "Relaunching Teams with debug port $PORT (dev only)..."
-    quit_teams; launch_debug; wait_for_port
+    need_teams; need_node "$NODE_DEV_MIN"; ensure_deps
+    say "Relaunching Teams with debug port $PORT (dev only)..."
+    quit_teams || exit 1
+    launch_debug; wait_for_port
     PIDS=()
     cleanup() {
       trap - INT TERM EXIT
-      kill "${PIDS[@]}" 2>/dev/null || true
-      wait "${PIDS[@]}" 2>/dev/null || true
-      echo; echo "Leaving dev: relaunching Teams without the debug port..."
-      quit_teams; launch_plain
+      # ${a[@]+...}: bash 3.2 (macOS) treats an empty array as unset under -u.
+      kill ${PIDS[@]+"${PIDS[@]}"} 2>/dev/null || true
+      wait ${PIDS[@]+"${PIDS[@]}"} 2>/dev/null || true
+      say ""; say "Leaving dev: relaunching Teams without the debug port..."
+      quit_teams && launch_plain
     }
     trap cleanup INT TERM EXIT
-    ( cd "$DIR/app" && exec ./node_modules/.bin/vite build --watch --minify false --outDir dist-dev --logLevel warn ) & PIDS+=($!)
     mkdir -p "$(dirname "$DEV_BUNDLE")"
-    node "$DIR/dev.mjs" "$DEV_BUNDLE" & PIDS+=($!)
-    echo "Dev mode: edit app/src, the overlay reloads on save. Ctrl-C to stop."
+    ( cd "$DIR/app" && exec ./node_modules/.bin/vite build --watch --minify false --outDir dist-dev --logLevel warn ) & PIDS+=($!)
+    node "$DIR/scripts/dev.mjs" "$DEV_BUNDLE" & PIDS+=($!)
+    say "Dev mode: edit app/src, the overlay reloads on save. Ctrl-C to stop."
     wait
     ;;
   status)
+    say "teams-calm: ${VERSION:-?} ($DIR)"
+    if [ -d "$TEAMS_APP" ]; then say "Teams:      $(teams_version)$(teams_running && echo ', running' || true)"
+    else say "Teams:      not installed"; fi
     if is_patched; then
-      patch_current 2>/dev/null && echo "patch: current build" || echo "patch: older build (run teams-calm)"
-    else echo "patch: not patched"; fi
-    port_open && echo "debug port $PORT: OPEN" || echo "debug port $PORT: closed"
+      if patch_current; then say "patch:      current build"; else say "patch:      older build (run teams-calm)"; fi
+    else say "patch:      not patched"; fi
+    if port_open; then say "debug port: $PORT OPEN"; else say "debug port: closed"; fi
     ;;
-  __root-patch)
-    [ "$(id -u)" = 0 ] || { echo "must run as root" >&2; exit 1; }
-    root_strip
-    cat "$2" >> "$TARGET"
+  doctor)
+    doctor
     ;;
-  __root-unpatch)
-    [ "$(id -u)" = 0 ] || { echo "must run as root" >&2; exit 1; }
-    root_strip
+  uninstall)
+    purge=0
+    for a in "$@"; do case "$a" in --purge) purge=1 ;; *) die "unknown option: $a" ;; esac; done
+    was_running=0; teams_running && was_running=1
+    unpatch
+    [ "$was_running" = 1 ] && restart_plain
+    remove_launcher
+    if [ "$purge" = 1 ]; then
+      rm -rf "$DIR/app/node_modules" "$DIR/app/dist" "$DIR/app/dist-dev"
+      say "Removed node_modules and build output."
+    fi
+    say "Teams Calm is uninstalled. Delete $DIR to remove the source too."
+    say "(Overlay preferences live in Teams' local storage and are inert without the patch.)"
+    ;;
+  help|-h|--help)
+    usage
+    ;;
+  version|-v|--version)
+    say "${VERSION:-unknown}"
+    ;;
+  __root-write)
+    root_write "${1:-}"
     ;;
   *)
-    echo "Usage: teams-calm [start|dev|patch|unpatch|off|status]" >&2
-    exit 1
+    usage >&2; exit 1
     ;;
 esac

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Uninstall Teams Calm: restore Teams' original files, relaunch plain Teams and
-# remove the launcher from PATH. Leaves the project folder untouched.
+# Uninstall Teams Calm: restore Teams' original files (asks for your
+# administrator password), relaunch plain Teams if it was running, and remove
+# the `teams-calm` launcher. Leaves the project folder in place.
+#
+#   ./uninstall.sh            uninstall
+#   ./uninstall.sh --purge    also delete node_modules and build output
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
-
-"$DIR/teams-calm" off
-
-BIN="$HOME/.local/bin/teams-calm"
-if [ -L "$BIN" ] || [ -f "$BIN" ]; then rm -f "$BIN"; echo "Removed $BIN"; fi
+exec "$DIR/teams-calm" uninstall "$@"

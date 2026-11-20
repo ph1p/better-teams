@@ -14,7 +14,7 @@
 // (chatsvcagg) and presence (ups) calls run inside Teams' web worker, so their
 // bearers never cross the page's fetch/XHR and cannot be captured here. Only
 // ic3 (chatsvc, asyncgw) and SubstrateSearch are reliably available in-page.
-// In dev (CDP port open), presence-bridge.mjs reads the workers' own request
+// In dev (CDP port open), scripts/presence-bridge.mjs reads the workers' own request
 // headers and files them into this vault via __tcAuthIngest, so mt, chatsvcagg
 // and presence become available too. In prod they stay absent.
 

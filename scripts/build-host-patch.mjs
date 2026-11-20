@@ -8,11 +8,11 @@
 // `with (childWindow)`, so `document`, `window`, `fetch`, timers etc. resolve to
 // the child window — the overlay renders and wraps fetch there.
 //
-// Usage: node build-host-patch.mjs <bundle.js> <out.js>
+// Usage: node scripts/build-host-patch.mjs <bundle.js> <out.js>
 import { readFileSync, writeFileSync } from "node:fs";
 
 const [src, out] = process.argv.slice(2);
-if (!src || !out) { console.error("Usage: node build-host-patch.mjs <bundle.js> <out.js>"); process.exit(1); }
+if (!src || !out) { console.error("Usage: node scripts/build-host-patch.mjs <bundle.js> <out.js>"); process.exit(1); }
 const app = readFileSync(src, "utf8");
 
 // Presence in prod comes from the DOM presence badges Teams paints in each
