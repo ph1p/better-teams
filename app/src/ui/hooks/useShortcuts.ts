@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { isIdle } from "../lib/live";
+import { viewerOpen } from "../lib/files";
 import type { Chat } from "../../types";
 
 interface Shortcuts {
@@ -24,7 +25,7 @@ export function useShortcuts(opts: Shortcuts): void {
   o.current = opts;
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (isIdle()) return;
+      if (isIdle() || viewerOpen()) return;
       const { flat, sel, pick, searchRef } = o.current;
       if (e.metaKey && !e.altKey && e.key.toLowerCase() === "k") {
         e.preventDefault();

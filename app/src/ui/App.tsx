@@ -10,6 +10,7 @@ import { Timeline } from "./chat/Timeline";
 import { Composer } from "./chat/Composer";
 import { ProfilePanel } from "./profile/ProfilePanel";
 import { NotesPanel } from "./notes/NotesPanel";
+import { FileViewer } from "./shared/FileViewer";
 import { messageText } from "./lib/format";
 import { usePref } from "./lib/prefs";
 import { useToast } from "./lib/toast";
@@ -285,6 +286,8 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
           onSetHidden={(chat, hidden) => void a.setHidden(chat, hidden)}
         />
       ) : null}
+
+      <FileViewer />
 
       {toast ? <div className="tc-toast">{toast}</div> : null}
     </>

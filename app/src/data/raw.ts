@@ -25,4 +25,7 @@ export const toMs = (v: unknown): number => {
 };
 
 // "https://…/contacts/8:orgid:<oid>" or "8:orgid:<oid>" -> "8:orgid:<oid>"
+/** Lower-case extension of a file name ("Plan.PDF" -> "pdf"), "" when none. */
+export const extOf = (name: string): string => (/\.(\w+)$/.exec(name)?.[1] || "").toLowerCase();
+
 export const mriOf = (s: unknown): string => (String(s ?? "").match(/\d+:[^/]+$/) || [""])[0];

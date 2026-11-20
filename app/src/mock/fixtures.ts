@@ -141,7 +141,7 @@ export const CHATS: SeedChat[] = [
   {
     id: "19:dm-jonas@unq.gbl.spaces", kind: "chat", members: [jonas.mri], readAgo: 0,
     messages: [
-      { from: jonas.mri, ago: 2 * D, html: p("Here's the schema dump you asked for."), files: ["schema-2026-11.sql"] },
+      { from: jonas.mri, ago: 2 * D, html: p("Here's the schema dump you asked for."), files: ["schema-2026-11.sql", "er-diagram.png", "migration-plan.pdf", "rollout.xlsx"] },
       { from: ME, ago: 2 * D - 10, html: p("Thanks! Will check tonight.") },
       { from: jonas.mri, ago: 5 * H, html: p(`Hey ${mention(me)}, the cache invalidation PR needs a second reviewer.`) },
       { from: ME, ago: 5 * H - 4, html: quote(jonas, "the cache invalidation PR needs a second reviewer.") + p("On it after lunch."), edited: true },

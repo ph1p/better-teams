@@ -2,7 +2,8 @@
 import type { FileRef, Message, Reaction } from "../types";
 import { myMri } from "./idb";
 import { profile } from "./profiles";
-import { arr, get, mriOf, obj, str, toMs, type Dict } from "./raw";
+import { allowedUrl } from "../services/http";
+import { arr, extOf, get, mriOf, obj, str, toMs, type Dict } from "./raw";
 import { deletedHere, rememberRef } from "./state";
 
 const SKIP_TYPES = /ThreadActivity|Control|Event\//i;
@@ -37,6 +38,17 @@ export function asCallRoot(n: Message, raw: Record<string, unknown>): Message {
   return { ...n, call: "start", from: n.from || "Meeting", content: "<p>Meeting" + (esc ? ": <b>" + esc + "</b>" : " started") + "</p>" };
 }
 
+/** The https site URL when it is on SharePoint Online, else "". */
+function sharePointSite(url: string): string {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && /\.sharepoint\.com$/.test(u.hostname) ? u.href.replace(/\/?$/, "/") : "";
+  } catch {
+    return "";
+  }
+}
+
+/** properties.files (a JSON string of Teams file chiclets) -> FileRef[]. See docs/file-send-flow.md. */
 function parseFiles(raw: unknown): FileRef[] {
   if (!raw) return [];
   try {
@@ -44,10 +56,26 @@ function parseFiles(raw: unknown): FileRef[] {
     return arr(parsed)
       .map((f): FileRef => {
         const info = obj(get(f, "fileInfo"));
-        return {
-          name: str(get(f, "fileName")) || str(get(f, "title")) || "file",
+        const ids = obj(get(f, "sharepointIds"));
+        const name = str(get(f, "fileName")) || str(get(f, "title")) || "file";
+        const ext = (str(get(f, "fileType")) || str(get(f, "type"))).toLowerCase() || extOf(name);
+        const ref: FileRef = {
+          name,
           url: str(info.shareUrl) || str(info.fileUrl) || str(get(f, "objectUrl")) || str(get(f, "openUrl")),
+          ext,
         };
+        const pv = obj(get(f, "filePreview"));
+        // Only AMS previews: they load with the page's cookies.
+        const pvUrl = allowedUrl(str(pv.previewUrl))?.href;
+        if (pvUrl) ref.preview = { url: pvUrl, width: Number(pv.previewWidth) || 0, height: Number(pv.previewHeight) || 0 };
+        const site = sharePointSite(str(info.siteUrl) || str(ids.siteUrl) || str(get(f, "baseUrl")));
+        const uniqueId = (str(ids.listItemUniqueId) || str(get(f, "itemid"))).replace(/[{}]/g, "");
+        if (site && /^[0-9a-f-]{36}$/i.test(uniqueId)) {
+          const q = "?UniqueId=" + encodeURIComponent(uniqueId);
+          ref.embed = site + "_layouts/15/embed.aspx" + q;
+          ref.download = site + "_layouts/15/download.aspx" + q;
+        }
+        return ref;
       })
       .filter((f) => f.name);
   } catch {

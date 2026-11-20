@@ -3,9 +3,10 @@
 // small simulation on top: typing then a canned reply after you write in a chat,
 // occasional background messages and presence drift. Subscribers (chat events,
 // typing, presence) get pushed the same way Teams' worker would push them.
-import type { Chat, Message, Profile, Reaction } from "../types";
+import type { Chat, FileRef, Message, Profile, Reaction } from "../types";
 import { APPS, CHATS, CHATTER, ME, PEOPLE, PRESENCE, REPLIES, type SeedChat } from "./fixtures";
 import { isAppMri } from "../apps";
+import { extOf } from "../data/raw";
 
 /** How many recent messages the first load shows; older ones page in on scroll. */
 const WINDOW = 30;
@@ -62,6 +63,20 @@ function makeMessage(from: string, html: string, time: number, extra: Partial<Me
   };
 }
 
+// A fake attachment: images get an SVG "photo" as their preview.
+const PHOTO = "data:image/svg+xml," + encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">`
+  + `<defs><linearGradient id="g" x2="0" y2="1"><stop offset="0" stop-color="#7aa7e6"/><stop offset="1" stop-color="#f3c79b"/></linearGradient></defs>`
+  + `<rect width="1200" height="800" fill="url(#g)"/><circle cx="900" cy="230" r="90" fill="#fff5d6"/>`
+  + `<path d="M0 640 L300 380 L520 560 L760 330 L1200 700 L1200 800 L0 800Z" fill="#3d5a73"/></svg>`,
+);
+
+function mockFile(name: string): FileRef {
+  const ext = extOf(name);
+  if (!/^(png|jpe?g|gif|webp)$/.test(ext)) return { name, url: "", ext };
+  return { name, url: "", ext, preview: { url: PHOTO, width: 1200, height: 800 } };
+}
+
 const chats = new Map<string, MockChat>();
 for (const seed of CHATS) {
   const messages: Message[] = [];
@@ -72,7 +87,7 @@ for (const seed of CHATS) {
       edited: !!s.edited,
       subject: s.subject || "",
       importance: s.importance || "normal",
-      files: (s.files || []).map((name) => ({ name, url: "" })),
+      files: (s.files || []).map(mockFile),
       ...(s.type ? { messageType: s.type } : {}),
       ...(s.call ? { call: s.call } : {}),
       ...(root ? { rootId: root.id, rootTime: root.rootTime, isReply: true } : {}),

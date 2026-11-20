@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 import {
-  SmilePlus, Pencil, Trash2, Undo2, Paperclip, X, Reply, Copy, Check, MessageSquareReply,
+  SmilePlus, Pencil, Trash2, Undo2, X, Reply, Copy, Check, MessageSquareReply,
 } from "lucide-react";
 import { splitQuote } from "../../quote";
 import { RichHtml } from "../../richText";
 import { Avatar } from "../shared/Avatar";
+import { Attachments } from "./Attachments";
 import { isAppMri } from "../../apps";
 import { Linkified } from "../shared/Linkified";
 import { avatarUri, fmtClock, htmlToText, isHtmlMsg, messageText, oneLine } from "../lib/format";
@@ -12,6 +13,8 @@ import { handleFormatKey } from "../lib/editKeys";
 import { htmlToMarkdown } from "../lib/htmlToMarkdown";
 import { usePresence } from "../lib/presence";
 import { glyphFor, PICKER } from "../lib/reactions";
+import { imageItem, openViewer } from "../lib/files";
+import { useCopied } from "../lib/clipboard";
 import type { Message as Msg } from "../../types";
 
 interface MessageProps {
@@ -42,7 +45,7 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onE
   // once the user removes it. null = message has no quote.
   const [editQuote, setEditQuote] = useState<string | null>(null);
   // Brief "copied" tick after copying the message text to the clipboard.
-  const [copied, setCopied] = useState(false);
+  const [copied, copy] = useCopied();
   // Close the reaction popover when clicking anywhere outside this message.
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -73,13 +76,7 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onE
       if (v) onEdit(cid, m.id, v, keptQuote);
     }
   };
-  const copyText = (): void => {
-    const t = bodyText || text;
-    if (!t) return;
-    Promise.resolve(navigator.clipboard?.writeText(t))
-      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); })
-      .catch(() => { /* clipboard blocked; ignore */ });
-  };
+  const copyText = (): void => copy(bodyText || text);
   return (
     <div ref={root} data-mid={m.id} className={"tc-msg" + (first ? " first" : "") + (m.isReply && channel ? " reply" : "")}>
       {first ? (
@@ -139,23 +136,19 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onE
               // Click a quoted reply's blockquote to jump to the original.
               const bq = (e.target as Element).closest?.("blockquote.tc-reply");
               if (bq) { const id = bq.getAttribute("data-reply-id"); if (id) onJumpTo?.(id); }
+              // Click an inline image to view it large, with the message's other images.
+              const img = (e.target as Element).closest?.("img.tc-inline-img");
+              if (img) {
+                const all = [...e.currentTarget.querySelectorAll<HTMLImageElement>("img.tc-inline-img")];
+                openViewer(all.map((el) => imageItem(el.currentSrc || el.src, el.alt)), all.indexOf(img as HTMLImageElement));
+              }
             }}
           >
             {html ? <RichHtml html={m.content} /> : <Linkified text={text} />}
             {m.edited ? <span className="tc-edited"> (edited)</span> : null}
           </div>
         )}
-        {m.files.length ? (
-          <div className="tc-files">
-            {m.files.map((f, i) =>
-              f.url ? (
-                <a key={i} className="tc-file" href={f.url} target="_blank" rel="noreferrer noopener"><Paperclip size={13} /> {f.name}</a>
-              ) : (
-                <span key={i} className="tc-file"><Paperclip size={13} /> {f.name}</span>
-              )
-            )}
-          </div>
-        ) : null}
+        <Attachments files={m.files} />
         {!m.deleted && m.reactions.length ? (
           <div className="tc-reacts">
             {m.reactions.map((r) => (

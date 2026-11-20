@@ -23,8 +23,16 @@ export interface Reaction {
 /** A file/attachment reference extracted from a message. */
 export interface FileRef {
   name: string;
-  /** Download/open URL, or "" when Teams gave none. */
+  /** Open-in-browser URL (SharePoint), or "" when Teams gave none. */
   url: string;
+  /** Lower-case file type, e.g. "pdf" or "png"; "" when unknown. */
+  ext: string;
+  /** Image preview Teams stored in AMS (/views/imgo, served with the page's cookies). */
+  preview?: { url: string; width: number; height: number };
+  /** SharePoint's own viewer page (Office, PDF, video, …), made to be framed. */
+  embed?: string;
+  /** SharePoint direct download. */
+  download?: string;
 }
 
 /** The last-message preview shown on a chat row. */
