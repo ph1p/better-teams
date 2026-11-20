@@ -11,6 +11,7 @@
 // does not, we abort instead of risking a message to the wrong person.
 
 import type { WriteResult } from "./types";
+import { formatMessage } from "./markdown";
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
@@ -306,6 +307,76 @@ export async function sendNativeDraft(people: PickPerson[], text: string): Promi
   btn.click();
   const id = await waitFor(() => nativeThreadId(), 8000);
   return { ok: true, id };
+}
+
+// Teams' native attach flow. The "attach" button opens a menu whose "upload
+// from this device" entry is backed by a plain multiple file input; setting
+// its files and firing change starts Teams' own upload (AMS + SharePoint, see
+// docs/file-send-flow.md). Each uploaded file then shows as a card in the
+// file well whose title carries its SharePoint URL.
+const FILE_PICKER = '[data-tid="sendMessageCommands-FilePicker"], [data-tid="newMessageCommands-FilePicker"]';
+const FILE_INPUT = '[data-tid="file-upload-from-pc"] input[type="file"]';
+const FILE_WELL = '[data-tid="file-well"]';
+const FILE_CARD = FILE_WELL + ' [data-testid="content-card-custom-title"]';
+const FILE_REMOVE = FILE_WELL + ' [data-testid="close-button"]';
+
+const uploadedCount = (): number =>
+  [...document.querySelectorAll(FILE_CARD)].filter((e) => /https:\/\//.test(e.getAttribute("aria-label") || "")).length;
+
+function clearFileWell(): void {
+  document.querySelectorAll<HTMLElement>(FILE_REMOVE).forEach((b) => b.click());
+}
+
+interface CkEditor { setData(html: string): void; }
+
+/**
+ * Send `files` (and optional markdown-lite `text`) to a chat through Teams'
+ * own composer, so Teams uploads them with its own tokens. Safety as in
+ * sendMessage: aborts unless the native composer targets `conversationId`.
+ * Text goes in through CKEditor's API; typing into its DOM is not seen by
+ * its model, and the send would go out without it. Mentions stay plain text.
+ */
+export async function sendFiles(conversationId: string, title: string, text: string, files: File[]): Promise<WriteResult> {
+  if (!files.length) return { ok: false, reason: "empty" };
+  const opened = await openNativeChat(conversationId, title);
+  if (!opened || nativeThreadId() !== conversationId) return { ok: false, reason: opened ? "wrong-chat" : "chat-not-open" };
+  const composer = await waitFor(findComposer);
+  if (!composer) return { ok: false, reason: "no-composer" };
+  // Files the user staged in Teams itself would go out with ours.
+  if (document.querySelector(FILE_WELL + " [role=group]")) return { ok: false, reason: "native-busy" };
+
+  document.querySelector<HTMLElement>(FILE_PICKER)?.click();
+  const input = await waitFor(() => document.querySelector<HTMLInputElement>(FILE_INPUT), 2000);
+  if (!input) return { ok: false, reason: "no-file-input" };
+  const dt = new DataTransfer();
+  files.forEach((f) => dt.items.add(f));
+  input.files = dt.files;
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  if (document.querySelector('[role="menu"]')) {
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+  }
+
+  // Generous: 30 s plus 20 s per MB (a slow 50 KB/s link).
+  const bytes = files.reduce((n, f) => n + f.size, 0);
+  const done = await waitFor(() => uploadedCount() >= files.length, 30_000 + bytes / 50, 250);
+  const fail = (reason: string): WriteResult => { clearFileWell(); return { ok: false, reason }; };
+  if (!done) return fail("upload-timeout");
+  if (nativeThreadId() !== conversationId) return fail("wrong-chat");
+
+  const html = text.trim() ? formatMessage(text).html : "";
+  const ck = (composer as HTMLElement & { ckeditorInstance?: CkEditor }).ckeditorInstance;
+  if (ck) ck.setData(html);
+  else if (text.trim()) setComposerText(composer, text);
+
+  const btn = await waitFor(() => {
+    const b = document.querySelector<HTMLButtonElement>(SEND_BUTTON);
+    return b && !b.disabled && b.getAttribute("aria-disabled") !== "true" ? b : null;
+  }, 1500);
+  // Re-check right before sending: the user may have clicked elsewhere.
+  if (nativeThreadId() !== conversationId) return fail("wrong-chat");
+  if (!btn) return fail("no-send-button");
+  btn.click();
+  return { ok: true, via: "button" };
 }
 
 function findComposer(): HTMLElement | null {

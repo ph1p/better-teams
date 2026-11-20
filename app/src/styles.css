@@ -223,6 +223,12 @@
   width: 34px; height: 34px; transition: opacity .15s, transform .1s; }
 #tc-root .tc-send:hover:not(:disabled) { transform: translateY(-1px); }
 #tc-root .tc-send:disabled { opacity: .4; cursor: default; }
+#tc-root .tc-composer.dropping .tc-composer-box { border-style: dashed; border-color: var(--tc-accent);
+  background: var(--tc-accent-soft); }
+#tc-root .tc-staged { @apply flex flex-wrap gap-1.5; margin: 0 0 8px; }
+#tc-root .tc-staged .tc-card { width: 240px; padding-right: 6px; }
+#tc-root .tc-staged .tc-card-main { cursor: default; }
+#tc-root .tc-card.uploading { opacity: .7; }
 #tc-root .tc-composer-hint { @apply flex justify-between gap-3; margin: 6px 4px 0;
   font-size: 11px; color: var(--tc-fg2); }
 /* Typing indicator sits on the composer box's top border: no layout shift. */

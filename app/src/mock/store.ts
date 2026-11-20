@@ -240,13 +240,13 @@ function find(convId: string, messageId: string): { c: MockChat; m: Message } | 
   return c && m ? { c, m } : null;
 }
 
-export function post(convId: string, from: string, html: string, rootId?: string): Message | null {
+export function post(convId: string, from: string, html: string, rootId?: string, files: FileRef[] = []): Message | null {
   const c = chats.get(convId);
   if (!c) return null;
   const time = Date.now();
   const root = rootId ? c.messages.find((m) => m.id === rootId) : undefined;
   const m = makeMessage(from, html, time,
-    root ? { rootId: root.id, rootTime: root.rootTime, isReply: true } : {});
+    { files, ...(root ? { rootId: root.id, rootTime: root.rootTime, isReply: true } : {}) });
   c.messages.push(m);
   if (from === ME) { c.readMs = time + 1; c.marked = false; }
   if (time > c.readMs || from === ME) c.hidden = false;

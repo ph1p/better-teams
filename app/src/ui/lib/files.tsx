@@ -23,7 +23,7 @@ const KINDS: [FileKind, RegExp][] = [
   ["text", /^(txt|md|log)$/],
 ];
 
-function fileKind(ext: string): FileKind {
+export function fileKind(ext: string): FileKind {
   const e = ext.toLowerCase();
   return KINDS.find(([, re]) => re.test(e))?.[0] ?? "other";
 }

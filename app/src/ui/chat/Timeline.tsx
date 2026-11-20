@@ -6,6 +6,8 @@ import { RichHtml } from "../../richText";
 import { formatMessage } from "../../markdown";
 import { fmtClock, fmtDay, messageText } from "../lib/format";
 import { GROUP_GAP_MS, LIVE_CALL_MS, THREAD_TAIL } from "../lib/constants";
+import { fileKind, KindIcon } from "../lib/files";
+import { extOf } from "../../data/raw";
 import type { Pending } from "../hooks/useMessages";
 import type { Chat, Message as Msg } from "../../types";
 
@@ -59,7 +61,22 @@ const renderPending = (p: Pending): JSX.Element => (
         <span className="who">You</span>
         <span className="when">sending…</span>
       </div>
-      <div className="tc-msg-content rich"><RichHtml html={formatMessage(p.text, [], () => "pending-" + p.key).html} /></div>
+      {p.text ? <div className="tc-msg-content rich"><RichHtml html={formatMessage(p.text, [], () => "pending-" + p.key).html} /></div> : null}
+      {p.files?.length ? (
+        <div className="tc-attach"><div className="tc-cards">
+          {p.files.map((name, i) => (
+            <div key={i} className="tc-card uploading">
+              <span className="tc-card-main">
+                <KindIcon kind={fileKind(extOf(name))} className="tc-card-icon" size={18} />
+                <span className="tc-card-text">
+                  <span className="tc-card-name">{name}</span>
+                  <span className="tc-card-ext">Uploading…</span>
+                </span>
+              </span>
+            </div>
+          ))}
+        </div></div>
+      ) : null}
     </div>
   </div>
 );

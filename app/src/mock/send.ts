@@ -1,7 +1,9 @@
 // Mock of src/send.ts. The real module drives Teams' own DOM (open a chat,
 // press its call button, use its people picker); here those actions resolve
 // against the store, and calls just report that they would have started.
-import type { WriteResult } from "../types";
+import type { FileRef, WriteResult } from "../types";
+import { extOf } from "../data/raw";
+import { formatMessage } from "../markdown";
 import type { NewChatResult, PickPerson } from "../send";
 import { ME, PEOPLE } from "./fixtures";
 import * as store from "./store";
@@ -57,4 +59,17 @@ export async function sendNativeDraft(people: PickPerson[], text: string): Promi
 export async function sendMessage(conversationId: string, _title: string, text: string): Promise<WriteResult> {
   const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return store.post(conversationId, ME, `<p>${esc}</p>`) ? { ok: true, via: "mock" } : { ok: false, reason: "unknown chat" };
+}
+
+// Uploads are instant here; images preview from the picked file itself.
+export async function sendFiles(conversationId: string, _title: string, text: string, files: File[]): Promise<WriteResult> {
+  if (!files.length) return { ok: false, reason: "empty" };
+  const refs = files.map((f): FileRef => {
+    const ext = extOf(f.name);
+    const url = URL.createObjectURL(f);
+    return f.type.startsWith("image/") ? { name: f.name, url, ext, preview: { url, width: 0, height: 0 } } : { name: f.name, url, ext };
+  });
+  const html = text.trim() ? formatMessage(text).html : "";
+  await later(null, 600);
+  return store.post(conversationId, ME, html, undefined, refs) ? { ok: true, via: "mock" } : { ok: false, reason: "unknown chat" };
 }

@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useState, type JSX } from "react";
-import { ArrowDown, MessageSquareReply, Reply, Send, Smile, SquareCode, X } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type JSX } from "react";
+import { ArrowDown, MessageSquareReply, Paperclip, Reply, Send, Smile, SquareCode, X } from "lucide-react";
 import { myMri, profile, searchPeople } from "../../teamsData";
 import { typing } from "../../services";
 import { EmojiPicker } from "../shared/EmojiPicker";
@@ -7,10 +7,17 @@ import { Avatar } from "../shared/Avatar";
 import { avatarUri } from "../lib/format";
 import { useDismiss } from "../lib/dismiss";
 import { codeBlock, handleFormatKey } from "../lib/editKeys";
+import { fileKind, KindIcon } from "../lib/files";
+import { extOf } from "../../data/raw";
 import { TypingIndicator } from "./TypingIndicator";
 import type { ComposerState } from "../hooks/useComposerState";
 import type { Chat } from "../../types";
 import type { MentionPick } from "../../mentions";
+
+const fmtSize = (n: number): string =>
+  n < 1024 ? n + " B" : n < 1048576 ? Math.round(n / 1024) + " KB" : (n / 1048576).toFixed(1) + " MB";
+
+const hasFiles = (e: DragEvent): boolean => [...e.dataTransfer.types].includes("Files");
 
 interface ComposerProps {
   chat: Chat;
@@ -22,7 +29,8 @@ interface ComposerProps {
 
 // The message box of the open chat: typing indicator, thread / quote chips,
 // emoji picker, @mention autocomplete (chat members + org directory) and
-// markdown-lite formatting (see src/markdown.ts, ui/lib/editKeys.ts).
+// markdown-lite formatting (see src/markdown.ts, ui/lib/editKeys.ts), and
+// files staged to send (attach button, paste, or drop on the composer).
 export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps): JSX.Element {
   const { composer, draft, setDraft, quote, setQuote, threadTo, setThreadTo } = cs;
   // @-autocomplete popup: open flag + current filter query (text after the @).
@@ -31,6 +39,23 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
   // Org-directory @mention hits (debounced searchPeople), merged after local members.
   const [atOrg, setAtOrg] = useState<MentionPick[]>([]);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [dropping, setDropping] = useState(false);
+  const onDragOver = (e: DragEvent<HTMLDivElement>): void => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    setDropping(true);
+  };
+  const onDragLeave = (e: DragEvent<HTMLDivElement>): void => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false);
+  };
+  const onDrop = (e: DragEvent<HTMLDivElement>): void => {
+    setDropping(false);
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    cs.addFiles(e.dataTransfer.files);
+    composer.current?.focus();
+  };
 
   // Insert text at the composer's caret (or append), keeping focus and caret.
   const insertAtCaret = (ins: string): void => {
@@ -150,7 +175,7 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
   };
 
   return (
-    <div className="tc-composer">
+    <div className={"tc-composer" + (dropping ? " dropping" : "")} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
       {/* Floats above the box so typing never shifts the layout. */}
       {chat.isChannel ? null : <TypingIndicator chatId={chat.id} />}
       {!atBottom ? (
@@ -197,7 +222,42 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
           ))}
         </div>
       ) : null}
+      {cs.files.length ? (
+        <div className="tc-staged">
+          {cs.files.map((f, i) => (
+            <div key={i + f.name} className="tc-card">
+              <span className="tc-card-main">
+                <KindIcon kind={fileKind(extOf(f.name))} className="tc-card-icon" size={18} />
+                <span className="tc-card-text">
+                  <span className="tc-card-name" title={f.name}>{f.name}</span>
+                  <span className="tc-card-ext">{fmtSize(f.size)}</span>
+                </span>
+              </span>
+              <button className="tc-quote-chip-x" onClick={() => cs.removeFile(i)} title="Remove" aria-label={"Remove " + f.name}><X size={13} /></button>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className="tc-composer-box">
+        <button
+          className="tc-emoji-btn"
+          onClick={() => fileInput.current?.click()}
+          title="Attach files (or paste / drop them here)"
+          aria-label="Attach files"
+        >
+          <Paperclip size={18} />
+        </button>
+        <input
+          ref={fileInput}
+          type="file"
+          multiple
+          hidden
+          onChange={(e) => {
+            if (e.target.files) cs.addFiles(e.target.files);
+            e.target.value = "";
+            composer.current?.focus();
+          }}
+        />
         <button
           className="tc-emoji-btn"
           onMouseDown={(e) => e.stopPropagation()}
@@ -223,6 +283,11 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
           placeholder={threadTo && chat.isChannel ? "Reply in thread…" : chat.isChannel ? "Start a new post in #" + chat.title : "Message " + chat.title}
           value={draft}
           onChange={(e) => onDraftChange(e.target.value)}
+          onPaste={(e) => {
+            if (!e.clipboardData.files.length) return;
+            e.preventDefault();
+            cs.addFiles(e.clipboardData.files);
+          }}
           onKeyDown={(e) => {
             if (atOpen && atCandidates.length) {
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -246,7 +311,7 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
         />
         <button
           className="tc-send"
-          disabled={!draft.trim()}
+          disabled={!draft.trim() && !cs.files.length}
           onClick={send}
           title="Send (Enter) · Shift+Enter for a new line"
           aria-label="Send"
