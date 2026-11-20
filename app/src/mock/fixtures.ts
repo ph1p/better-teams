@@ -35,6 +35,19 @@ const david = person("David Kim", "Security Engineer", "Platform", "Remote");
 
 export const PEOPLE: Person[] = [me, maya, jonas, priya, lukas, sofia, tom, elena, aiko, noah, ben, clara, david];
 
+// Teams apps (bots) sit in the 28: MRI space and carry a square app icon.
+const appIcon = (letter: string, color: string): string =>
+  "data:image/svg+xml," + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="${color}"/>` +
+    `<text x="16" y="22" font-family="sans-serif" font-size="17" font-weight="700" fill="#fff" text-anchor="middle">${letter}</text></svg>`,
+  );
+const tracker: Person = {
+  mri: "28:00000000-0000-4000-8000-0000000000a1", displayName: "Tracker", imageUri: appIcon("T", "#2f6fdb"),
+  email: "", jobTitle: "", department: "", officeLocation: "", developer: "Example Corp",
+};
+/** App profiles: in the profile cache, but not people (no search, no presence). */
+export const APPS: Person[] = [tracker];
+
 /** Starting presence per person; the store drifts a few of them over time. */
 export const PRESENCE: Record<string, string> = {
   [me.mri]: "Available", [maya.mri]: "Busy", [jonas.mri]: "Available", [priya.mri]: "DoNotDisturb",
@@ -56,6 +69,8 @@ export interface SeedMessage {
   subject?: string;
   files?: string[];
   call?: "start" | "end";
+  /** Teams messageType; default "RichText/Html". */
+  type?: string;
 }
 
 export interface SeedChat {
@@ -83,6 +98,14 @@ const quote = (who: Person, text: string): string =>
   `<blockquote itemscope="" itemtype="http://schema.skype.com/Reply" itemid="0">` +
   `<strong itemprop="mri" itemid="${who.mri}">${who.displayName}</strong>` +
   `<p itemprop="preview">${text}</p></blockquote>`;
+
+// A bot card as Teams stores it: Swift JSON, base64 in a URIObject.
+const card = (title: string, text: string): string =>
+  `<URIObject type="SWIFT.1"><Swift b64="${btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify({
+    type: "message/card",
+    attachments: [{ contentType: "application/vnd.microsoft.card.adaptive", content: { title, text } }],
+  }))))}"/></URIObject>`;
+const CARD = "RichText/Media_Card";
 
 // A long scroll-back for the release group, so paging older history works.
 const releaseBacklog: SeedMessage[] = Array.from({ length: 60 }, (_, i) => {
@@ -212,6 +235,14 @@ export const CHATS: SeedChat[] = [
       { from: aiko.mri, ago: 8 * D, html: p("Research repository is live."), subject: "Research repo" },
       { from: lukas.mri, ago: 1 * D, html: p("Design crit") , call: "start" },
       { from: lukas.mri, ago: 1 * D - 45, html: p("Meeting ended · 45 min"), replyTo: 1, call: "end" },
+    ],
+  },
+  {
+    id: "19:dm-tracker@unq.gbl.spaces", kind: "chat", members: [tracker.mri], readAgo: 2 * H,
+    messages: [
+      { from: tracker.mri, ago: 3 * D, html: p("Hi! I'll post updates for issues you're watching here.") },
+      { from: tracker.mri, ago: 4 * H, type: CARD, html: card("WEB-412 assigned to you", "Retry uploads with backoff · Priority: High") },
+      { from: tracker.mri, ago: 70, type: CARD, html: card("WEB-398 moved to Done", "Fix timezone in nightly tests") },
     ],
   },
   {

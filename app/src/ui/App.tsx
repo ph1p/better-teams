@@ -5,12 +5,13 @@ import {
   type PeopleHit,
 } from "../teamsData";
 import { splitQuote } from "../quote";
+import { isAppMri } from "../apps";
 import { openNativeChat, openNativeNewChat, sendMessage, sendNativeDraft, startNativeCall, joinNativeMeeting, startNativeChannelMeeting, type PickPerson } from "../send";
 import { chat as chatSvc, typing } from "../services";
 import {
   Send, Search, Hash, MailOpen, Mail, ExternalLink, X, Reply, Phone, Video, RotateCw,
   ArrowDown, Smile, Eye, EyeOff, CheckCheck, SquarePen, Rows2, Rows3, StickyNote,
-  MessageSquareReply, ChevronsUpDown,
+  MessageSquareReply, ChevronsUpDown, Blocks,
 } from "lucide-react";
 import { EmojiPicker } from "./shared/EmojiPicker";
 import { Avatar } from "./shared/Avatar";
@@ -154,16 +155,19 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
 
   const selChat = chats.find((c) => c.id === sel);
   // Calls: 1:1 and group chats ring their members (Teams rings at most 20 in a
-  // group call). Channels, meetings and Notes have no callee list here.
-  const callable = !!selChat && selChat.kind === "chat" && selChat.members.length > 0 && selChat.members.length <= MAX_CALL;
+  // group call). Channels, meetings and Notes have no callee list here. Apps
+  // (bots) can't be called, so they never count as callees.
+  const callees = selChat?.kind === "chat" ? selChat.members.filter((m) => !isAppMri(m)) : [];
+  const callable = callees.length > 0 && callees.length <= MAX_CALL;
   const callLabel = (what: string): string =>
-    !selChat || selChat.members.length <= 1 ? what : `Group ${what.toLowerCase()} (${selChat.members.length} people)`;
+    callees.length <= 1 ? what : `Group ${what.toLowerCase()} (${callees.length} people)`;
   const selIsChannel = !!selChat?.isChannel;
   // Header subtitle: what is useful to know about the other side right now.
   const headSub = !selChat ? "" :
     selChat.isChannel ? selChat.team :
     selChat.kind === "meeting" ? "Meeting chat" :
     selChat.kind === "notes" ? "Only you" :
+    selChat.app ? ["Teams app", profile(selChat.avatarMri).developer].filter(Boolean).join(" · ") :
     selChat.members.length > 1 ? `${selChat.members.length + 1} people` :
     selChat.avatarMri ? [statusOf(selChat.avatarMri) === "Unknown" ? "" : STATUS_LABEL[statusOf(selChat.avatarMri)], profile(selChat.avatarMri).jobTitle].filter(Boolean).join(" · ") :
     selChat.team;
@@ -355,9 +359,10 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     channels.sort((a, b) => teamRank.get(a.team)! - teamRank.get(b.team)!);
     return ([
       { id: "fav", title: "Favorites", rows: list.filter(pinned) },
-      { id: "dms", title: "Direct messages", rows: rest.filter((c) => c.kind === "chat" && c.members.length <= 1) },
+      { id: "dms", title: "Direct messages", rows: rest.filter((c) => c.kind === "chat" && !c.app && c.members.length <= 1) },
       { id: "groups", title: "Groups", rows: rest.filter((c) => c.kind === "chat" && c.members.length > 1) },
       { id: "channels", title: "Channels", rows: channels, groupByTeam: true },
+      { id: "apps", title: "Apps", rows: rest.filter((c) => c.app) },
       { id: "meetings", title: "Meetings", rows: rest.filter((c) => c.kind === "meeting"), defaultCollapsed: true },
     ] as SideSection[]).filter((s) => s.rows.length);
   }, [chats, query, unreadOnly, keep]);
@@ -1221,7 +1226,10 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                 <Avatar name={selChat.title} uri={avatarUri(selChat.avatarMri)} mri={selChat.avatarMri} status={statusOf(selChat.avatarMri)} onOpen={openProfile} />
               )}
               <div className="tc-head-text">
-                <span className="tc-name">{selChat.title}</span>
+                <span className="tc-head-title">
+                  <span className="tc-name">{selChat.title}</span>
+                  {selChat.app ? <span className="tc-app-badge">App</span> : null}
+                </span>
                 {headSub ? <span className="tc-sub">{headSub}</span> : null}
               </div>
               <button
@@ -1252,15 +1260,25 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
               ) : null}
               {callable ? (
                 <>
-                  <button className="tc-ghost tc-icon-only" onClick={() => void startCall(selChat.members, "audio", selChat)} title={callLabel("Audio call")} aria-label={callLabel("Audio call")}>
+                  <button className="tc-ghost tc-icon-only" onClick={() => void startCall(callees, "audio", selChat)} title={callLabel("Audio call")} aria-label={callLabel("Audio call")}>
                     <Phone size={15} />
                   </button>
-                  <button className="tc-ghost tc-icon-only" onClick={() => void startCall(selChat.members, "video", selChat)} title={callLabel("Video call")} aria-label={callLabel("Video call")}>
+                  <button className="tc-ghost tc-icon-only" onClick={() => void startCall(callees, "video", selChat)} title={callLabel("Video call")} aria-label={callLabel("Video call")}>
                     <Video size={15} />
                   </button>
                 </>
               ) : null}
             </div>
+            {selChat.app ? (
+              <div className="tc-app-note">
+                <Blocks size={14} />
+                <span>
+                  <b>App chat.</b> {selChat.title} is a Teams app
+                  {profile(selChat.avatarMri).developer ? ` by ${profile(selChat.avatarMri).developer}` : ""}, not a person.
+                  It posts updates and answers commands; it can't be called.
+                </span>
+              </div>
+            ) : null}
             {msgSearchOpen ? (
               <div className="tc-msgsearch">
                 <Search size={14} className="tc-search-icon" />

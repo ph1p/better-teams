@@ -4,7 +4,8 @@
 // occasional background messages and presence drift. Subscribers (chat events,
 // typing, presence) get pushed the same way Teams' worker would push them.
 import type { Chat, Message, Profile, Reaction } from "../types";
-import { CHATS, CHATTER, ME, PEOPLE, PRESENCE, REPLIES, type SeedChat } from "./fixtures";
+import { APPS, CHATS, CHATTER, ME, PEOPLE, PRESENCE, REPLIES, type SeedChat } from "./fixtures";
+import { isAppMri } from "../apps";
 
 /** How many recent messages the first load shows; older ones page in on scroll. */
 const WINDOW = 30;
@@ -32,7 +33,7 @@ let idSeq = 0;
 const nextId = (time: number): string => String(time) + String(++idSeq).padStart(3, "0");
 
 export const profiles: Record<string, Profile> = {};
-for (const { mri, ...p } of PEOPLE) profiles[mri] = p;
+for (const { mri, ...p } of [...PEOPLE, ...APPS]) profiles[mri] = p;
 export const nameOf = (mri: string): string => profiles[mri]?.displayName || "Unknown";
 
 const REACTION_GLYPH: Record<string, string> = { like: "👍", heart: "❤️", laugh: "😆", surprised: "😮", sad: "😢", angry: "😠" };
@@ -72,6 +73,7 @@ for (const seed of CHATS) {
       subject: s.subject || "",
       importance: s.importance || "normal",
       files: (s.files || []).map((name) => ({ name, url: "" })),
+      ...(s.type ? { messageType: s.type } : {}),
       ...(s.call ? { call: s.call } : {}),
       ...(root ? { rootId: root.id, rootTime: root.rootTime, isReply: true } : {}),
     });
@@ -177,6 +179,7 @@ export function listChats(): Chat[] {
       isChannel: seed.kind === "channel",
       avatarMri: seed.kind === "chat" && others.length === 1 ? others[0] : "",
       members: others,
+      app: seed.kind === "chat" && others.length === 1 && isAppMri(others[0]),
       favorite: c.favorite,
       pinned: c.pinned,
       hidden: c.hidden,
@@ -308,6 +311,10 @@ function scheduleReply(c: MockChat, rootId?: string): void {
   const others = c.seed.members.filter((m) => m !== ME);
   if (!others.length) return;
   const who = pick(others);
+  if (isAppMri(who)) {
+    setTimeout(() => post(c.seed.id, who, "<p>Sorry, I didn't get that. Try <b>help</b>.</p>", rootId), 700);
+    return;
+  }
   const convId = c.seed.id;
   const channel = c.seed.kind === "channel";
   // Channels only answer in threads; a new top-level post stays quiet.
@@ -327,7 +334,7 @@ export function startSimulation(): void {
   if (started) return;
   started = true;
   setInterval(() => {
-    const candidates = [...chats.values()].filter((c) => c.seed.kind === "chat" && c.seed.members.length);
+    const candidates = [...chats.values()].filter((c) => c.seed.kind === "chat" && c.seed.members.length && !c.seed.members.some(isAppMri));
     const c = pick(candidates);
     post(c.seed.id, pick(c.seed.members), `<p>${pick(CHATTER)}</p>`);
   }, 45_000);

@@ -5,6 +5,7 @@ import {
 import { splitQuote } from "../../quote";
 import { RichHtml } from "../../richText";
 import { Avatar } from "../shared/Avatar";
+import { isAppMri } from "../../apps";
 import { Linkified } from "../shared/Linkified";
 import { avatarUri, fmtClock, htmlToText, isHtmlMsg, messageText, oneLine } from "../lib/format";
 import { usePresence } from "../lib/presence";
@@ -87,6 +88,7 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onUndo, onE
         {first && (
           <div className="tc-msg-meta">
             <span className="who">{m.from || (m.mine ? "You" : "Unknown")}</span>
+            {isAppMri(m.fromMri) ? <span className="tc-app-badge">App</span> : null}
             <span className="when" title={new Date(m.time).toLocaleString()}>{fmtClock(m.time)}</span>
             {m.importance === "high" || m.importance === "urgent" ? (
               <span className="tc-imp">{m.importance}</span>

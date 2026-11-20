@@ -26,6 +26,7 @@
 import type { Chat, ChatKind, FileRef, Message, Profile, Quote, Reaction, WriteResult } from "./types";
 import { buildMentionContent, type MentionPick } from "./mentions";
 import { buildQuoteHtml } from "./quote";
+import { isAppMri } from "./apps";
 import { chat, chatsvc, substrate, region, token, type Res } from "./services";
 
 // Service-layer result -> the UI's WriteResult.
@@ -152,6 +153,7 @@ export async function loadProfiles(): Promise<Record<string, Profile>> {
         jobTitle: str(p.jobTitle) || str(p.title),
         department: str(p.department),
         officeLocation: str(p.officeLocation) || str(p.physicalDeliveryOfficeName),
+        ...(str(p.developer) ? { developer: str(p.developer) } : {}),
       };
     }
     PROFILES = map;
@@ -296,6 +298,7 @@ export async function listChats(): Promise<Chat[]> {
       avatarMri: kind === "chat" && others.length === 1 ? others[0] : "",
       // Other participants' MRIs — powers the "chats with this user" panel.
       members: others,
+      app: kind === "chat" && others.length === 1 && isAppMri(others[0]),
       favorite: favs.has(str(c.id)),
       pinned: props.ispinned === "true" || props.ispinned === true,
       hidden,

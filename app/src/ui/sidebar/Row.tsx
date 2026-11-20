@@ -48,7 +48,10 @@ export function Row({ chat, selected, compact, showTeam = true, onClick, onOpenP
       {icon}
       <div className="tc-row-body">
         <div className="tc-row-top">
-          <span className="tc-name">{chat.title}</span>
+          <span className="tc-row-title">
+            <span className="tc-name">{chat.title}</span>
+            {chat.app ? <span className="tc-app-badge">App</span> : null}
+          </span>
           <span className="tc-time">{fmtTime(chat.time)}</span>
         </div>
         {compact ? null : (

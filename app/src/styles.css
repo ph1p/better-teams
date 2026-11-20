@@ -96,6 +96,8 @@
   width: 32px; height: 32px; border-radius: 50%; background: var(--tc-accent);
   color: #fff; font-size: 12px; font-weight: 600; }
 #tc-root .tc-av img { @apply w-full h-full; object-fit: cover; }
+/* Teams apps (bots): rounded-square icon, like the app tiles in Teams. */
+#tc-root .tc-av.app { border-radius: 25%; }
 #tc-root .tc-av-btn { @apply cursor-pointer; transition: box-shadow .12s; }
 #tc-root .tc-av-btn:hover { box-shadow: 0 0 0 2px var(--tc-accent); }
 /* Presence ring: drawn as box-shadow on the avatar itself (gap in --tc-bg,
@@ -120,6 +122,13 @@
 #tc-root .tc-name { @apply overflow-hidden whitespace-nowrap; font-weight: 600;
   font-size: 13.5px; text-overflow: ellipsis; }
 #tc-root .tc-time { flex: 0 0 auto; font-size: 11px; color: var(--tc-fg2); }
+#tc-root .tc-row-title, #tc-root .tc-head-title { @apply flex items-center gap-1.5; min-width: 0; }
+#tc-root .tc-row-title .tc-app-badge { flex: 0 0 auto; font-size: 9px; line-height: 14px; }
+/* Strip under the header of an app chat: says plainly it's a bot, not a person. */
+#tc-root .tc-app-note { @apply flex items-center gap-2; padding: 7px 16px; font-size: 12.5px;
+  color: var(--tc-fg2); background: var(--tc-bg2); border-bottom: 1px solid var(--tc-line); }
+#tc-root .tc-app-note svg { flex: 0 0 auto; color: var(--tc-accent); }
+#tc-root .tc-app-note b { color: var(--tc-fg); font-weight: 600; }
 #tc-root .tc-prev { @apply overflow-hidden whitespace-nowrap; font-size: 12.5px;
   color: var(--tc-fg2); text-overflow: ellipsis; }
 #tc-root .tc-unread { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%;
@@ -393,6 +402,8 @@
 #tc-root .tc-subject { font-weight: 700; font-size: 15px; margin: 2px 0; }
 #tc-root .tc-imp { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #fff;
   background: #c4314b; border-radius: 4px; padding: 0 5px; }
+#tc-root .tc-app-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--tc-fg2);
+  background: var(--tc-bg3); border-radius: 4px; padding: 0 5px; }
 #tc-root .tc-edited { font-size: 11px; color: var(--tc-fg2); }
 #tc-root .tc-files { @apply flex flex-wrap gap-1.5; margin-top: 4px; }
 #tc-root .tc-file { @apply inline-flex items-center gap-1.5; font-size: 12.5px;

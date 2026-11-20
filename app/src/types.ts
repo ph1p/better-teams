@@ -45,6 +45,8 @@ export interface Chat {
   avatarMri: string;
   /** MRIs of the other members (used for shared-chat lookups). */
   members: string[];
+  /** 1:1 chat with a Teams app/bot (Jira, Workflows, …): no calls, no presence. */
+  app: boolean;
   favorite: boolean;
   pinned: boolean;
   /** Hidden from the chat list (Teams' "Hide"); search still finds it. */
@@ -91,6 +93,8 @@ export interface Profile {
   jobTitle: string;
   department: string;
   officeLocation: string;
+  /** Publisher of a Teams app (bot profiles only), e.g. "Atlassian.com". */
+  developer?: string;
 }
 
 /** A message being quote-replied to (composer chip + outgoing quote HTML). */
