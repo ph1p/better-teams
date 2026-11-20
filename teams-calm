@@ -121,6 +121,17 @@ warn_untested() {
   esac
 }
 
+# Stop watchers left over from an earlier `dev` (closed terminal, crash). They
+# keep module paths from the old node_modules and fail with ENOENT once it is
+# reinstalled, and they would fight the new session over dist-dev.
+stop_stale_dev() {
+  local pats=("$DIR/app/node_modules/.* build --watch" "dev\.mjs $DEV_BUNDLE") p found=0
+  for p in "${pats[@]}"; do
+    if pgrep -f -- "$p" >/dev/null 2>&1; then found=1; pkill -f -- "$p" 2>/dev/null || true; fi
+  done
+  [ "$found" = 0 ] || { say "Stopped a dev session left over from earlier."; sleep 1; }
+}
+
 # Install npm dependencies when missing or older than the lockfile.
 ensure_deps() {
   local stamp="$DIR/app/node_modules/.package-lock.json"
@@ -252,7 +263,7 @@ case "$cmd" in
     if teams_running; then restart_plain; else say "Teams starts without the overlay next time."; fi
     ;;
   dev)
-    need_teams; need_node "$NODE_DEV_MIN"; ensure_deps
+    need_teams; need_node "$NODE_DEV_MIN"; stop_stale_dev; ensure_deps
     say "Relaunching Teams with debug port $PORT (dev only)..."
     quit_teams || exit 1
     launch_debug; wait_for_port
@@ -267,7 +278,7 @@ case "$cmd" in
     }
     trap cleanup INT TERM EXIT
     mkdir -p "$(dirname "$DEV_BUNDLE")"
-    ( cd "$DIR/app" && exec ./node_modules/.bin/vite build --watch --minify false --outDir dist-dev --logLevel warn ) & PIDS+=($!)
+    ( cd "$DIR/app" && exec "$DIR/app/node_modules/.bin/vite" build --watch --minify false --outDir dist-dev --logLevel warn ) & PIDS+=($!)
     node "$DIR/scripts/dev.mjs" "$DEV_BUNDLE" & PIDS+=($!)
     say "Dev mode: edit app/src, the overlay reloads on save. Ctrl-C to stop."
     wait
