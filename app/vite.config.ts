@@ -1,6 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
@@ -16,9 +16,9 @@ const MOCK = path.join(SRC, "mock");
 // load (once for the whole `vite build --watch` session), so define a
 // placeholder and stamp the real id into each emitted chunk.
 const BUILD_PLACEHOLDER = "__TC_BUILD_ID__";
-const buildId = () => ({
+const buildId = (): Plugin => ({
   name: "tc-build-id",
-  renderChunk(code) {
+  renderChunk(code: string) {
     return code.split(BUILD_PLACEHOLDER).join(String(Date.now()));
   },
 });
@@ -27,7 +27,7 @@ const buildId = () => ({
 // talks to Teams (its IndexedDB, worker or DOM) resolves to its stand-in under
 // src/mock/ instead; the mocks themselves still import the real files (types).
 const MOCKED = ["teamsData.ts", "send.ts", "services/chat.ts", "services/typing.ts", "services/presence.ts"];
-const mockTeams = () => ({
+const mockTeams = (): Plugin => ({
   name: "tc-mock-teams",
   enforce: "pre",
   async resolveId(source, importer, options) {

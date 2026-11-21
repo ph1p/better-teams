@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Wrap the overlay bundle into a payload for Teams' own client-bindings/bundle.js.
 //
 // Teams (new, macOS) injects Resources/client-bindings/bundle.js only into a
@@ -8,11 +7,11 @@
 // `with (childWindow)`, so `document`, `window`, `fetch`, timers etc. resolve to
 // the child window — the overlay renders and wraps fetch there.
 //
-// Usage: node scripts/build-host-patch.mjs <bundle.js> <out.js>
+// Usage: node scripts/build-host-patch.ts <bundle.js> <out.js>
 import { readFileSync, writeFileSync } from "node:fs";
 
 const [src, out] = process.argv.slice(2);
-if (!src || !out) { console.error("Usage: node scripts/build-host-patch.mjs <bundle.js> <out.js>"); process.exit(1); }
+if (!src || !out) { console.error("Usage: node scripts/build-host-patch.ts <bundle.js> <out.js>"); process.exit(1); }
 const app = readFileSync(src, "utf8");
 
 // Presence in prod comes from the DOM presence badges Teams paints in each
@@ -23,7 +22,7 @@ const app = readFileSync(src, "utf8");
 // worker-wrapper can't inject a tap and the CSP `trusted-types` allowlist blocks
 // minting our own policy. The child realm carries no presence data either (no
 // unifiedPresenceService traffic, no presence module among its webpack chunks),
-// so there is nothing to tap without CDP. The dev reloader (dev.mjs) does tap the
+// so there is nothing to tap without CDP. The dev reloader (dev.ts) does tap the
 // socket over CDP; prod relies on the DOM scrape, which already covers everyone
 // Teams shows a badge for.
 

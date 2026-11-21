@@ -18,12 +18,13 @@ jobs:
           package_json_file: app/package.json
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
           cache-dependency-path: app/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
+      - run: pnpm run lint
       - run: pnpm run build
-      - run: node ../scripts/build-host-patch.mjs dist/teams-calm-app.js dist/teams-calm-host.js
+      - run: node ../scripts/build-host-patch.ts dist/teams-calm-app.js dist/teams-calm-host.js
       - name: shell scripts parse
         run: for f in ../teams-calm ../install.sh ../uninstall.sh; do bash -n "$f"; done

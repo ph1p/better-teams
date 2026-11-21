@@ -17,19 +17,52 @@
 
 const PORT = 9222;
 
-function connect(wsUrl) {
+/** An entry of CDP's /json target list. */
+export interface CdpTarget {
+  id: string;
+  type: string;
+  url?: string;
+  title?: string;
+  webSocketDebuggerUrl: string;
+}
+
+/** A raw CDP message (response or event). */
+export interface CdpMsg {
+  id?: number;
+  method?: string;
+  params?: Record<string, any>;
+  result?: Record<string, any>;
+  error?: unknown;
+}
+
+/** What call() resolves with: the response's result (or error), or a local failure marker. */
+interface CallRes {
+  result?: { value?: unknown; objectId?: string };
+  objects?: { objectId?: string };
+  __closed?: true;
+  __timeout?: true;
+}
+type Call = (method: string, params?: object) => Promise<CallRes>;
+interface Conn { ws: WebSocket; call: Call; targetId?: string }
+type Log = (...a: unknown[]) => void;
+
+const listTargets = async (): Promise<CdpTarget[]> => (await fetch(`http://localhost:${PORT}/json`)).json() as Promise<CdpTarget[]>;
+const timeout = (ms: number) => new Promise<never>((_, x) => setTimeout(x, ms));
+
+function connect(wsUrl: string): Promise<Conn> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(wsUrl);
     let id = 0;
-    const pend = new Map();
+    const pend = new Map<number, (r: CallRes) => void>();
     ws.addEventListener("message", (e) => {
-      let j; try { j = JSON.parse(e.data); } catch { return; }
-      if (j.id && pend.has(j.id)) { pend.get(j.id)(j.result || j.error); pend.delete(j.id); }
+      let j: CdpMsg; try { j = JSON.parse(String(e.data)); } catch { return; }
+      const r = j.id ? pend.get(j.id) : undefined;
+      if (r) { r((j.result || j.error) as CallRes); pend.delete(j.id!); }
     });
     ws.addEventListener("error", reject);
     ws.addEventListener("close", () => { for (const r of pend.values()) r({ __closed: true }); });
     ws.addEventListener("open", () => {
-      const call = (method, params = {}) => new Promise((r) => {
+      const call: Call = (method, params = {}) => new Promise((r) => {
         const n = ++id; pend.set(n, r);
         ws.send(JSON.stringify({ id: n, method, params }));
         setTimeout(() => { if (pend.has(n)) { pend.delete(n); r({ __timeout: true }); } }, 5000);
@@ -65,14 +98,14 @@ const TAP_FN = `function(){
   return tapped;
 }`;
 
-async function findTrouterWorker() {
-  let list;
-  try { list = await (await fetch(`http://localhost:${PORT}/json`)).json(); }
+async function findTrouterWorker(): Promise<Conn | null> {
+  let list: CdpTarget[];
+  try { list = await listTargets(); }
   catch { return null; }
   const workers = list.filter((x) => x.type === "worker" && x.webSocketDebuggerUrl);
   for (const w of workers) {
-    let c;
-    try { c = await Promise.race([connect(w.webSocketDebuggerUrl), new Promise((_, x) => setTimeout(x, 3000))]); }
+    let c: Conn;
+    try { c = await Promise.race([connect(w.webSocketDebuggerUrl), timeout(3000)]); }
     catch { continue; }
     await c.call("Runtime.enable");
     const r = await c.call("Runtime.evaluate", {
@@ -97,12 +130,12 @@ async function findTrouterWorker() {
 // A header may arrive on requestWillBeSent (headers inline) or, when the browser
 // adds it later, on requestWillBeSentExtraInfo; we handle both and de-dupe so the
 // same bearer isn't shipped twice. Dev/CDP only; never runs against prod.
-function tapWorkerAuth(worker, page, logFn) {
-  const seen = new Set(); // request ids we've already forwarded a header for
-  const urls = new Map(); // requestId -> url (extraInfo carries no url)
+function tapWorkerAuth(worker: Conn, page: Conn, logFn: Log) {
+  const seen = new Set<string>(); // request ids we've already forwarded a header for
+  const urls = new Map<string, string>(); // requestId -> url (extraInfo carries no url)
   let forwarded = 0;
 
-  const authOf = (headers) => {
+  const authOf = (headers: Record<string, string> | undefined): string => {
     if (!headers) return "";
     for (const k of Object.keys(headers)) {
       if (/^authorization$/i.test(k)) return headers[k] || "";
@@ -110,7 +143,7 @@ function tapWorkerAuth(worker, page, logFn) {
     return "";
   };
 
-  const forward = (requestId, header, url) => {
+  const forward = (requestId: string, header: string, url: string) => {
     if (!header || !/^Bearer /i.test(header) || seen.has(requestId)) return;
     seen.add(requestId);
     if (seen.size > 2000) seen.clear(); // bound memory on a long-lived session
@@ -126,8 +159,8 @@ function tapWorkerAuth(worker, page, logFn) {
   };
 
   worker.ws.addEventListener("message", (e) => {
-    let j;
-    try { j = JSON.parse(e.data); } catch { return; }
+    let j: CdpMsg;
+    try { j = JSON.parse(String(e.data)); } catch { return; }
     if (j.method === "Network.requestWillBeSent") {
       const p = j.params || {};
       const url = (p.request && p.request.url) || "";
@@ -148,14 +181,14 @@ function tapWorkerAuth(worker, page, logFn) {
 // Auth-tap every worker target (Teams runs several). Reuses an already-open
 // connection for a known target id; opens one for the rest. Returns the extra
 // connections so stop() can close them. Re-run to pick up workers spawned later.
-async function tapAllWorkersAuth(page, known, logFn) {
-  let list;
-  try { list = await (await fetch(`http://localhost:${PORT}/json`)).json(); }
+async function tapAllWorkersAuth(page: Conn, known: Map<string, Conn>, logFn: Log) {
+  let list: CdpTarget[];
+  try { list = await listTargets(); }
   catch { return; }
   for (const w of list.filter((x) => x.type === "worker" && x.webSocketDebuggerUrl)) {
     if (known.has(w.id)) continue;
-    let c;
-    try { c = await Promise.race([connect(w.webSocketDebuggerUrl), new Promise((_, x) => setTimeout(x, 3000))]); }
+    let c: Conn;
+    try { c = await Promise.race([connect(w.webSocketDebuggerUrl), timeout(3000)]); }
     catch { continue; }
     known.set(w.id, c);
     c.ws.addEventListener("close", () => known.delete(w.id));
@@ -163,9 +196,9 @@ async function tapAllWorkersAuth(page, known, logFn) {
   }
 }
 
-async function findPage() {
-  let list;
-  try { list = await (await fetch(`http://localhost:${PORT}/json`)).json(); }
+async function findPage(): Promise<Conn | null> {
+  let list: CdpTarget[];
+  try { list = await listTargets(); }
   catch { return null; }
   const t = list.find((x) => x.type === "page" && /teams\.microsoft\.com/.test(x.url || ""));
   if (!t) return null;
@@ -180,7 +213,7 @@ async function findPage() {
 }
 
 // Enumerate the worker's live sockets and (re)tap trouter. Returns #newly tapped.
-async function retap(worker) {
+async function retap(worker: Conn): Promise<number> {
   const proto = await worker.call("Runtime.evaluate", { expression: "WebSocket.prototype" });
   if (!proto.result || !proto.result.objectId) return 0;
   const q = await worker.call("Runtime.queryObjects", { prototypeObjectId: proto.result.objectId });
@@ -188,10 +221,10 @@ async function retap(worker) {
   const r = await worker.call("Runtime.callFunctionOn", {
     objectId: q.objects.objectId, returnByValue: true, functionDeclaration: TAP_FN,
   });
-  return (r.result && r.result.value) || 0;
+  return (r.result?.value as number | undefined) || 0;
 }
 
-export async function startPresenceBridge(logFn = () => {}, onStop = () => {}) {
+export async function startPresenceBridge(logFn: Log = () => {}, onStop: () => void = () => {}): Promise<(() => void) | null> {
   const worker = await findTrouterWorker();
   if (!worker) { logFn("presence: no trouter worker found"); return null; }
   const page = await findPage();
@@ -202,7 +235,7 @@ export async function startPresenceBridge(logFn = () => {}, onStop = () => {}) {
 
   // Worker bearers -> page vault (see tapWorkerAuth). The trouter worker is
   // tapped on its existing connection; other workers get their own.
-  const authConns = new Map(); // targetId -> connection
+  const authConns = new Map<string, Conn>(); // targetId -> connection
   if (worker.targetId) authConns.set(worker.targetId, worker);
   await tapWorkerAuth(worker, page, logFn);
   await tapAllWorkersAuth(page, authConns, logFn);
@@ -217,7 +250,7 @@ export async function startPresenceBridge(logFn = () => {}, onStop = () => {}) {
         returnByValue: true,
       });
       if (drain.__closed || drain.__timeout) return;
-      const items = JSON.parse((drain.result && drain.result.value) || "[]");
+      const items: [string, string][] = JSON.parse((drain.result?.value as string | undefined) || "[]");
       for (const [mri, st] of items) {
         await page.call("Runtime.evaluate", {
           expression: `self.__tcPresence && self.__tcPresence.push(${JSON.stringify(mri)},${JSON.stringify(st)})`,
@@ -247,9 +280,9 @@ export async function startPresenceBridge(logFn = () => {}, onStop = () => {}) {
   return stop;
 }
 
-// Allow running standalone: `node scripts/presence-bridge.mjs`
+// Allow running standalone: `node scripts/presence-bridge.ts`
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const log = (...a) => console.log(`[presence ${new Date().toLocaleTimeString()}]`, ...a);
+  const log = (...a: unknown[]) => console.log(`[presence ${new Date().toLocaleTimeString()}]`, ...a);
   const stop = await startPresenceBridge(log);
   if (!stop) process.exit(1);
   log("bridge running; Ctrl+C to stop");

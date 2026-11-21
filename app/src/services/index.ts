@@ -15,7 +15,7 @@
 // presence (ups) and most chatsvc calls run inside Teams' web worker, so their
 // bearers never cross the page's fetch/XHR. auth.ts asks Teams' page auth
 // handler for those (the one the worker itself uses, via cdl.ts cdlToken).
-// SubstrateSearch is captured in-page only. In dev, scripts/presence-bridge.mjs
+// SubstrateSearch is captured in-page only. In dev, scripts/presence-bridge.ts
 // also files the workers' own request headers into the vault (__tcAuthIngest).
 
 export { cdl, cdlReady, cdlSubscribe, installCdl, whenCdl, type CdlRes } from "./cdl";

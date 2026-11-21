@@ -98,9 +98,9 @@ real module's exports.
 teams-calm                 launcher (start, dev, patch, off, status, uninstall…)
 install.sh / uninstall.sh  thin wrappers around the launcher
 scripts/
-  build-host-patch.mjs     wraps the app bundle into the bundle.js payload
-  dev.mjs                  CDP hot-reload for `teams-calm dev`
-  presence-bridge.mjs      presence events in dev mode
+  build-host-patch.ts     wraps the app bundle into the bundle.js payload
+  dev.ts                  CDP hot-reload for `teams-calm dev`
+  presence-bridge.ts      presence events in dev mode
 app/src/
   mount.tsx                entry: mounts the overlay into a Teams window
   teamsData.ts, data/      read/write layer over Teams' IndexedDB + chat service
@@ -116,7 +116,7 @@ docs/                      notes on the Teams APIs used
 Teams ships local JS (`Contents/Resources/client-bindings/bundle.js`) that it
 runs in a hidden 1×1 host page; every visible window is `window.open`ed from
 there. `teams-calm` appends the overlay to that file (between
-`/*teams-calm:begin*/` markers, built by `scripts/build-host-patch.mjs`). The
+`/*teams-calm:begin*/` markers, built by `scripts/build-host-patch.ts`). The
 visible windows enforce Trusted Types, so no script can be injected into them;
 instead the host page runs the overlay inside `with (childWindow) { … }`, so
 `document`, `fetch`, timers etc. resolve to the child window.
