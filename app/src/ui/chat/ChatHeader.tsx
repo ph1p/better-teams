@@ -28,7 +28,8 @@ interface ChatHeaderProps {
   onSetMuted: (chat: Chat, muted: boolean) => void;
   onAddMembers: (chat: Chat, people: PeopleHit[], shareHistoryDays: number) => Promise<boolean>;
   onRemoveMember: (chat: Chat, mri: string) => Promise<boolean>;
-  onLeave: (chat: Chat) => void;
+  onLeave: (chat: Chat, what?: "channel" | "team" | "delete") => void;
+  onNewChannel: (chat: Chat) => void;
 }
 
 // The title, as an input while renaming: Enter saves, Escape or leaving cancels.
@@ -61,7 +62,7 @@ function RenameInput({ chat, onRename, onDone }: {
 // toggles and the call buttons; app chats get an explanatory strip below.
 export function ChatHeader({
   chat, searchOpen, onToggleSearch, notesOpen, onToggleNotes, onOpenProfile, onJoinCall, onMeetNow, onCall,
-  flash, knownPeople, onRename, onSetMuted, onAddMembers, onRemoveMember, onLeave,
+  flash, knownPeople, onRename, onSetMuted, onAddMembers, onRemoveMember, onLeave, onNewChannel,
 }: ChatHeaderProps): JSX.Element {
   const { statusOf } = usePresence();
   const [renaming, setRenaming] = useState(false);
@@ -147,6 +148,7 @@ export function ChatHeader({
           onMembers={() => setMembersOpen(true)}
           onSetMuted={onSetMuted}
           onLeave={onLeave}
+          onNewChannel={onNewChannel}
         />
       </div>
       {membersOpen && chat.group && !chat.left ? (

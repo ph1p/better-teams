@@ -27,6 +27,7 @@ interface SidebarProps {
   onPick: (id: string) => void;
   onOpenProfile: (mri: string) => void;
   onMenu: (e: MouseEvent, chat: Chat) => void;
+  onAddChannel: (chat: Chat) => void;
   onHide?: () => void;
   onError: (msg: string) => void;
 }
@@ -87,7 +88,7 @@ export function Sidebar(p: SidebarProps): JSX.Element {
           <Section key={sec.id} id={sec.id} title={sec.id === "search" || sec.id === "unread" ? "" : s.sections[sec.id]}
             rows={sec.rows} sel={sel} compact={compact}
             capped={sec.capped} groupByTeam={sec.groupByTeam} defaultCollapsed={sec.defaultCollapsed}
-            onPick={p.onPick} onOpenProfile={p.onOpenProfile} onMenu={p.onMenu} />
+            onPick={p.onPick} onOpenProfile={p.onOpenProfile} onMenu={p.onMenu} onAddChannel={p.onAddChannel} />
         ))}
         {!error && !sections.length ? (
           <div className="tc-list-empty">

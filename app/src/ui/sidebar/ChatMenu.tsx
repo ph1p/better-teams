@@ -2,7 +2,9 @@ import type { JSX } from "react";
 import { Bell, BellOff, Eye, EyeOff, Mail, MailOpen } from "lucide-react";
 import { useDismiss } from "../lib/dismiss";
 import type { Chat } from "../../types";
+import type { Flash } from "../lib/toast";
 import { t } from "../../i18n";
+import { ChannelLeaveItem, ChannelPresets } from "../chat/ChannelItems";
 
 // Right-click chat menu position + target.
 export interface Menu { x: number; y: number; chat: Chat; }
@@ -13,18 +15,27 @@ interface ChatMenuProps {
   onSetUnread: (chat: Chat, unread: boolean) => void;
   onSetHidden: (chat: Chat, hidden: boolean) => void;
   onSetMuted: (chat: Chat, muted: boolean) => void;
+  onLeave: (chat: Chat, what?: "channel" | "team" | "delete") => void;
+  onNewChannel: (chat: Chat) => void;
+  flash: Flash;
 }
 
 // The right-click menu for a chat row: read state, mute and hide/unhide.
-// Channels mute through the header's notification presets instead.
-export function ChatMenu({ menu, onClose, onSetUnread, onSetHidden, onSetMuted }: ChatMenuProps): JSX.Element {
+// Channels get their notification presets (whose "Off" mutes) and leave.
+export function ChatMenu({ menu, onClose, onSetUnread, onSetHidden, onSetMuted, onLeave, onNewChannel, flash }: ChatMenuProps): JSX.Element {
   // Close the menu on any click, scroll, Escape, or resize.
   useDismiss(true, "#tc-root .tc-menu", onClose);
   const s = t().sidebar;
+  // The channel menu is tall and grows as Teams answers: in the lower half,
+  // anchor it by its bottom edge so it opens upwards and stays on screen.
+  const up = menu.y > window.innerHeight / 2;
   return (
     <div
       className="tc-menu"
-      style={{ left: Math.min(menu.x, window.innerWidth - 200), top: Math.min(menu.y, window.innerHeight - 170) }}
+      style={{
+        left: Math.min(menu.x, window.innerWidth - 220),
+        ...(up ? { bottom: window.innerHeight - menu.y } : { top: menu.y }),
+      }}
       onMouseDown={(e) => e.stopPropagation()}
     >
       {/* Channels: Teams' unread bookmark op is only known for chats. */}
@@ -55,6 +66,13 @@ export function ChatMenu({ menu, onClose, onSetUnread, onSetHidden, onSetMuted }
           {menu.chat.hidden ? s.unhide : s.hide}
         </button>
       )}
+      {menu.chat.isChannel ? (
+        <>
+          {menu.chat.unread ? <div className="tc-menu-sep" /> : null}
+          <ChannelPresets chat={menu.chat} flash={flash} onDone={onClose} />
+          <ChannelLeaveItem chat={menu.chat} onLeave={onLeave} onNewChannel={onNewChannel} onDone={onClose} />
+        </>
+      ) : null}
     </div>
   );
 }

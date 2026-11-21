@@ -4,7 +4,7 @@ import { isAppMri } from "../apps";
 import { getAll, myMri, open } from "./idb";
 import { profile } from "./profiles";
 import { arr, get, mriOf, obj, str, toMs, type Dict } from "./raw";
-import { withPending } from "./groups";
+import { isDeparted, withPending } from "./groups";
 import { effectiveHidden, effectiveHorizon, effectiveMarked, flushPendingHorizons } from "./readState";
 import { isOneToOneId, lastByConv } from "./state";
 
@@ -71,6 +71,11 @@ function liveCallRoot(tp: Dict): string {
   return "";
 }
 
+/** Left the thread: its last leave is newer than its last join. */
+function hasLeft(tp: Dict): boolean {
+  return (Number(tp.lastleaveat) || 0) > (Number(tp.lastjoinat) || 0);
+}
+
 export async function listChats(): Promise<Chat[]> {
   void flushPendingHorizons();
   const db = await open("conversation");
@@ -117,7 +122,15 @@ export async function listChats(): Promise<Chat[]> {
     // A thread we left (lastleaveat after lastjoinat) keeps a stale horizon that
     // read writes can't move (we're no longer a member), so it would show unread
     // forever, even right after marking it read.
-    const left = (Number(tp.lastleaveat) || 0) > (Number(tp.lastjoinat) || 0);
+    const left = hasLeft(tp);
+    // A team we left keeps its channel rows (General is the team's own row),
+    // but chatsvc refuses them with 403 AclCheckFailed, so they could never
+    // load. Teams no longer lists them either.
+    if (kind === "channel" && (left || (team && hasLeft(teamTp)) || isDeparted(str(c.id), teamKey))) continue;
+    // Hidden standard channel (Teams' "Hide"): Teams lists a channel other
+    // than General only while its favorite property is "true". A missing one
+    // is kept, to stay on the safe side.
+    if (kind === "channel" && c.id !== teamKey && props.favorite != null && String(props.favorite).toLowerCase() !== "true") continue;
     // Hidden (Teams' "Hide"): the worker keeps the hide time in the user
     // property unpinnedTime; a newer message brings the chat back.
     const hiddenAt = Number(props.unpinnedTime) || 0;

@@ -32,15 +32,23 @@ export const app = {
   hideFailed: (hidden: boolean, reason: string) =>
     hidden ? `Couldn't hide the chat (${reason})` : `Couldn't unhide the chat (${reason})`,
   chatHidden: "Chat hidden. Search finds it; a new message brings it back.",
-  renameFailed: (reason: string) => `Couldn't rename the chat (${reason})`,
+  renameFailed: (reason: string) => `Couldn't rename (${reason})`,
   muteFailed: (muted: boolean, reason: string) =>
     muted ? `Couldn't mute the chat (${reason})` : `Couldn't unmute the chat (${reason})`,
   addFailed: (reason: string) => `Couldn't add people (${reason})`,
   removeFailed: (reason: string) => `Couldn't remove them (${reason})`,
   leaveFailed: (reason: string) => `Couldn't leave the chat (${reason})`,
+  leaveChannelFailed: (reason: string) => `Couldn't leave (${reason})`,
   muted: "Muted. You won't get notifications for this chat.",
   unmuted: "Unmuted.",
   left: (name: string) => `You left ${name}.`,
+  channelHidden: (name: string) => `${name} hidden.`,
+  channelDeleted: (name: string) => `${name} deleted.`,
+  channelCreated: (name: string) => `${name} created.`,
+  channelCreatedSoon: (name: string) => `${name} created. It shows up in a moment.`,
+  cantAddChannel: "You can't add channels to this team",
+  createChannelFailed: (reason: string) => `Couldn't create the channel (${reason})`,
+  deleteChannelFailed: (reason: string) => `Couldn't delete the channel (${reason})`,
 
   // Messages (toasts)
   reactionFailed: (reason: string) => `Reaction failed (${reason})`,

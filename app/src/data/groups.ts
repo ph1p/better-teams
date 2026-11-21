@@ -12,6 +12,26 @@ import type { ChannelNotifications, ChannelPreset } from "../services/groups";
 
 export type { ChannelNotifications, ChannelPreset };
 
+/**
+ * What the channel menus offer, as in Teams: a private or shared channel is
+ * left on its own, a standard one only hidden, General neither. The team can
+ * be left from any of its channels, General included. Renaming and deleting
+ * follow Teams' own canEdit / canDelete for the channel, adding a channel the
+ * team's canAddChannel.
+ */
+export interface ChannelActions {
+  channel: "leave" | "hide" | null;
+  team: boolean;
+  rename: boolean;
+  delete: boolean;
+  /** A new channel can be added to this channel's team. */
+  create: boolean;
+  channelId: string;
+  /** Team thread id (19:…@thread.tacv2) and its M365 group id. */
+  teamId: string;
+  groupId: string;
+}
+
 const OVERRIDE_MS = 60_000;
 
 interface Pending {
@@ -60,11 +80,13 @@ export function withPending<T extends { title: string; muted: boolean; members: 
   return out;
 }
 
-/** Rename a group chat. Teams trims the name; an empty one is refused. */
+/** Rename a group chat or a channel. Teams trims the name; an empty one is refused. */
 export async function renameChat(conversationId: string, title: string): Promise<WriteResult> {
   const t = title.trim();
   if (!t) return { ok: false, reason: "empty name" };
-  const r = await groups.setConversationTitle(conversationId, t);
+  const r = isChannelId(conversationId)
+    ? await groups.renameChannel(conversationId, t)
+    : await groups.setConversationTitle(conversationId, t);
   if (r.ok) touch(conversationId).title = t;
   return toWrite(r, "cdl");
 }
@@ -92,6 +114,83 @@ export async function leaveChat(conversationId: string): Promise<WriteResult> {
   if (!r.ok) return toWrite(r, "cdl");
   await setChatHidden(conversationId, true);
   return { ok: true, via: "cdl" };
+}
+
+// Channels we left or hid and teams we left this session. IndexedDB shows it
+// (lastleaveat, the favorite property) only after a sync; until then
+// listChats skips them here.
+const departed = new Set<string>();
+
+/** True when we left or hid this channel, or left the team with this thread id, just now. */
+export function isDeparted(convId: string, teamId?: string): boolean {
+  return departed.has(convId) || (!!teamId && departed.has(teamId));
+}
+
+// The answer barely changes; the menu asks on open and the action again on click.
+const actionsCache = new Map<string, { at: number; v: ChannelActions | null }>();
+
+/** What can be left or hidden for a channel; null when Teams doesn't say. */
+export async function getChannelActions(channelId: string): Promise<ChannelActions | null> {
+  const hit = actionsCache.get(channelId);
+  if (hit && Date.now() - hit.at < OVERRIDE_MS) return hit.v;
+  const r = await groups.getChannelInfo(channelId);
+  if (!r.ok) return null;
+  const i = r.data;
+  const v: ChannelActions = {
+    channel: i.isGeneral ? null : i.channelType === "STANDARD" ? "hide" : i.canLeaveChannel ? "leave" : null,
+    team: i.canLeaveTeam && !!i.teamId,
+    rename: i.canEdit,
+    delete: i.canDelete && !i.isGeneral,
+    create: i.canAddChannel && !!i.teamId && !!i.groupId,
+    channelId, teamId: i.teamId, groupId: i.groupId,
+  };
+  actionsCache.set(channelId, { at: Date.now(), v });
+  return v;
+}
+
+/** Leave or hide the channel itself, as getChannelActions decided. */
+export async function leaveChannel(a: ChannelActions): Promise<WriteResult> {
+  if (!a.channel) return { ok: false, reason: "can't leave this channel" };
+  const r = a.channel === "leave"
+    ? await groups.leaveChannel(a.channelId, a.teamId)
+    : await groups.setChannelVisibility(a.channelId, false);
+  if (r.ok) { departed.add(a.channelId); actionsCache.delete(a.channelId); }
+  return toWrite(r, "cdl");
+}
+
+/** Delete the channel for the whole team. */
+export async function deleteChannel(a: ChannelActions): Promise<WriteResult> {
+  if (!a.delete) return { ok: false, reason: "can't delete this channel" };
+  const i = await groups.getChannelInfo(a.channelId);
+  if (!i.ok) return toWrite(i, "cdl");
+  const r = await groups.deleteChannel(a.channelId, i.data);
+  if (r.ok) { departed.add(a.channelId); actionsCache.delete(a.channelId); }
+  return toWrite(r, "cdl");
+}
+
+/** A new channel's thread id; "" when Teams didn't report it yet. */
+export type CreateResult = { ok: true; id: string } | { ok: false; reason: string };
+
+/** Add a channel to the team `a` belongs to; `threads` picks Teams' threads layout over posts. */
+export async function createChannel(
+  a: ChannelActions, name: string, description: string, isPrivate: boolean, threads: boolean,
+): Promise<CreateResult> {
+  const displayName = name.trim();
+  if (!a.create) return { ok: false, reason: "can't add channels to this team" };
+  if (!displayName) return { ok: false, reason: "name missing" };
+  const r = await groups.createChannel(
+    { teamId: a.teamId, groupId: a.groupId },
+    { displayName, description: description.trim(), isPrivate, threads },
+  );
+  return r.ok ? { ok: true, id: r.data } : { ok: false, reason: r.reason };
+}
+
+/** Leave the channel's whole team, all its channels with it. */
+export async function leaveTeam(a: ChannelActions): Promise<WriteResult> {
+  if (!a.team) return { ok: false, reason: "can't leave this team" };
+  const r = await groups.leaveTeam(a.teamId, a.groupId);
+  if (r.ok) { departed.add(a.teamId); actionsCache.clear(); }
+  return toWrite(r, "cdl");
 }
 
 /** Mute a chat's notifications (Teams' "Mute"). Channels use setChannelNotifications. */

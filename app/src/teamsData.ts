@@ -33,4 +33,5 @@ export { setChatHidden, markRead, markUnread } from "./data/readState";
 export {
   renameChat, addChatMembers, removeChatMember, leaveChat, setChatMuted,
   getChannelNotifications, setChannelNotifications, type ChannelNotifications, type ChannelPreset,
+  getChannelActions, leaveChannel, leaveTeam, deleteChannel, createChannel, type ChannelActions, type CreateResult,
 } from "./data/groups";

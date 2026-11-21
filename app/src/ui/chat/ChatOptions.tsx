@@ -1,23 +1,15 @@
 // The "…" menu in the chat header: rename, members, mute and leave for chats;
-// the notification preset for channels. Leave arms on the first click and
+// the notification preset, rename, leave and delete for channels (ChannelItems.tsx). Leave arms on the first click and
 // acts on the second, like removing a file (lib/arm.ts).
 
 import { t } from "../../i18n";
-import { useEffect, useRef, useState, type JSX } from "react";
-import { AtSign, Bell, BellOff, Check, LogOut, MoreHorizontal, Pencil, Users } from "lucide-react";
-import { getChannelNotifications, setChannelNotifications, type ChannelNotifications, type ChannelPreset } from "../../teamsData";
+import { useRef, useState, type JSX } from "react";
+import { Bell, BellOff, LogOut, MoreHorizontal, Pencil, Users } from "lucide-react";
+import { ChannelLeaveItem, ChannelPresets } from "./ChannelItems";
 import { useDismiss } from "../lib/dismiss";
 import { useArm } from "../lib/arm";
 import type { Flash } from "../lib/toast";
 import type { Chat } from "../../types";
-
-interface Preset { id: ChannelPreset; label: () => string; icon: JSX.Element }
-
-const PRESETS: Preset[] = [
-  { id: "ALL_NEW_MSGS", label: () => t().chat.presetAll, icon: <Bell size={14} /> },
-  { id: "MENTIONS_AND_REPLIES", label: () => t().chat.presetMentions, icon: <AtSign size={14} /> },
-  { id: "MUTE", label: () => t().chat.presetOff, icon: <BellOff size={14} /> },
-];
 
 interface ChatOptionsProps {
   chat: Chat;
@@ -25,39 +17,11 @@ interface ChatOptionsProps {
   onRename: () => void;
   onMembers: () => void;
   onSetMuted: (chat: Chat, muted: boolean) => void;
-  onLeave: (chat: Chat) => void;
+  onLeave: (chat: Chat, what?: "channel" | "team" | "delete") => void;
+  onNewChannel: (chat: Chat) => void;
 }
 
-function ChannelPresets({ chat, flash, onDone }: { chat: Chat; flash: Flash; onDone: () => void }): JSX.Element {
-  // undefined: loading; null: Teams didn't answer (the choice still works).
-  const [cur, setCur] = useState<ChannelNotifications | null | undefined>(undefined);
-  useEffect(() => {
-    let live = true;
-    void getChannelNotifications(chat.id).then((n) => { if (live) setCur(n); });
-    return () => { live = false; };
-  }, [chat.id]);
-  const pick = async (preset: Preset): Promise<void> => {
-    onDone();
-    const res = await setChannelNotifications(chat.id, preset.id, cur);
-    flash(res.ok ? t().chat.presetSet(preset.label()) : t().chat.presetFailed(res.reason), 3000);
-  };
-  return (
-    <>
-      <div className="tc-menu-label">{t().chat.channelNotifications}</div>
-      {PRESETS.map((p) => (
-        <button key={p.id} className="tc-menu-item" role="menuitemradio" aria-checked={cur?.preset === p.id}
-          disabled={cur === undefined} onClick={() => void pick(p)}>
-          {p.icon}
-          <span className="tc-menu-grow">{p.label()}</span>
-          {cur?.preset === p.id ? <Check size={14} className="tc-menu-check" /> : null}
-        </button>
-      ))}
-      {cur?.customized ? <div className="tc-menu-note">{t().chat.presetCustom}</div> : null}
-    </>
-  );
-}
-
-export function ChatOptions({ chat, flash, onRename, onMembers, onSetMuted, onLeave }: ChatOptionsProps): JSX.Element | null {
+export function ChatOptions({ chat, flash, onRename, onMembers, onSetMuted, onLeave, onNewChannel }: ChatOptionsProps): JSX.Element | null {
   const [open, setOpen] = useState(false);
   const { armed, tryArm, disarm } = useArm<"leave">();
   const btn = useRef<HTMLButtonElement>(null);
@@ -85,7 +49,12 @@ export function ChatOptions({ chat, flash, onRename, onMembers, onSetMuted, onLe
       </button>
       {open && r ? (
         <div className="tc-menu tc-opts-menu" role="menu" style={{ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) }}>
-          {chat.isChannel ? <ChannelPresets chat={chat} flash={flash} onDone={close} /> : (
+          {chat.isChannel ? (
+            <>
+              <ChannelPresets chat={chat} flash={flash} onDone={close} />
+              <ChannelLeaveItem chat={chat} onLeave={onLeave} onNewChannel={onNewChannel} onRename={onRename} onDone={close} />
+            </>
+          ) : (
             <>
               {manage ? (
                 <>

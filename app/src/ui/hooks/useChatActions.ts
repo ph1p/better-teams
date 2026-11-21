@@ -1,6 +1,6 @@
 import { useCallback, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import {
-  addChatMembers, leaveChat, markRead, markUnread, myMri, profile, removeChatMember, renameChat, sendRemote, setChatHidden,
+  addChatMembers, createChannel, deleteChannel, getChannelActions, leaveChannel, leaveChat, leaveTeam, markRead, markUnread, myMri, profile, removeChatMember, renameChat, sendRemote, setChatHidden,
   setChatMuted, type PeopleHit,
 } from "../../teamsData";
 import {
@@ -38,12 +38,17 @@ const toPick = (p: PeopleHit): PickPerson => ({
 // read state and hiding. Writes are optimistic and revert on failure.
 export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   const [newChat, setNewChat] = useState<NewChatState>(null);
+  // Add channel dialog: the channel whose team gets the new one; null = closed.
+  const [newChannel, setNewChannel] = useState<Chat | null>(null);
 
   // Select a chat once our list knows it. A chat Teams just created only shows
   // up after the next poll picks it out of Teams' local store.
-  const pickWhenListed = useCallback(async (id: string, ms = 12000): Promise<boolean> => {
+  // `id` may also be a match, for a chat whose id we don't know yet.
+  const pickWhenListed = useCallback(async (id: string | ((c: Chat) => boolean), ms = 12000): Promise<boolean> => {
+    const match = typeof id === "string" ? (c: Chat) => c.id === id : id;
     for (let t = 0; t <= ms; t += 300) {
-      if (chatsRef.current.some((c) => c.id === id)) { pick(id); return true; }
+      const hit = chatsRef.current.find(match);
+      if (hit) { pick(hit.id); return true; }
       await new Promise((r) => setTimeout(r, 300));
     }
     return false;
@@ -218,14 +223,59 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
     optimistic(chat, { members: chat.members.filter((m) => m !== mri) }, () => removeChatMember(chat.id, mri), t().app.removeFailed),
   [optimistic]);
 
-  const leave = useCallback(async (chat: Chat): Promise<void> => {
-    if (await optimistic(chat, { left: true, hidden: true }, () => leaveChat(chat.id), t().app.leaveFailed)) {
-      flash(t().app.left(chat.title), 4000);
+  // Leave a group chat; for a channel, leave or hide the channel itself, leave
+  // its whole team, or delete it (getChannelActions decides; the menus already
+  // named which).
+  const leave = useCallback(async (chat: Chat, what: "channel" | "team" | "delete" = "channel"): Promise<void> => {
+    if (!chat.isChannel) {
+      if (await optimistic(chat, { left: true, hidden: true }, () => leaveChat(chat.id), t().app.leaveFailed)) {
+        flash(t().app.left(chat.title), 4000);
+      }
+      return;
     }
-  }, [optimistic, flash]);
+    const acts = await getChannelActions(chat.id);
+    if (!acts) { flash(t().app.leaveChannelFailed("no channel info"), 4000); return; }
+    if (what === "delete") {
+      if (await optimistic(chat, { left: true, hidden: true }, () => deleteChannel(acts), t().app.deleteChannelFailed)) {
+        flash(t().app.channelDeleted(chat.title), 4000);
+      }
+      return;
+    }
+    const team = what === "team";
+    const run = team ? () => leaveTeam(acts) : () => leaveChannel(acts);
+    if (!(await optimistic(chat, { left: true, hidden: true }, run, t().app.leaveChannelFailed))) return;
+    // The team's other channels go too; the next poll drops them for good.
+    if (team) setChats((cs) => cs.map((c) => (c.isChannel && c.team === chat.team ? { ...c, left: true, hidden: true } : c)));
+    flash(team ? t().app.left(chat.team || chat.title)
+      : acts.channel === "hide" ? t().app.channelHidden(chat.title) : t().app.left(chat.title), 4000);
+  }, [optimistic, flash, setChats]);
+
+  // Add a channel to `from`'s team, then open it once the list has it. A
+  // private channel may come back without its id: it shows up with a later
+  // poll, so find it there by team and name (unique within a team). Resolves
+  // to an error text for the dialog, or null.
+  const addChannel = useCallback(async (from: Chat, name: string, desc: string, priv: boolean, threads: boolean): Promise<string | null> => {
+    const acts = await getChannelActions(from.id);
+    if (!acts) return t().app.createChannelFailed("no channel info");
+    const r = await createChannel(acts, name, desc, priv, threads);
+    if (!r.ok) return t().app.createChannelFailed(r.reason);
+    setNewChannel(null);
+    const title = name.trim();
+    flash(r.id ? t().app.channelCreated(title) : t().app.channelCreatedSoon(title), r.id ? 4000 : 5000);
+    const byName = (c: Chat) => c.kind === from.kind && c.team === from.team && c.title === title;
+    void pickWhenListed(r.id || byName, 60000);
+    return null;
+  }, [flash, pickWhenListed]);
+
+  // The team label's "+": open the dialog only where Teams lets us add one.
+  const openNewChannel = useCallback(async (from: Chat): Promise<void> => {
+    const acts = await getChannelActions(from.id);
+    if (acts?.create) setNewChannel(from);
+    else flash(t().app.cantAddChannel, 4000);
+  }, [flash]);
 
   return {
-    newChat, setNewChat, knownPeople, startNewChat, startDirect, startCall, joinCall, meetNow, setChatUnread, setHidden,
+    newChat, setNewChat, newChannel, setNewChannel, openNewChannel, createChannel: addChannel, knownPeople, startNewChat, startDirect, startCall, joinCall, meetNow, setChatUnread, setHidden,
     rename, setMuted, addMembers, removeMember, leave,
   };
 }

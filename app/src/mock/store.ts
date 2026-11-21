@@ -326,7 +326,7 @@ export function setHidden(convId: string, hidden: boolean): boolean {
 /** Group chat management, as the worker's resolvers do it. */
 export function setTopic(convId: string, topic: string): boolean {
   const c = chats.get(convId);
-  if (!c?.group) return false;
+  if (!c?.group && c?.seed.kind !== "channel") return false;
   c.seed.topic = topic;
   poke();
   return true;
@@ -354,6 +354,28 @@ export function channelPreset(convId: string, preset?: string): string | null {
   if (!c || c.seed.kind !== "channel") return null;
   if (preset) c.preset = preset;
   return c.preset || "ALL_NEW_MSGS";
+}
+
+/** Leave a channel, or with `team` every channel of its team. */
+export function leaveChannel(convId: string, team: boolean): boolean {
+  const c = chats.get(convId);
+  if (!c || c.seed.kind !== "channel") return false;
+  for (const [id, x] of chats) {
+    if (id === convId || (team && x.seed.kind === "channel" && x.seed.team === c.seed.team)) chats.delete(id);
+  }
+  poke();
+  return true;
+}
+
+/** Add a channel to the team of channel `convId`; its id, or "" for no team. */
+export function addChannel(convId: string, topic: string, isPrivate: boolean): string {
+  const c = chats.get(convId);
+  if (!c || c.seed.kind !== "channel") return "";
+  const id = `19:mock-${isPrivate ? "private-" : ""}${Date.now().toString(36)}@thread.tacv2`;
+  const seed: SeedChat = { id, kind: "channel", topic, team: c.seed.team, members: [...c.seed.members], messages: [] };
+  chats.set(id, { seed, group: false, messages: [], readMs: Date.now(), marked: false, hidden: false, favorite: false, pinned: false, floor: 0, cursor: 0 });
+  poke();
+  return id;
 }
 
 /** The 1:1 or group chat with exactly these people, created if there is none yet. */

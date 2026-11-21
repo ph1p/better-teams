@@ -5,6 +5,7 @@ import { Sidebar } from "./sidebar/Sidebar";
 import { ChatMenu, type Menu } from "./sidebar/ChatMenu";
 import { buildSections } from "./sidebar/sections";
 import { NewChat } from "./sidebar/NewChat";
+import { NewChannel } from "./sidebar/NewChannel";
 import { ChatHeader, MessageSearchBar } from "./chat/ChatHeader";
 import { Timeline } from "./chat/Timeline";
 import { Composer } from "./chat/Composer";
@@ -217,6 +218,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
         }}
         unreadOnly={unreadOnly} unreadCount={unreadCount} onUnreadFilter={setUnreadFilter}
         onPick={pick} onOpenProfile={openProfile} onMenu={openMenu}
+        onAddChannel={(c) => void a.openNewChannel(c)}
         onHide={onHide} onError={(msg) => flash(msg, 4000)}
       />
 
@@ -239,6 +241,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
               onAddMembers={a.addMembers}
               onRemoveMember={a.removeMember}
               onLeave={a.leave}
+              onNewChannel={a.setNewChannel}
             />
             {msgSearchOpen ? (
               <MessageSearchBar query={msgSearch} onQuery={setMsgSearch} matches={visible.length} onClose={closeMsgSearch} />
@@ -285,6 +288,14 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
         />
       ) : null}
 
+      {a.newChannel ? (
+        <NewChannel
+          team={a.newChannel.team}
+          onCreate={(name, desc, priv, threads) => a.createChannel(a.newChannel!, name, desc, priv, threads)}
+          onClose={() => a.setNewChannel(null)}
+        />
+      ) : null}
+
       {profileMri ? (
         <ProfilePanel
           mri={profileMri}
@@ -310,6 +321,9 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
           onSetUnread={(chat, unread) => void a.setChatUnread(chat, unread)}
           onSetHidden={(chat, hidden) => void a.setHidden(chat, hidden)}
           onSetMuted={a.setMuted}
+          onLeave={a.leave}
+          onNewChannel={a.setNewChannel}
+          flash={flash}
         />
       ) : null}
 

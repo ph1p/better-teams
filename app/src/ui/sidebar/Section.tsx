@@ -1,5 +1,5 @@
 import { useState, type JSX, type MouseEvent } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { Row } from "./Row";
 import { RECENT_MS, SECTION_CAP, SECTION_MIN } from "../lib/constants";
 import { usePref } from "../lib/prefs";
@@ -22,6 +22,8 @@ interface SectionProps {
   onPick: (id: string) => void;
   onOpenProfile: (mri: string) => void;
   onMenu: (e: MouseEvent, chat: Chat) => void;
+  // With groupByTeam: the label's hover "+" adds a channel to the team of the given row.
+  onAddChannel?: (chat: Chat) => void;
 }
 
 // A collapsible sidebar group; an empty title renders the rows alone, without a
@@ -31,7 +33,7 @@ interface SectionProps {
 // show — even in a collapsed section, so collapsing never hides new messages.
 export function Section({
   id, title, rows, sel, compact, capped = true, defaultCollapsed = false, groupByTeam = false,
-  onPick, onOpenProfile, onMenu,
+  onPick, onOpenProfile, onMenu, onAddChannel,
 }: SectionProps): JSX.Element {
   const [collapsed, setCollapsed] = usePref<boolean>("sec:" + id, defaultCollapsed);
   const [all, setAll] = useState(false);
@@ -50,7 +52,18 @@ export function Section({
   for (const c of shown) {
     if (groupByTeam && c.team !== team) {
       team = c.team;
-      body.push(<div key={"t:" + c.team} className="tc-team-label">{c.team || t().sidebar.otherTeam}</div>);
+      const name = c.team || t().sidebar.otherTeam;
+      body.push(
+        <div key={"t:" + c.team} className="tc-team-label">
+          <span>{name}</span>
+          {onAddChannel && c.team ? (
+            <button className="tc-team-add" title={t().chat.newChannel} aria-label={t().chat.newChannel + ": " + name}
+              onClick={() => onAddChannel(c)}>
+              <Plus size={13} />
+            </button>
+          ) : null}
+        </div>,
+      );
     }
     body.push(
       <Row key={c.id} chat={c} compact={compact} showTeam={!groupByTeam} selected={c.id === sel}

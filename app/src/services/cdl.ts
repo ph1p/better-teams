@@ -222,10 +222,11 @@ export type CdlRes<T> = { ok: true; data: T } | { ok: false; reason: string };
  */
 export function check<T>(r: CdlRes<Record<string, unknown>>, field: string, bad?: RegExp): CdlRes<T> {
   if (!r.ok) return r;
-  const v = r.data[field] as { __typename?: string; errorCode?: string; errorMessage?: string } | null | undefined;
+  const v = r.data[field] as { __typename?: string; errorCode?: string; errorType?: string; errorMessage?: string } | null | undefined;
   if (!v) return { ok: false, reason: `no ${field}` };
   if (bad && v.__typename && bad.test(v.__typename)) {
-    return { ok: false, reason: `${v.__typename}${v.errorCode ? ": " + v.errorCode : ""}${v.errorMessage ? " " + v.errorMessage : ""}` };
+    const code = v.errorCode || v.errorType;
+    return { ok: false, reason: `${v.__typename}${code ? ": " + code : ""}${v.errorMessage ? " " + v.errorMessage : ""}` };
   }
   return { ok: true, data: v as T };
 }

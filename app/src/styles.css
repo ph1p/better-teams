@@ -329,6 +329,9 @@
   border-radius: 10px; background: var(--tc-bg); color: var(--tc-fg); font-family: var(--tc-font);
   font-size: 13.5px; padding: 8px 10px; }
 #tc-root .tc-newchat-msg:focus { border-color: var(--tc-accent); }
+#tc-root .tc-newchat-layout { @apply flex flex-wrap items-center gap-x-4; font-size: 13px; }
+#tc-root .tc-newchat-layout > span { @apply w-full; margin-top: 10px; opacity: 0.7; }
+#tc-root .tc-newchat-check { @apply flex items-center gap-2 cursor-pointer; margin-top: 10px; font-size: 13px; }
 #tc-root .tc-newchat-note { color: var(--tc-fg2); font-size: 12.5px; margin-top: 8px; }
 #tc-root .tc-newchat-foot { @apply flex items-center justify-between; margin-top: 10px; }
 #tc-root .tc-newchat-foot small { color: var(--tc-fg2); font-size: 12px; }
@@ -764,8 +767,15 @@
 #tc-root .tc-row:not(.compact):not(.unread) .tc-name { font-weight: 500; }
 #tc-root .tc-row.unread .tc-prev { color: var(--tc-fg); }
 /* Team label inside the Channels section. */
-#tc-root .tc-team-label { @apply truncate; font-size: 11px; font-weight: 600; color: var(--tc-fg2);
-  padding: 8px 8px 2px 10px; opacity: .8; }
+#tc-root .tc-team-label { @apply flex items-center gap-1; font-size: 11px; font-weight: 600; color: var(--tc-fg2);
+  padding: 8px 4px 2px 10px; opacity: .8; }
+#tc-root .tc-team-label > span { @apply truncate flex-1 min-w-0; }
+/* "+" to add a channel: shown while the label is hovered or the button focused. */
+#tc-root .tc-team-add { @apply grid place-items-center shrink-0 cursor-pointer; width: 20px; height: 20px;
+  padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--tc-fg2); opacity: 0;
+  transition: opacity .12s; }
+#tc-root .tc-team-label:hover .tc-team-add, #tc-root .tc-team-add:focus-visible { opacity: 1; }
+#tc-root .tc-team-add:hover { background: var(--tc-hover); color: var(--tc-fg); }
 #tc-root .tc-section + .tc-section { margin-top: 4px; }
 
 /* Scrollbars: thin, themed. */

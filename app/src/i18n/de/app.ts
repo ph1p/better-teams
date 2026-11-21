@@ -33,15 +33,23 @@ export const app: Messages["app"] = {
   hideFailed: (hidden, reason) =>
     hidden ? `Chat konnte nicht ausgeblendet werden (${reason})` : `Chat konnte nicht eingeblendet werden (${reason})`,
   chatHidden: "Chat ausgeblendet. Die Suche findet ihn; eine neue Nachricht holt ihn zurück.",
-  renameFailed: (reason) => `Chat konnte nicht umbenannt werden (${reason})`,
+  renameFailed: (reason) => `Umbenennen fehlgeschlagen (${reason})`,
   muteFailed: (muted, reason) =>
     muted ? `Chat konnte nicht stummgeschaltet werden (${reason})` : `Stummschaltung konnte nicht aufgehoben werden (${reason})`,
   addFailed: (reason) => `Personen konnten nicht hinzugefügt werden (${reason})`,
   removeFailed: (reason) => `Person konnte nicht entfernt werden (${reason})`,
   leaveFailed: (reason) => `Chat konnte nicht verlassen werden (${reason})`,
+  leaveChannelFailed: (reason) => `Verlassen fehlgeschlagen (${reason})`,
   muted: "Stummgeschaltet. Du erhältst keine Benachrichtigungen für diesen Chat.",
   unmuted: "Stummschaltung aufgehoben.",
   left: (name) => `Du hast ${name} verlassen.`,
+  channelHidden: (name) => `${name} ausgeblendet.`,
+  channelDeleted: (name) => `${name} gelöscht.`,
+  channelCreated: (name) => `${name} erstellt.`,
+  channelCreatedSoon: (name) => `${name} erstellt. Er erscheint gleich.`,
+  cantAddChannel: "In diesem Team kannst du keine Kanäle hinzufügen",
+  createChannelFailed: (reason) => `Kanal konnte nicht erstellt werden (${reason})`,
+  deleteChannelFailed: (reason) => `Kanal konnte nicht gelöscht werden (${reason})`,
 
   // Messages (toasts)
   reactionFailed: (reason) => `Reaktion fehlgeschlagen (${reason})`,
