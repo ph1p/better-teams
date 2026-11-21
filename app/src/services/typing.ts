@@ -62,9 +62,13 @@ export function resetTyping(convId: string): void {
 
 /** The bare mutation. Callers normally go through notifyTyping(). */
 export async function sendTyping(convId: string): Promise<CdlRes<boolean>> {
-  const r = await cdl<{ sendTypingIndicator?: unknown }>("ComponentsComposeMessageSendTypingIndicatorMutation", D.TYPING_SEND, {
-    convId,
-  });
+  const r = await cdl<{ sendTypingIndicator?: unknown }>(
+    "ComponentsComposeMessageSendTypingIndicatorMutation",
+    D.TYPING_SEND,
+    {
+      convId,
+    },
+  );
   return r.ok ? { ok: true, data: r.data.sendTypingIndicator === true } : r;
 }
 
@@ -73,7 +77,9 @@ const asUsers = (v: unknown): TypingUser[] =>
 
 /** Who is typing right now. */
 export async function typingUsers(convId: string): Promise<CdlRes<TypingUser[]>> {
-  const r = await cdl<{ typingUsers?: unknown }>("ComponentsTypingIndicatorTypingUsersQuery", D.TYPING_USERS, { convId });
+  const r = await cdl<{ typingUsers?: unknown }>("ComponentsTypingIndicatorTypingUsersQuery", D.TYPING_USERS, {
+    convId,
+  });
   return r.ok ? { ok: true, data: asUsers(r.data.typingUsers) } : r;
 }
 

@@ -4,13 +4,8 @@ import { get } from "./raw";
 const DB_CACHE: Record<string, IDBDatabase> = {};
 
 async function findDb(fragment: string): Promise<string | undefined> {
-  const names = (await indexedDB.databases())
-    .map((d) => d.name)
-    .filter((n): n is string => !!n);
-  return (
-    names.find((n) => n.includes(`:${fragment}-manager:`)) ||
-    names.find((n) => n.includes(`:${fragment}:`))
-  );
+  const names = (await indexedDB.databases()).map((d) => d.name).filter((n): n is string => !!n);
+  return names.find((n) => n.includes(`:${fragment}-manager:`)) || names.find((n) => n.includes(`:${fragment}:`));
 }
 
 export async function open(fragment: string): Promise<IDBDatabase> {
@@ -39,8 +34,6 @@ export async function open(fragment: string): Promise<IDBDatabase> {
 
 export let CURRENT_OID = "";
 export const myMri = (): string => (CURRENT_OID ? "8:orgid:" + CURRENT_OID : "");
-
-
 
 function req(r: IDBRequest): Promise<unknown[]> {
   return new Promise((res) => {

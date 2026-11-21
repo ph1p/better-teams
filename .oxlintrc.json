@@ -1,18 +1,10 @@
 {
   "$schema": "./app/node_modules/oxlint/configuration_schema.json",
-  "plugins": [
-    "typescript",
-    "react",
-    "unicorn",
-    "oxc"
-  ],
+  "plugins": ["typescript", "react", "unicorn", "oxc"],
   "env": {
     "browser": true,
     "node": true,
     "es2024": true
   },
-  "ignorePatterns": [
-    "**/dist/**",
-    "**/node_modules/**"
-  ]
+  "ignorePatterns": ["**/dist/**", "**/node_modules/**"]
 }

@@ -4,19 +4,11 @@ export const app = {
   selectChat: "Select a chat",
   markReadFailed: (reason: string) => `Couldn't mark as read (${reason})`,
   // The pill in Teams' title bar; one is picked at random each time it shows.
-  pill: [
-    "Get me out of here",
-    "Make it stop",
-    "Where's my chat?",
-    "Escape",
-    "I've seen enough",
-    "Back to sanity",
-  ],
+  pill: ["Get me out of here", "Make it stop", "Where's my chat?", "Escape", "I've seen enough", "Back to sanity"],
   pillTitle: "Back to the calm view (⌥⌘T)",
 
   // Chat actions (toasts)
-  sentFailedAfterOpen: (reason: string) =>
-    `Opened the chat, but the message wasn't sent (${reason})`,
+  sentFailedAfterOpen: (reason: string) => `Opened the chat, but the message wasn't sent (${reason})`,
   noEmail: (name: string) => `No email on file for ${name}.`,
   thisPerson: "this person",
   chatOpenedSoon: "Chat opened in Teams. It shows up here shortly.",

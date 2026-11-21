@@ -11,7 +11,10 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 const [src, out] = process.argv.slice(2);
-if (!src || !out) { console.error("Usage: node scripts/build-host-patch.ts <bundle.js> <out.js>"); process.exit(1); }
+if (!src || !out) {
+  console.error("Usage: node scripts/build-host-patch.ts <bundle.js> <out.js>");
+  process.exit(1);
+}
 const app = readFileSync(src, "utf8");
 
 // Presence in prod comes from the DOM presence badges Teams paints in each

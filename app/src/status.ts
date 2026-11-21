@@ -9,14 +9,7 @@
 import type { WriteResult } from "./types";
 import { presence } from "./services";
 
-export type SettableStatus =
-  | "Available"
-  | "Busy"
-  | "DoNotDisturb"
-  | "BeRightBack"
-  | "Away"
-  | "Offline"
-  | "Reset";
+export type SettableStatus = "Available" | "Busy" | "DoNotDisturb" | "BeRightBack" | "Away" | "Offline" | "Reset";
 
 const ITEM: Record<SettableStatus, string> = {
   Available: "me_control_presence_availability_available",
@@ -109,7 +102,10 @@ function expiryDate(e: NoteExpiry): Date | undefined {
   return undefined;
 }
 
-export interface MyNote { text: string; until?: number }
+export interface MyNote {
+  text: string;
+  until?: number;
+}
 let lastNote: MyNote | null = null;
 
 /** The note we last set from the overlay (Teams' own value isn't read yet). */

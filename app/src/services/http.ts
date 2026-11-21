@@ -29,9 +29,7 @@ export function allowedUrl(url: string): URL | null {
   }
 }
 
-export type Res<T = unknown> =
-  | { ok: true; status: number; data: T }
-  | { ok: false; status: number; reason: string };
+export type Res<T = unknown> = { ok: true; status: number; data: T } | { ok: false; status: number; reason: string };
 
 export interface CallOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";

@@ -27,9 +27,22 @@ export function Avatar({ name, uri, small, mri, status, onOpen, className }: Ava
   const clickable = !!(mri && onOpen) && !app;
   const av = (
     <div
-      className={"tc-av" + (small ? " sm" : "") + (app ? " app" : "") + (clickable ? " tc-av-btn" : "") + (className ? " " + className : "")}
+      className={
+        "tc-av" +
+        (small ? " sm" : "") +
+        (app ? " app" : "") +
+        (clickable ? " tc-av-btn" : "") +
+        (className ? " " + className : "")
+      }
       style={style}
-      onClick={clickable ? (e) => { e.stopPropagation(); onOpen!(mri!); } : undefined}
+      onClick={
+        clickable
+          ? (e) => {
+              e.stopPropagation();
+              onOpen!(mri!);
+            }
+          : undefined
+      }
       title={clickable ? t().app.viewProfile(name || t().app.profile) : undefined}
     >
       {uri && !broken ? <img src={uri} alt="" onError={() => setBroken(true)} /> : initials(name)}
@@ -38,7 +51,11 @@ export function Avatar({ name, uri, small, mri, status, onOpen, className }: Ava
   const ring = !app && status && status !== "Unknown";
   if (!ring) return av;
   return (
-    <div className={"tc-av-ring is-" + status!.toLowerCase() + (small ? " sm" : "")} style={{ "--tc-ring": STATUS_COLOR[status!] } as CSSProperties} title={statusLabel(status!)}>
+    <div
+      className={"tc-av-ring is-" + status!.toLowerCase() + (small ? " sm" : "")}
+      style={{ "--tc-ring": STATUS_COLOR[status!] } as CSSProperties}
+      title={statusLabel(status!)}
+    >
       {av}
     </div>
   );

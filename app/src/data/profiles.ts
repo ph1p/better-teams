@@ -10,10 +10,7 @@ import { obj, str } from "./raw";
 // layer records it off Teams' own traffic. Only org users (8:orgid:) have photos.
 export function profilePhotoUrl(mri: string): string {
   if (!CURRENT_OID || !mri || mri.indexOf("8:orgid:") !== 0) return "";
-  return (
-    `/api/mt/${region("mt")}/beta/users/${CURRENT_OID}/profilepicturev2/` +
-    encodeURIComponent(mri)
-  );
+  return `/api/mt/${region("mt")}/beta/users/${CURRENT_OID}/profilepicturev2/` + encodeURIComponent(mri);
 }
 
 let PROFILES: Record<string, Profile> = {};
@@ -45,7 +42,12 @@ export async function loadProfiles(): Promise<Record<string, Profile>> {
 }
 
 const EMPTY_PROFILE: Profile = {
-  displayName: "", imageUri: "", email: "", jobTitle: "", department: "", officeLocation: "",
+  displayName: "",
+  imageUri: "",
+  email: "",
+  jobTitle: "",
+  department: "",
+  officeLocation: "",
 };
 export function profile(mri: string): Profile {
   return PROFILES[mri] || EMPTY_PROFILE;

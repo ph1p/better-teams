@@ -11,9 +11,22 @@ import { Fragment, useEffect, useState, type ReactNode, type JSX } from "react";
 import { highlightLines, onHighlighterReady, normLang } from "./highlight";
 
 const ENTITIES: Record<string, string> = {
-  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
-  hellip: "…", mdash: "—", ndash: "–", rsquo: "’", lsquo: "‘",
-  ldquo: "“", rdquo: "”", times: "×", copy: "©", reg: "®",
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+  hellip: "…",
+  mdash: "—",
+  ndash: "–",
+  rsquo: "’",
+  lsquo: "‘",
+  ldquo: "“",
+  rdquo: "”",
+  times: "×",
+  copy: "©",
+  reg: "®",
 };
 export function decodeEntities(s: string): string {
   return String(s)
@@ -38,27 +51,53 @@ type TagMap = [tag: keyof JSX.IntrinsicElements | null, cls: string | null];
 // Map an opening HTML tag to the React tag + className we render it as.
 function mapTag(name: string, attrs: Attrs): TagMap {
   switch (name) {
-    case "p": return ["p", null];
-    case "div": return ["div", null];
-    case "br": return ["br", null];
-    case "ul": return ["ul", "tc-ul"];
-    case "ol": return ["ol", "tc-ol"];
-    case "li": return ["li", null];
-    case "b": case "strong": return ["strong", null];
-    case "i": case "em": return ["em", null];
-    case "u": return ["u", null];
-    case "s": case "strike": case "del": return ["s", null];
-    case "code": return ["code", "tc-code"];
-    case "pre": return ["pre", "tc-pre"];
-    case "blockquote": case "quote": return ["blockquote", "tc-quote"];
-    case "h1": case "h2": case "h3": case "h4": case "h5": case "h6":
+    case "p":
+      return ["p", null];
+    case "div":
+      return ["div", null];
+    case "br":
+      return ["br", null];
+    case "ul":
+      return ["ul", "tc-ul"];
+    case "ol":
+      return ["ol", "tc-ol"];
+    case "li":
+      return ["li", null];
+    case "b":
+    case "strong":
+      return ["strong", null];
+    case "i":
+    case "em":
+      return ["em", null];
+    case "u":
+      return ["u", null];
+    case "s":
+    case "strike":
+    case "del":
+      return ["s", null];
+    case "code":
+      return ["code", "tc-code"];
+    case "pre":
+      return ["pre", "tc-pre"];
+    case "blockquote":
+    case "quote":
+      return ["blockquote", "tc-quote"];
+    case "h1":
+    case "h2":
+    case "h3":
+    case "h4":
+    case "h5":
+    case "h6":
       return ["div", "tc-h"];
     case "span":
       // @mention spans get a pill; everything else is a transparent wrapper.
       return /Mention/i.test(attrs.itemtype || "") ? ["span", "tc-mention"] : [null, null];
-    case "a": return ["a", null];
-    case "img": return ["img", null];
-    default: return [null, null]; // unknown wrapper: keep its text children
+    case "a":
+      return ["a", null];
+    case "img":
+      return ["img", null];
+    default:
+      return [null, null]; // unknown wrapper: keep its text children
   }
 }
 
@@ -83,7 +122,9 @@ export function parse(html: string): ElNode {
   const stack: ElNode[] = [root];
   let last = 0;
   let m: RegExpExecArray | null;
-  const push = (node: Node): void => { stack[stack.length - 1].children.push(node); };
+  const push = (node: Node): void => {
+    stack[stack.length - 1].children.push(node);
+  };
   const text = (raw: string): void => {
     if (!raw) return;
     const t = decodeEntities(raw);
@@ -97,7 +138,10 @@ export function parse(html: string): ElNode {
     if (closing) {
       // Pop to the matching open tag if there is one.
       for (let i = stack.length - 1; i > 0; i--) {
-        if (stack[i].tag === name) { stack.length = i; break; }
+        if (stack[i].tag === name) {
+          stack.length = i;
+          break;
+        }
       }
       continue;
     }
@@ -110,7 +154,10 @@ export function parse(html: string): ElNode {
         const close = new RegExp("</" + name + "\\s*>", "i");
         close.lastIndex = last;
         const c = html.slice(last).search(close);
-        if (c >= 0) { last += c + name.length + 3; tokenRe.lastIndex = last; }
+        if (c >= 0) {
+          last += c + name.length + 3;
+          tokenRe.lastIndex = last;
+        }
       }
       continue;
     }
@@ -179,7 +226,10 @@ function langHint(node: Node): string {
     if (m && normLang(m[1])) return normLang(m[1]);
     const dl = a["data-lang"] || a["data-language"] || "";
     if (dl && normLang(dl)) return normLang(dl);
-    for (const c of n.children || []) { const r = probe(c); if (r) return r; }
+    for (const c of n.children || []) {
+      const r = probe(c);
+      if (r) return r;
+    }
     return "";
   };
   return probe(node);
@@ -193,7 +243,11 @@ function CodeBlock({ code, lang }: { code: string; lang: string }): JSX.Element 
   useEffect(() => onHighlighterReady(() => bump((n) => n + 1)), []);
   const lines = lang ? highlightLines(code, lang) : null;
   if (!lines) {
-    return <pre className="tc-pre"><code className="tc-code">{code}</code></pre>;
+    return (
+      <pre className="tc-pre">
+        <code className="tc-code">{code}</code>
+      </pre>
+    );
   }
   return (
     <pre className="tc-pre tc-shiki" data-lang={lang}>
@@ -201,7 +255,9 @@ function CodeBlock({ code, lang }: { code: string; lang: string }): JSX.Element 
         {lines.map((line, i) => (
           <span key={i} className="tc-code-line">
             {line.map((t, j) => (
-              <span key={j} style={t.color ? { color: t.color } : undefined}>{t.content}</span>
+              <span key={j} style={t.color ? { color: t.color } : undefined}>
+                {t.content}
+              </span>
             ))}
             {"\n"}
           </span>
@@ -220,7 +276,9 @@ function toReact(node: Node): ReactNode {
   if (node.tag === "pre") {
     // Teams opens code blocks with a <br> and pads with NBSPs; grammars expect
     // plain spaces, and the leading newline would render as an empty line.
-    const code = textOf(node).replace(/ /g, " ").replace(/^\n+|\n+$/g, "");
+    const code = textOf(node)
+      .replace(/ /g, " ")
+      .replace(/^\n+|\n+$/g, "");
     return <CodeBlock key={key} code={code} lang={langHint(node)} />;
   }
 
@@ -259,7 +317,11 @@ function toReact(node: Node): ReactNode {
     props.className = "tc-quote tc-reply";
     if (node.attrs.itemid) props["data-reply-id"] = node.attrs.itemid;
   }
-  return <T key={key} {...props}>{kids}</T>;
+  return (
+    <T key={key} {...props}>
+      {kids}
+    </T>
+  );
 }
 
 // Render a Teams HTML content string as safe React nodes.

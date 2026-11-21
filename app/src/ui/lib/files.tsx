@@ -3,13 +3,32 @@
 
 import { useSyncExternalStore, type JSX } from "react";
 import {
-  File, FileArchive, FileAudio, FileCode, FileImage, FileSpreadsheet, FileText, FileVideo, Presentation,
+  File,
+  FileArchive,
+  FileAudio,
+  FileCode,
+  FileImage,
+  FileSpreadsheet,
+  FileText,
+  FileVideo,
+  Presentation,
   type LucideIcon,
 } from "lucide-react";
 import type { FileRef } from "../../types";
 import { t } from "../../i18n";
 
-type FileKind = "image" | "video" | "audio" | "pdf" | "word" | "excel" | "powerpoint" | "code" | "archive" | "text" | "other";
+type FileKind =
+  | "image"
+  | "video"
+  | "audio"
+  | "pdf"
+  | "word"
+  | "excel"
+  | "powerpoint"
+  | "code"
+  | "archive"
+  | "text"
+  | "other";
 
 const KINDS: [FileKind, RegExp][] = [
   ["image", /^(png|jpe?g|gif|webp|bmp|svg|heic|tiff?)$/],
@@ -30,9 +49,17 @@ export function fileKind(ext: string): FileKind {
 }
 
 const KIND_ICON: Record<FileKind, LucideIcon> = {
-  image: FileImage, video: FileVideo, audio: FileAudio, pdf: FileText, word: FileText,
-  excel: FileSpreadsheet, powerpoint: Presentation, code: FileCode, archive: FileArchive,
-  text: FileText, other: File,
+  image: FileImage,
+  video: FileVideo,
+  audio: FileAudio,
+  pdf: FileText,
+  word: FileText,
+  excel: FileSpreadsheet,
+  powerpoint: Presentation,
+  code: FileCode,
+  archive: FileArchive,
+  text: FileText,
+  other: File,
 };
 
 // ---- viewer store ---------------------------------------------------------
@@ -84,7 +111,13 @@ export function stepViewer(delta: number): void {
 export const viewerOpen = (): boolean => state !== null;
 
 export function useViewer(): ViewerState | null {
-  return useSyncExternalStore((f) => { subs.add(f); return () => subs.delete(f); }, () => state);
+  return useSyncExternalStore(
+    (f) => {
+      subs.add(f);
+      return () => subs.delete(f);
+    },
+    () => state,
+  );
 }
 
 /** Save an image through the page's own session (AMS answers only with Teams' cookies). */
@@ -146,7 +179,21 @@ export function imageItem(src: string, alt: string): ViewerItem {
 }
 
 /** The type icon on its kind-colored tile. */
-export function KindIcon({ kind, className, size, strokeWidth }: { kind: FileKind; className: string; size: number; strokeWidth?: number }): JSX.Element {
+export function KindIcon({
+  kind,
+  className,
+  size,
+  strokeWidth,
+}: {
+  kind: FileKind;
+  className: string;
+  size: number;
+  strokeWidth?: number;
+}): JSX.Element {
   const Icon = KIND_ICON[kind];
-  return <span className={className + " k-" + kind}><Icon size={size} strokeWidth={strokeWidth} /></span>;
+  return (
+    <span className={className + " k-" + kind}>
+      <Icon size={size} strokeWidth={strokeWidth} />
+    </span>
+  );
 }

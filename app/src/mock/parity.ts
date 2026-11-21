@@ -12,6 +12,10 @@ import * as Chat from "./services/chat";
 import * as Typing from "./services/typing";
 import * as Presence from "./services/presence";
 
-export const parity: [
-  typeof RealData, typeof RealSend, typeof RealChat, typeof RealTyping, typeof RealPresence,
-] = [Data, Send, Chat, Typing, Presence];
+export const parity: [typeof RealData, typeof RealSend, typeof RealChat, typeof RealTyping, typeof RealPresence] = [
+  Data,
+  Send,
+  Chat,
+  Typing,
+  Presence,
+];

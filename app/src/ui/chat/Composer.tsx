@@ -90,7 +90,10 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
   // Insert text at the composer's caret (or append), keeping focus and caret.
   const insertAtCaret = (ins: string): void => {
     const el = composer.current;
-    if (!el) { setDraft(draft + ins); return; }
+    if (!el) {
+      setDraft(draft + ins);
+      return;
+    }
     const s = el.selectionStart ?? draft.length;
     const e = el.selectionEnd ?? draft.length;
     const next = draft.slice(0, s) + ins + draft.slice(e);
@@ -98,7 +101,11 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
     requestAnimationFrame(() => {
       el.focus();
       const pos = s + ins.length;
-      try { el.setSelectionRange(pos, pos); } catch { /* ignore */ }
+      try {
+        el.setSelectionRange(pos, pos);
+      } catch {
+        /* ignore */
+      }
     });
   };
 
@@ -138,8 +145,13 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
     // Match "@" preceded by start/space, up to the caret, name chars only.
     const upto = v.slice(0, caret);
     const m = /(?:^|\s)@([^\s@]{0,40})$/.exec(upto);
-    if (m) { setAtQuery(m[1]); setAtOpen(true); }
-    else { setAtOpen(false); setAtQuery(""); }
+    if (m) {
+      setAtQuery(m[1]);
+      setAtOpen(true);
+    } else {
+      setAtOpen(false);
+      setAtQuery("");
+    }
   };
 
   // Replace the half-typed "@query" at the caret with "@Display Name " and record
@@ -160,21 +172,37 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
     requestAnimationFrame(() => {
       el?.focus();
       const pos = start + insert.length;
-      try { el?.setSelectionRange(pos, pos); } catch { /* ignore */ }
+      try {
+        el?.setSelectionRange(pos, pos);
+      } catch {
+        /* ignore */
+      }
     });
   };
 
   // Close the @-picker and the emoji picker when the open chat changes.
-  useEffect(() => { setAtOpen(false); setAtQuery(""); setAtOrg([]); }, [chat.id]);
-  useEffect(() => { setEmojiOpen(false); }, [chat.id]);
+  useEffect(() => {
+    setAtOpen(false);
+    setAtQuery("");
+    setAtOrg([]);
+  }, [chat.id]);
+  useEffect(() => {
+    setEmojiOpen(false);
+  }, [chat.id]);
 
   // Debounced org-directory search while the @-picker is open. Local chat members
   // show instantly; org hits stream in ~250ms after typing stops. Stale responses
   // are dropped via the `live` guard so an older query can't overwrite a newer one.
   useEffect(() => {
-    if (!atOpen) { setAtOrg([]); return; }
+    if (!atOpen) {
+      setAtOrg([]);
+      return;
+    }
     const q = atQuery.trim();
-    if (q.length < 2) { setAtOrg([]); return; }
+    if (q.length < 2) {
+      setAtOrg([]);
+      return;
+    }
     let live = true;
     const h = setTimeout(() => {
       searchPeople(q, 8)
@@ -182,9 +210,14 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
           if (!live) return;
           setAtOrg(hits.map((p) => ({ mri: p.mri, name: p.displayName, mentionType: "person" })));
         })
-        .catch(() => { /* keep local-only candidates */ });
+        .catch(() => {
+          /* keep local-only candidates */
+        });
     }, 250);
-    return () => { live = false; clearTimeout(h); };
+    return () => {
+      live = false;
+      clearTimeout(h);
+    };
   }, [atOpen, atQuery]);
 
   // Auto-grow the composer.
@@ -209,7 +242,12 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
       {/* Floats above the box so typing never shifts the layout. */}
       {chat.isChannel ? null : <TypingIndicator chatId={chat.id} />}
       {!atBottom ? (
-        <button className="tc-scroll-newest" onClick={onScrollToBottom} title={t().composer.jumpToNewest} aria-label={t().composer.jumpToNewest}>
+        <button
+          className="tc-scroll-newest"
+          onClick={onScrollToBottom}
+          title={t().composer.jumpToNewest}
+          aria-label={t().composer.jumpToNewest}
+        >
           <ArrowDown size={16} />
         </button>
       ) : null}
@@ -220,7 +258,14 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
             <span className="tc-quote-chip-from">{t().composer.replyInThread(threadTo.from)}</span>
             <span className="tc-quote-chip-text">{threadTo.text || "…"}</span>
           </div>
-          <button className="tc-quote-chip-x" onClick={() => setThreadTo(null)} title={t().composer.postAsNew} aria-label={t().composer.cancelThreadReply}><X size={13} /></button>
+          <button
+            className="tc-quote-chip-x"
+            onClick={() => setThreadTo(null)}
+            title={t().composer.postAsNew}
+            aria-label={t().composer.cancelThreadReply}
+          >
+            <X size={13} />
+          </button>
         </div>
       ) : null}
       {quote ? (
@@ -230,22 +275,25 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
             <span className="tc-quote-chip-from">{quote.from}</span>
             <span className="tc-quote-chip-text">{quote.text || "…"}</span>
           </div>
-          <button className="tc-quote-chip-x" onClick={() => setQuote(null)} aria-label={t().composer.cancelQuote}><X size={13} /></button>
+          <button className="tc-quote-chip-x" onClick={() => setQuote(null)} aria-label={t().composer.cancelQuote}>
+            <X size={13} />
+          </button>
         </div>
       ) : null}
       {emojiOpen ? (
         <div className="tc-emoji-pop" onMouseDown={(e) => e.stopPropagation()}>
-          <EmojiPicker onPick={(em) => { insertAtCaret(em); setEmojiOpen(false); }} />
+          <EmojiPicker
+            onPick={(em) => {
+              insertAtCaret(em);
+              setEmojiOpen(false);
+            }}
+          />
         </div>
       ) : null}
       {atOpen && atCandidates.length ? (
         <div className="tc-at-pop" onMouseDown={(e) => e.stopPropagation()}>
           {atCandidates.map((c) => (
-            <button
-              key={c.mri}
-              className="tc-at-opt"
-              onClick={() => pickMention(c)}
-            >
+            <button key={c.mri} className="tc-at-opt" onClick={() => pickMention(c)}>
               <Avatar name={c.name} uri={avatarUri(c.mri)} mri={c.mri} small />
               <span className="tc-at-name">{c.name}</span>
             </button>
@@ -259,11 +307,20 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
               <span className="tc-card-main">
                 <KindIcon kind={fileKind(extOf(f.name))} className="tc-card-icon" size={18} />
                 <span className="tc-card-text">
-                  <span className="tc-card-name" title={f.name}>{f.name}</span>
+                  <span className="tc-card-name" title={f.name}>
+                    {f.name}
+                  </span>
                   <span className="tc-card-ext">{fmtSize(f.size)}</span>
                 </span>
               </span>
-              <button className="tc-quote-chip-x" onClick={() => cs.removeFile(i)} title={t().common.remove} aria-label={t().common.removeNamed(f.name)}><X size={13} /></button>
+              <button
+                className="tc-quote-chip-x"
+                onClick={() => cs.removeFile(i)}
+                title={t().common.remove}
+                aria-label={t().common.removeNamed(f.name)}
+              >
+                <X size={13} />
+              </button>
             </div>
           ))}
         </div>
@@ -301,7 +358,9 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
         <button
           className="tc-emoji-btn"
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => { if (composer.current) codeBlock(composer.current); }}
+          onClick={() => {
+            if (composer.current) codeBlock(composer.current);
+          }}
           title={t().composer.codeBlockTitle}
           aria-label={t().composer.insertCodeBlock}
         >
@@ -310,7 +369,13 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
         <textarea
           ref={composer}
           rows={1}
-          placeholder={threadTo && chat.isChannel ? t().composer.placeholderThread : chat.isChannel ? t().composer.placeholderChannel(chatTitle(chat)) : t().composer.placeholderChat(chatTitle(chat))}
+          placeholder={
+            threadTo && chat.isChannel
+              ? t().composer.placeholderThread
+              : chat.isChannel
+                ? t().composer.placeholderChannel(chatTitle(chat))
+                : t().composer.placeholderChat(chatTitle(chat))
+          }
           value={draft}
           onChange={(e) => onDraftChange(e.target.value)}
           onPaste={(e) => {
@@ -325,12 +390,17 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
                 pickMention(atCandidates[0]);
                 return;
               }
-              if (e.key === "Escape") { e.preventDefault(); setAtOpen(false); return; }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setAtOpen(false);
+                return;
+              }
             }
             if (handleFormatKey(e)) return;
             if (e.key === "Escape" && (threadTo || quote)) {
               e.preventDefault();
-              if (quote) setQuote(null); else setThreadTo(null);
+              if (quote) setQuote(null);
+              else setThreadTo(null);
               return;
             }
             if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {

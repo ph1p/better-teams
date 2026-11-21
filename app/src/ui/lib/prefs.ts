@@ -25,12 +25,15 @@ export function write<T>(key: string, value: T): void {
 // useState that survives reloads. The setter takes a value or an updater.
 export function usePref<T>(key: string, fallback: T): [T, (v: T | ((cur: T) => T)) => void] {
   const [val, setVal] = useState<T>(() => read(key, fallback));
-  const set = useCallback((v: T | ((cur: T) => T)): void => {
-    setVal((cur) => {
-      const next = typeof v === "function" ? (v as (c: T) => T)(cur) : v;
-      write(key, next);
-      return next;
-    });
-  }, [key]);
+  const set = useCallback(
+    (v: T | ((cur: T) => T)): void => {
+      setVal((cur) => {
+        const next = typeof v === "function" ? (v as (c: T) => T)(cur) : v;
+        write(key, next);
+        return next;
+      });
+    },
+    [key],
+  );
   return [val, set];
 }

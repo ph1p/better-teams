@@ -161,7 +161,10 @@ function field(r: CdlRes<Data>, name: string): CdlRes<true> {
 }
 
 export async function setConversationTitle(convId: string, title: string): Promise<CdlRes<true>> {
-  return field(await cdl<Data>("ComponentsChatTitleUpdaterSetConversationTitleMutation", RENAME, { convId, title }), "setConversationTitle");
+  return field(
+    await cdl<Data>("ComponentsChatTitleUpdaterSetConversationTitleMutation", RENAME, { convId, title }),
+    "setConversationTitle",
+  );
 }
 
 /**
@@ -169,17 +172,24 @@ export async function setConversationTitle(convId: string, title: string): Promi
  * N the last N days (Teams' own encoding; the worker turns N into a time).
  */
 export async function addMembers(convId: string, mris: string[], shareHistoryDays = 0): Promise<CdlRes<true>> {
-  return field(await cdl<Data>("ComponentsChatAddMembersAddMembersToConversationMutation", ADD_MEMBERS, {
-    convId,
-    members: mris.map((id) => ({ id })),
-    shareHistoryTime: shareHistoryDays,
-  }), "addMembersToConversation");
+  return field(
+    await cdl<Data>("ComponentsChatAddMembersAddMembersToConversationMutation", ADD_MEMBERS, {
+      convId,
+      members: mris.map((id) => ({ id })),
+      shareHistoryTime: shareHistoryDays,
+    }),
+    "addMembersToConversation",
+  );
 }
 
 export async function removeMember(convId: string, mri: string): Promise<CdlRes<true>> {
-  return field(await cdl<Data>("ComponentsChatRosterRemoveMemberFromConversationMutation", REMOVE_MEMBER, {
-    convId, userToRemove: mri,
-  }), "removeMemberFromConversation");
+  return field(
+    await cdl<Data>("ComponentsChatRosterRemoveMemberFromConversationMutation", REMOVE_MEMBER, {
+      convId,
+      userToRemove: mri,
+    }),
+    "removeMemberFromConversation",
+  );
 }
 
 export async function leaveChat(convId: string): Promise<CdlRes<true>> {
@@ -187,7 +197,10 @@ export async function leaveChat(convId: string): Promise<CdlRes<true>> {
 }
 
 export async function setMuteChat(convId: string, mute: boolean): Promise<CdlRes<true>> {
-  return field(await cdl<Data>("ComponentsChatOptionsSharedSetMuteChatMutation", MUTE, { convId, mute }), "setMuteChat");
+  return field(
+    await cdl<Data>("ComponentsChatOptionsSharedSetMuteChatMutation", MUTE, { convId, mute }),
+    "setMuteChat",
+  );
 }
 
 /** Teams' channel notification presets (the "Channel notifications" menu). */
@@ -203,7 +216,9 @@ export interface ChannelNotifications {
 export async function getChannelNotifications(channelId: string): Promise<CdlRes<ChannelNotifications>> {
   const r = await cdl<Data>("channelNotificationSettingsPopoverQuery", CHANNEL_NOTIF_GET, { channelId });
   if (!r.ok) return r;
-  const ch = r.data.channelConversationById as { notificationAndFollowSettings?: { channelGranularSetting?: Data } } | null;
+  const ch = r.data.channelConversationById as {
+    notificationAndFollowSettings?: { channelGranularSetting?: Data };
+  } | null;
   const s = ch?.notificationAndFollowSettings?.channelGranularSetting;
   if (!s) return { ok: false, reason: "no channel notification settings" };
   return {
@@ -219,20 +234,25 @@ export async function getChannelNotifications(channelId: string): Promise<CdlRes
 
 /** Set a channel's preset, keeping its @tag / @channel-@team mention choices. */
 export async function setChannelNotifications(
-  convId: string, preset: ChannelPreset, keep?: Pick<ChannelNotifications, "tagMentions" | "channelTeamMentions">,
+  convId: string,
+  preset: ChannelPreset,
+  keep?: Pick<ChannelNotifications, "tagMentions" | "channelTeamMentions">,
 ): Promise<CdlRes<true>> {
-  return field(await cdl<Data>("channelGranularSettingsMutation", CHANNEL_NOTIF_SET, {
-    input: {
-      convId,
-      channelGranularSetting: {
-        channelPreset: preset,
-        followThreads: preset !== "MUTE",
-        tagMentions: keep?.tagMentions ?? true,
-        channelTeamMentions: keep?.channelTeamMentions ?? true,
-        desktopNotifications: "FOLLOW_GNS",
+  return field(
+    await cdl<Data>("channelGranularSettingsMutation", CHANNEL_NOTIF_SET, {
+      input: {
+        convId,
+        channelGranularSetting: {
+          channelPreset: preset,
+          followThreads: preset !== "MUTE",
+          tagMentions: keep?.tagMentions ?? true,
+          channelTeamMentions: keep?.channelTeamMentions ?? true,
+          desktopNotifications: "FOLLOW_GNS",
+        },
       },
-    },
-  }), "setFollowNotificationSettings");
+    }),
+    "setFollowNotificationSettings",
+  );
 }
 
 /** What can be left or hidden for a channel, and its team. */
@@ -294,23 +314,33 @@ export async function leaveChannel(channelId: string, teamId: string): Promise<C
 
 export async function leaveTeam(teamThreadId: string, groupId: string): Promise<CdlRes<true>> {
   const r = check<{ errorCode?: string | null }>(
-    await cdl<Data>("leaveTeamMutation", LEAVE_TEAM, { groupId: groupId || null, teamThreadId }), "leaveTeam");
+    await cdl<Data>("leaveTeamMutation", LEAVE_TEAM, { groupId: groupId || null, teamThreadId }),
+    "leaveTeam",
+  );
   if (!r.ok) return r;
   return r.data.errorCode ? { ok: false, reason: r.data.errorCode } : { ok: true, data: true };
 }
 
 /** Show or hide a standard channel in the channel list (Teams' "Hide"). */
 export async function setChannelVisibility(channelId: string, show: boolean): Promise<CdlRes<true>> {
-  return field(await cdl<Data>("useToggleChannelVisibilityMutation", CHANNEL_VISIBILITY, {
-    input: { id: channelId, shouldShow: show, isJoinLeaveFlow: false },
-  }), "toggleChannelVisibility");
+  return field(
+    await cdl<Data>("useToggleChannelVisibilityMutation", CHANNEL_VISIBILITY, {
+      input: { id: channelId, shouldShow: show, isJoinLeaveFlow: false },
+    }),
+    "toggleChannelVisibility",
+  );
 }
 
 /** Rename a channel (Teams' "Edit channel", name only). */
 export async function renameChannel(channelId: string, displayName: string): Promise<CdlRes<true>> {
-  const r = check<{ success?: boolean }>(await cdl<Data>("editChannelMutation", EDIT_CHANNEL, {
-    channelId, details: { displayName },
-  }), "editChannel", /Errors?$/);
+  const r = check<{ success?: boolean }>(
+    await cdl<Data>("editChannelMutation", EDIT_CHANNEL, {
+      channelId,
+      details: { displayName },
+    }),
+    "editChannel",
+    /Errors?$/,
+  );
   if (!r.ok) return r;
   return r.data.success === false ? { ok: false, reason: "editChannel refused" } : { ok: true, data: true };
 }
@@ -322,8 +352,12 @@ export async function renameChannel(channelId: string, displayName: string): Pro
 export async function deleteChannel(channelId: string, i: ChannelInfo): Promise<CdlRes<true>> {
   const r = await cdl<Data>("deleteChannelMutation", DELETE_CHANNEL, {
     input: {
-      id: channelId, displayName: i.displayName, isShown: !i.isHidden, isGeneral: i.isGeneral,
-      hostTeamId: i.teamId || null, hostTeamGroupId: i.groupId || null,
+      id: channelId,
+      displayName: i.displayName,
+      isShown: !i.isHidden,
+      isGeneral: i.isGeneral,
+      hostTeamId: i.teamId || null,
+      hostTeamGroupId: i.groupId || null,
     },
   });
   if (!r.ok) return r;
@@ -340,17 +374,23 @@ export async function createChannel(
   channel: { displayName: string; description: string; isPrivate: boolean; threads: boolean },
 ): Promise<CdlRes<string>> {
   const r = check<{ __typename?: string; id?: string; threadId?: string | null; errorType?: string }>(
-    await cdl<Data>("createChannelV2Mutation", CREATE_CHANNEL, {
-      team: { teamThreadId: team.teamId, teamGroupId: team.groupId },
-      channel: {
-        displayName: channel.displayName,
-        description: channel.description,
-        channelType: channel.isPrivate ? "Private" : "Standard",
-        // Teams' layout choice: threads (chat-like) or posts with replies.
-        chatModality: channel.threads ? "Conversational" : "PostReply",
+    await cdl<Data>(
+      "createChannelV2Mutation",
+      CREATE_CHANNEL,
+      {
+        team: { teamThreadId: team.teamId, teamGroupId: team.groupId },
+        channel: {
+          displayName: channel.displayName,
+          description: channel.description,
+          channelType: channel.isPrivate ? "Private" : "Standard",
+          // Teams' layout choice: threads (chat-like) or posts with replies.
+          chatModality: channel.threads ? "Conversational" : "PostReply",
+        },
       },
-    }, { timeoutMs: 60_000 }),
-    "createChannelV2", /Error/,
+      { timeoutMs: 60_000 },
+    ),
+    "createChannelV2",
+    /Error/,
   );
   if (!r.ok) return r;
   const d = r.data;
@@ -376,16 +416,29 @@ export async function listThreadMembers(threadId: string): Promise<CdlRes<Thread
   // Teams pages by 100; a few pages cover any team we'd show in a panel.
   for (let page = 0; page < 10; page++) {
     const r: CdlRes<{ members?: Data[]; nextLink?: string | null; error?: string | null }> = check(
-      await cdl<Data>("ComponentsThreadMembersTableGetMembersQuery", MEMBERS, {
-        threadId, roles: ["Admin", "User", "Guest"], nextLink,
-      }, { timeoutMs: 30_000 }), "threadMembersByRole");
+      await cdl<Data>(
+        "ComponentsThreadMembersTableGetMembersQuery",
+        MEMBERS,
+        {
+          threadId,
+          roles: ["Admin", "User", "Guest"],
+          nextLink,
+        },
+        { timeoutMs: 30_000 },
+      ),
+      "threadMembersByRole",
+    );
     if (!r.ok) return r;
     if (r.data.error) return { ok: false, reason: r.data.error };
     for (const m of r.data.members ?? []) {
       const u = (m.user ?? {}) as Data;
       out.push({
-        mri: String(u.id ?? ""), displayName: String(u.displayName ?? ""), jobTitle: String(u.jobTitle ?? ""),
-        role: String(m.role ?? ""), objectId: String(u.objectId ?? ""), tenantId: String(u.tenantId ?? ""),
+        mri: String(u.id ?? ""),
+        displayName: String(u.displayName ?? ""),
+        jobTitle: String(u.jobTitle ?? ""),
+        role: String(m.role ?? ""),
+        objectId: String(u.objectId ?? ""),
+        tenantId: String(u.tenantId ?? ""),
       });
     }
     nextLink = r.data.nextLink || null;
@@ -402,19 +455,34 @@ export type AddFailures = { mri: string; error: string }[];
  * is given (they must already be in its team).
  */
 export async function addThreadMembers(
-  team: { teamId: string; groupId: string }, channelId: string | null, mris: string[],
+  team: { teamId: string; groupId: string },
+  channelId: string | null,
+  mris: string[],
 ): Promise<CdlRes<AddFailures>> {
   const users = mris.map((userMri) => ({ userMri, role: "User" }));
   const name = channelId ? "addBulkMembersToPrivateChannel" : "addBulkMembersToTeam";
-  const r = check<{ erroredMembers?: Data[] }>(channelId
-    ? await cdl<Data>("addBulkMembersToPrivateChannelMutation", ADD_CHANNEL_MEMBERS,
-      { teamId: team.teamId, channelId, users }, { timeoutMs: 60_000 })
-    : await cdl<Data>("addBulkMembersToTeamMutation", ADD_TEAM_MEMBERS,
-      { teamId: team.teamId, groupId: team.groupId, users }, { timeoutMs: 60_000 }), name);
+  const r = check<{ erroredMembers?: Data[] }>(
+    channelId
+      ? await cdl<Data>(
+          "addBulkMembersToPrivateChannelMutation",
+          ADD_CHANNEL_MEMBERS,
+          { teamId: team.teamId, channelId, users },
+          { timeoutMs: 60_000 },
+        )
+      : await cdl<Data>(
+          "addBulkMembersToTeamMutation",
+          ADD_TEAM_MEMBERS,
+          { teamId: team.teamId, groupId: team.groupId, users },
+          { timeoutMs: 60_000 },
+        ),
+    name,
+  );
   if (!r.ok) return r;
   return {
     ok: true,
-    data: (r.data.erroredMembers ?? []).filter(Boolean).map((e) => ({ mri: String(e.id ?? ""), error: String(e.error ?? "") })),
+    data: (r.data.erroredMembers ?? [])
+      .filter(Boolean)
+      .map((e) => ({ mri: String(e.id ?? ""), error: String(e.error ?? "") })),
   };
 }
 
@@ -423,10 +491,25 @@ export async function addThreadMembers(
  * group) or a private channel (`threadId` the channel). The worker picks the
  * right service from the thread's type.
  */
-export async function removeThreadMember(threadId: string, groupId: string | null, m: ThreadMember): Promise<CdlRes<true>> {
-  const r = await cdl<Data>("removeThreadMembershipMutation", REMOVE_THREAD_MEMBER, {
-    threadId, groupId, userMri: m.mri, objectId: m.objectId || null, userTenantId: m.tenantId || null,
-  }, { timeoutMs: 30_000 });
+export async function removeThreadMember(
+  threadId: string,
+  groupId: string | null,
+  m: ThreadMember,
+): Promise<CdlRes<true>> {
+  const r = await cdl<Data>(
+    "removeThreadMembershipMutation",
+    REMOVE_THREAD_MEMBER,
+    {
+      threadId,
+      groupId,
+      userMri: m.mri,
+      objectId: m.objectId || null,
+      userTenantId: m.tenantId || null,
+    },
+    { timeoutMs: 30_000 },
+  );
   if (!r.ok) return r;
-  return r.data.removeThreadMembership === true ? { ok: true, data: true } : { ok: false, reason: "removeThreadMembership refused" };
+  return r.data.removeThreadMembership === true
+    ? { ok: true, data: true }
+    : { ok: false, reason: "removeThreadMembership refused" };
 }

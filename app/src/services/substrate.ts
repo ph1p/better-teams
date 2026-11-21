@@ -13,9 +13,19 @@ function uuid(): string {
 }
 
 const PEOPLE_FIELDS = [
-  "Id", "MRI", "DisplayName", "EmailAddresses", "PeopleType", "PeopleSubtype",
-  "UserPrincipalName", "GivenName", "Surname", "CompanyName", "JobTitle",
-  "ImAddress", "Department",
+  "Id",
+  "MRI",
+  "DisplayName",
+  "EmailAddresses",
+  "PeopleType",
+  "PeopleSubtype",
+  "UserPrincipalName",
+  "GivenName",
+  "Surname",
+  "CompanyName",
+  "JobTitle",
+  "ImAddress",
+  "Department",
 ];
 
 /** Raw People suggestions for `query`. `oid` anchors the request to the user's mailbox. */

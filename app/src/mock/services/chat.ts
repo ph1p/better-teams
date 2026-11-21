@@ -22,7 +22,10 @@ export async function sendMessage(i: SendInput): Promise<CdlRes<{ id: string; or
   return m ? { ok: true, data: { id: m.id, originalArrivalTime: new Date(m.time).toISOString() } } : no("unknown chat");
 }
 
-export async function deleteMessage(convId: string, msg: { id: string; clientMessageId: string }): Promise<CdlRes<true>> {
+export async function deleteMessage(
+  convId: string,
+  msg: { id: string; clientMessageId: string },
+): Promise<CdlRes<true>> {
   return store.setDeleted(convId, msg.id, true) ? done : no("not yours");
 }
 
@@ -44,7 +47,9 @@ export async function markUnread(convId: string, _last: MsgRef): Promise<CdlRes<
 
 export async function listMessages(convId: string, _cursor?: string): Promise<CdlRes<MessagePage>> {
   const list = store.recent(convId);
-  return list ? { ok: true, data: { messages: [...list].reverse(), older: null, available: true } } : no("unknown chat");
+  return list
+    ? { ok: true, data: { messages: [...list].reverse(), older: null, available: true } }
+    : no("unknown chat");
 }
 
 export async function setChatHidden(convId: string, hidden: boolean): Promise<CdlRes<true>> {

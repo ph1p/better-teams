@@ -17,7 +17,12 @@ export interface SideSection {
 
 // Unread filter: chats opened during this filter session stay listed (keep)
 // even once read, so the open chat never vanishes; leaving the filter drops them.
-export function buildSections(chats: Chat[], query: string, unreadOnly: boolean, keep: ReadonlySet<string>): SideSection[] {
+export function buildSections(
+  chats: Chat[],
+  query: string,
+  unreadOnly: boolean,
+  keep: ReadonlySet<string>,
+): SideSection[] {
   const q = query.toLowerCase().trim();
   if (q) {
     // Search: one flat result list, best matches first (title before team /
@@ -44,14 +49,18 @@ export function buildSections(chats: Chat[], query: string, unreadOnly: boolean,
   // busy team sits on top. Within a team, newest first (list order).
   const channels = rest.filter((c) => c.kind === "channel");
   const teamRank = new Map<string, number>();
-  channels.forEach((c, i) => { if (!teamRank.has(c.team)) teamRank.set(c.team, i); });
+  channels.forEach((c, i) => {
+    if (!teamRank.has(c.team)) teamRank.set(c.team, i);
+  });
   channels.sort((a, b) => teamRank.get(a.team)! - teamRank.get(b.team)!);
-  return ([
-    { id: "fav", rows: list.filter(pinned) },
-    { id: "dms", rows: rest.filter((c) => c.kind === "chat" && !c.app && !c.group) },
-    { id: "groups", rows: rest.filter((c) => c.kind === "chat" && c.group) },
-    { id: "channels", rows: channels, groupByTeam: true },
-    { id: "apps", rows: rest.filter((c) => c.app) },
-    { id: "meetings", rows: rest.filter((c) => c.kind === "meeting"), defaultCollapsed: true },
-  ] as SideSection[]).filter((s) => s.rows.length);
+  return (
+    [
+      { id: "fav", rows: list.filter(pinned) },
+      { id: "dms", rows: rest.filter((c) => c.kind === "chat" && !c.app && !c.group) },
+      { id: "groups", rows: rest.filter((c) => c.kind === "chat" && c.group) },
+      { id: "channels", rows: channels, groupByTeam: true },
+      { id: "apps", rows: rest.filter((c) => c.app) },
+      { id: "meetings", rows: rest.filter((c) => c.kind === "meeting"), defaultCollapsed: true },
+    ] as SideSection[]
+  ).filter((s) => s.rows.length);
 }

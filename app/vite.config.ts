@@ -39,27 +39,29 @@ const mockTeams = (): Plugin => ({
   },
 });
 
-export default defineConfig(({ mode }) => mode === "mock"
-  ? {
-      plugins: [mockTeams(), tailwindcss(), react()],
-      define: { __BUILD__: JSON.stringify("mock") },
-      server: { port: 5199, open: true },
-    }
-  : {
-      plugins: [tailwindcss(), react(), buildId()],
-      define: { "process.env.NODE_ENV": '"production"', __BUILD__: JSON.stringify(BUILD_PLACEHOLDER) },
-      build: {
-        outDir: "dist",
-        cssCodeSplit: false,
-        lib: {
-          entry: "src/mount.tsx",
-          name: "TeamsCalmApp",
-          formats: ["iife"],
-          fileName: () => "teams-calm-app.js",
+export default defineConfig(({ mode }) =>
+  mode === "mock"
+    ? {
+        plugins: [mockTeams(), tailwindcss(), react()],
+        define: { __BUILD__: JSON.stringify("mock") },
+        server: { port: 5199, open: true },
+      }
+    : {
+        plugins: [tailwindcss(), react(), buildId()],
+        define: { "process.env.NODE_ENV": '"production"', __BUILD__: JSON.stringify(BUILD_PLACEHOLDER) },
+        build: {
+          outDir: "dist",
+          cssCodeSplit: false,
+          lib: {
+            entry: "src/mount.tsx",
+            name: "TeamsCalmApp",
+            formats: ["iife"],
+            fileName: () => "teams-calm-app.js",
+          },
+          rollupOptions: {
+            output: { inlineDynamicImports: true },
+          },
+          minify: "esbuild",
         },
-        rollupOptions: {
-          output: { inlineDynamicImports: true },
-        },
-        minify: "esbuild",
       },
-    });
+);

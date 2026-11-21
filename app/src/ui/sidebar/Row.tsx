@@ -25,20 +25,40 @@ const preview = (chat: Chat): string => {
 
 // One conversation row in the sidebar. Compact: icon/avatar + name, the time
 // only on hover, the last message as a tooltip. Detailed: adds a preview line.
-export function Row({ chat, selected, compact, showTeam = true, onClick, onOpenProfile, onMenu }: RowProps): JSX.Element {
+export function Row({
+  chat,
+  selected,
+  compact,
+  showTeam = true,
+  onClick,
+  onOpenProfile,
+  onMenu,
+}: RowProps): JSX.Element {
   const { statusOf } = usePresence();
   const prev = preview(chat);
   const icon = chat.isChannel ? (
-    <div className="tc-av tc-hash"><Hash size={compact ? 13 : 16} /></div>
+    <div className="tc-av tc-hash">
+      <Hash size={compact ? 13 : 16} />
+    </div>
   ) : chat.kind === "meeting" ? (
-    <div className="tc-av tc-hash"><CalendarDays size={compact ? 13 : 16} /></div>
+    <div className="tc-av tc-hash">
+      <CalendarDays size={compact ? 13 : 16} />
+    </div>
   ) : chat.kind === "notes" ? (
-    <div className="tc-av tc-hash"><NotebookPen size={compact ? 13 : 16} /></div>
+    <div className="tc-av tc-hash">
+      <NotebookPen size={compact ? 13 : 16} />
+    </div>
   ) : chat.group ? (
     <GroupAvatar members={chat.members} small={compact} />
   ) : (
-    <Avatar name={chatTitle(chat)} uri={avatarUri(chat.avatarMri)} mri={chat.avatarMri} small={compact}
-      status={statusOf(chat.avatarMri)} onOpen={onOpenProfile} />
+    <Avatar
+      name={chatTitle(chat)}
+      uri={avatarUri(chat.avatarMri)}
+      mri={chat.avatarMri}
+      small={compact}
+      status={statusOf(chat.avatarMri)}
+      onOpen={onOpenProfile}
+    />
   );
   return (
     <div
@@ -67,7 +87,8 @@ export function Row({ chat, selected, compact, showTeam = true, onClick, onOpenP
       </div>
       {chat.liveCall ? (
         <span className="tc-row-live" title={t().sidebar.liveCall} aria-label={t().sidebar.liveCall}>
-          <span className="tc-live-dot" />{compact ? null : <Video size={12} />}
+          <span className="tc-live-dot" />
+          {compact ? null : <Video size={12} />}
         </span>
       ) : null}
       {chat.unread ? <span className="tc-unread" aria-label={t().sidebar.unreadDot} /> : null}

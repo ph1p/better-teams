@@ -19,7 +19,10 @@ import { claimMentions, escText, mentionEntry, mentionSpan, type MentionContent,
 
 // Private-use markers: mentions (M) and finished inline HTML (H) are swapped
 // out for these while the text is escaped and scanned for markup.
-const M0 = "", M1 = "", H0 = "", H1 = "";
+const M0 = "",
+  M1 = "",
+  H0 = "",
+  H1 = "";
 const MENTION_RE = /(\d+)/g;
 const STASH_RE = /(\d+)/g;
 
@@ -51,7 +54,10 @@ export function inOpenFence(textBeforeCaret: string): boolean {
 
 class Renderer {
   private stash: string[] = [];
-  constructor(private names: string[], private newId: () => string) {}
+  constructor(
+    private names: string[],
+    private newId: () => string,
+  ) {}
 
   /** Mention markers back to their literal `@Name` (inside code). */
   private literal(s: string): string {
@@ -72,9 +78,9 @@ class Renderer {
     // Code spans first: nothing inside them is markup.
     let s = src.replace(/`([^`\n]+)`/g, (_, code: string) => this.keep(`<code>${escText(this.literal(code))}</code>`));
     s = s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, (_, label: string, url: string) =>
-      this.link(url, escText(label)));
-    s = s.replace(/\bhttps?:\/\/[^\s<>-]*[^\s<>.,:;"'!?)\]-]/g, (url: string) =>
-      this.link(url, escText(url)));
+      this.link(url, escText(label)),
+    );
+    s = s.replace(/\bhttps?:\/\/[^\s<>-]*[^\s<>.,:;"'!?)\]-]/g, (url: string) => this.link(url, escText(url)));
     s = escText(s)
       .replace(/\*\*(?=\S)([^*\n]+?)(?<=\S)\*\*/g, "<strong>$1</strong>")
       .replace(/~~(?=\S)([^~\n]+?)(?<=\S)~~/g, "<s>$1</s>")
@@ -89,8 +95,10 @@ class Renderer {
     const id = "codeBlockEditor-" + this.newId();
     const body = lines.map((l) => escText(this.literal(l))).join("<br />");
     const cls = "language-" + (lang.toLowerCase() || "plaintext");
-    return `<p itemtype="http://schema.skype.com/CodeBlockEditor" id="${id}">&nbsp;</p>`
-      + `<pre class="${escAttr(cls)}" itemid="${id}"><code>${body}</code></pre>`;
+    return (
+      `<p itemtype="http://schema.skype.com/CodeBlockEditor" id="${id}">&nbsp;</p>` +
+      `<pre class="${escAttr(cls)}" itemid="${id}"><code>${body}</code></pre>`
+    );
   }
 
   blocks(lines: string[]): string {
@@ -124,7 +132,8 @@ class Renderer {
         flush();
         const tag = list === BULLET ? "ul" : "ol";
         html += `<${tag}>`;
-        for (; i < lines.length && list.test(lines[i]); i++) html += "<li>" + this.inline(list.exec(lines[i])![1]) + "</li>";
+        for (; i < lines.length && list.test(lines[i]); i++)
+          html += "<li>" + this.inline(list.exec(lines[i])![1]) + "</li>";
         i--;
         html += `</${tag}>`;
         continue;
@@ -150,7 +159,11 @@ class Renderer {
  * Mentions inside code stay literal text and are not sent as mentions.
  * `newId` names code blocks; pass a stable one to render a preview.
  */
-export function formatMessage(text: string, picks: readonly MentionPick[] = [], newId: () => string = uuid): MentionContent {
+export function formatMessage(
+  text: string,
+  picks: readonly MentionPick[] = [],
+  newId: () => string = uuid,
+): MentionContent {
   const body = text.replace(/\r\n?/g, "\n").replace(/^\n+|\s+$/g, "");
   const spans = claimMentions(body, picks);
   let src = "";
@@ -161,7 +174,10 @@ export function formatMessage(text: string, picks: readonly MentionPick[] = [], 
   });
   src += body.slice(cursor);
 
-  const raw = new Renderer(spans.map((s) => s.pick.name), newId).blocks(src.split("\n"));
+  const raw = new Renderer(
+    spans.map((s) => s.pick.name),
+    newId,
+  ).blocks(src.split("\n"));
 
   // Number the surviving mentions in document order.
   const entries: string[] = [];

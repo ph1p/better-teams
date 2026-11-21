@@ -56,13 +56,13 @@ delete it to remove everything.
 
 ## Troubleshooting
 
-| Symptom | Fix |
-| --- | --- |
-| Overlay gone after a Teams update | Run `teams-calm`. |
-| Teams misbehaves or won't start | `teams-calm off`, then report the Teams version from `teams-calm status`. |
-| `client-bindings/bundle.js missing` | This Teams build loads differently and is not supported. |
-| `teams-calm: command not found` | Add `~/.local/bin` to `PATH` (the installer prints the line). |
-| Teams did not quit | Quit it from the menu bar, then run the command again. |
+| Symptom                             | Fix                                                                       |
+| ----------------------------------- | ------------------------------------------------------------------------- |
+| Overlay gone after a Teams update   | Run `teams-calm`.                                                         |
+| Teams misbehaves or won't start     | `teams-calm off`, then report the Teams version from `teams-calm status`. |
+| `client-bindings/bundle.js missing` | This Teams build loads differently and is not supported.                  |
+| `teams-calm: command not found`     | Add `~/.local/bin` to `PATH` (the installer prints the line).             |
+| Teams did not quit                  | Quit it from the menu bar, then run the command again.                    |
 
 ## Develop
 

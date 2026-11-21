@@ -66,7 +66,10 @@ function touch(convId: string): Pending {
 export function withPending<T extends { title: string; muted: boolean; members: string[] }>(convId: string, idb: T): T {
   const p = pending.get(convId);
   if (!p) return idb;
-  if (Date.now() - p.at > OVERRIDE_MS) { pending.delete(convId); return idb; }
+  if (Date.now() - p.at > OVERRIDE_MS) {
+    pending.delete(convId);
+    return idb;
+  }
   const out = { ...idb };
   if (p.title !== undefined) {
     if (idb.title === p.title) p.title = undefined;
@@ -80,8 +83,10 @@ export function withPending<T extends { title: string; muted: boolean; members: 
     const have = new Set(idb.members);
     for (const [mri, inChat] of p.members) if (have.has(mri) === inChat) p.members.delete(mri);
     if (p.members.size) {
-      out.members = [...idb.members.filter((m) => p.members!.get(m) !== false),
-        ...[...p.members].filter(([m, inChat]) => inChat && !have.has(m)).map(([m]) => m)];
+      out.members = [
+        ...idb.members.filter((m) => p.members!.get(m) !== false),
+        ...[...p.members].filter(([m, inChat]) => inChat && !have.has(m)).map(([m]) => m),
+      ];
     } else p.members = undefined;
   }
   if (p.title === undefined && p.muted === undefined && !p.members) pending.delete(convId);
@@ -99,7 +104,11 @@ export async function renameChat(conversationId: string, title: string): Promise
   return toWrite(r, "cdl");
 }
 
-export async function addChatMembers(conversationId: string, mris: string[], shareHistoryDays = 0): Promise<WriteResult> {
+export async function addChatMembers(
+  conversationId: string,
+  mris: string[],
+  shareHistoryDays = 0,
+): Promise<WriteResult> {
   if (!mris.length) return { ok: true };
   const r = await groups.addMembers(conversationId, mris, shareHistoryDays);
   if (r.ok) {
@@ -150,14 +159,27 @@ export async function getChannelActions(channelId: string): Promise<ChannelActio
     rename: i.canEdit,
     delete: i.canDelete && !i.isGeneral,
     create: i.canAddChannel && !!i.teamId && !!i.groupId,
-    channelId, teamId: i.teamId, groupId: i.groupId,
-    members: null, addMembers: false, removeMembers: false,
+    channelId,
+    teamId: i.teamId,
+    groupId: i.groupId,
+    members: null,
+    addMembers: false,
+    removeMembers: false,
   };
   const teamOwner = i.teamRole === "ADMIN";
   if (i.channelType === "STANDARD" || i.isGeneral) {
-    if (i.teamId) Object.assign(v, { members: "team", addMembers: teamOwner && i.canAddTeamMember && !!i.groupId, removeMembers: teamOwner && !!i.groupId });
+    if (i.teamId)
+      Object.assign(v, {
+        members: "team",
+        addMembers: teamOwner && i.canAddTeamMember && !!i.groupId,
+        removeMembers: teamOwner && !!i.groupId,
+      });
   } else if (i.channelType === "PRIVATE") {
-    Object.assign(v, { members: "channel", addMembers: i.canAddMembers && !!i.teamId, removeMembers: i.channelRole === "ADMIN" });
+    Object.assign(v, {
+      members: "channel",
+      addMembers: i.canAddMembers && !!i.teamId,
+      removeMembers: i.channelRole === "ADMIN",
+    });
   }
   actionsCache.set(channelId, { at: Date.now(), v });
   return v;
@@ -166,10 +188,14 @@ export async function getChannelActions(channelId: string): Promise<ChannelActio
 /** Leave or hide the channel itself, as getChannelActions decided. */
 export async function leaveChannel(a: ChannelActions): Promise<WriteResult> {
   if (!a.channel) return { ok: false, reason: "can't leave this channel" };
-  const r = a.channel === "leave"
-    ? await groups.leaveChannel(a.channelId, a.teamId)
-    : await groups.setChannelVisibility(a.channelId, false);
-  if (r.ok) { departed.add(a.channelId); actionsCache.delete(a.channelId); }
+  const r =
+    a.channel === "leave"
+      ? await groups.leaveChannel(a.channelId, a.teamId)
+      : await groups.setChannelVisibility(a.channelId, false);
+  if (r.ok) {
+    departed.add(a.channelId);
+    actionsCache.delete(a.channelId);
+  }
   return toWrite(r, "cdl");
 }
 
@@ -179,7 +205,10 @@ export async function deleteChannel(a: ChannelActions): Promise<WriteResult> {
   const i = await groups.getChannelInfo(a.channelId);
   if (!i.ok) return toWrite(i, "cdl");
   const r = await groups.deleteChannel(a.channelId, i.data);
-  if (r.ok) { departed.add(a.channelId); actionsCache.delete(a.channelId); }
+  if (r.ok) {
+    departed.add(a.channelId);
+    actionsCache.delete(a.channelId);
+  }
   return toWrite(r, "cdl");
 }
 
@@ -188,7 +217,11 @@ export type CreateResult = { ok: true; id: string } | { ok: false; reason: strin
 
 /** Add a channel to the team `a` belongs to; `threads` picks Teams' threads layout over posts. */
 export async function createChannel(
-  a: ChannelActions, name: string, description: string, isPrivate: boolean, threads: boolean,
+  a: ChannelActions,
+  name: string,
+  description: string,
+  isPrivate: boolean,
+  threads: boolean,
 ): Promise<CreateResult> {
   const displayName = name.trim();
   if (!a.create) return { ok: false, reason: "can't add channels to this team" };
@@ -212,7 +245,10 @@ export async function addChannelMembers(a: ChannelActions, mris: string[]): Prom
   if (!a.addMembers || !a.members) return { ok: false, reason: "can't add members here" };
   if (!mris.length) return { ok: true };
   const r = await groups.addThreadMembers(
-    { teamId: a.teamId, groupId: a.groupId }, a.members === "channel" ? a.channelId : null, mris);
+    { teamId: a.teamId, groupId: a.groupId },
+    a.members === "channel" ? a.channelId : null,
+    mris,
+  );
   if (!r.ok) return toWrite(r, "cdl");
   if (r.data.length) return { ok: false, reason: [...new Set(r.data.map((e) => e.error))].join(", ") };
   return { ok: true, via: "cdl" };
@@ -229,7 +265,10 @@ export async function removeChannelMember(a: ChannelActions, m: ChannelMember): 
 export async function leaveTeam(a: ChannelActions): Promise<WriteResult> {
   if (!a.team) return { ok: false, reason: "can't leave this team" };
   const r = await groups.leaveTeam(a.teamId, a.groupId);
-  if (r.ok) { departed.add(a.teamId); actionsCache.clear(); }
+  if (r.ok) {
+    departed.add(a.teamId);
+    actionsCache.clear();
+  }
   return toWrite(r, "cdl");
 }
 
@@ -247,7 +286,9 @@ export async function getChannelNotifications(channelId: string): Promise<Channe
 }
 
 export async function setChannelNotifications(
-  channelId: string, preset: ChannelPreset, current?: ChannelNotifications | null,
+  channelId: string,
+  preset: ChannelPreset,
+  current?: ChannelNotifications | null,
 ): Promise<WriteResult> {
   return toWrite(await groups.setChannelNotifications(channelId, preset, current ?? undefined), "cdl");
 }

@@ -27,7 +27,9 @@ import { t, useLang } from "../i18n";
 export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   // Re-render everything on a language switch; tag the overlay for screen readers.
   const uiLang = useLang();
-  useEffect(() => { document.getElementById("tc-root")?.setAttribute("lang", uiLang); }, [uiLang]);
+  useEffect(() => {
+    document.getElementById("tc-root")?.setAttribute("lang", uiLang);
+  }, [uiLang]);
   const [toast, flash] = useToast();
   const { chats, setChats, chatsRef, error, sel, setSel } = useChatList();
   const [query, setQuery] = useState("");
@@ -78,47 +80,67 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   );
   const unreadCount = useMemo(() => chats.filter((c) => c.unread && !c.hidden).length, [chats]);
 
-  const pick = useCallback((id: string): void => {
-    setSel(id);
-    if (unreadOnly) setKeep((k) => (k.has(id) ? k : new Set(k).add(id)));
-    // Opening a chat marks it read in Teams, same as the native client. Fire the
-    // write and flip our flag only when the chat was actually unread; put the
-    // flag back when the write fails, so the list doesn't lie until next poll.
-    const hit = chatsRef.current.find((c) => c.id === id);
-    if (hit && hit.unread) {
-      setChats((cs) => cs.map((c) => (c.id === id ? { ...c, unread: false } : c)));
-      markRead(id, hit.time).then((res) => {
-        if (res.ok) return;
-        setChats((cs) => cs.map((c) => (c.id === id ? { ...c, unread: true } : c)));
-        flash(t().app.markReadFailed(res.reason));
+  const pick = useCallback(
+    (id: string): void => {
+      setSel(id);
+      if (unreadOnly) setKeep((k) => (k.has(id) ? k : new Set(k).add(id)));
+      // Opening a chat marks it read in Teams, same as the native client. Fire the
+      // write and flip our flag only when the chat was actually unread; put the
+      // flag back when the write fails, so the list doesn't lie until next poll.
+      const hit = chatsRef.current.find((c) => c.id === id);
+      if (hit && hit.unread) {
+        setChats((cs) => cs.map((c) => (c.id === id ? { ...c, unread: false } : c)));
+        markRead(id, hit.time).then((res) => {
+          if (res.ok) return;
+          setChats((cs) => cs.map((c) => (c.id === id ? { ...c, unread: true } : c)));
+          flash(t().app.markReadFailed(res.reason));
+        });
+      }
+      requestAnimationFrame(() => {
+        document.querySelector(`#tc-root .tc-row[data-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest" });
       });
-    }
-    requestAnimationFrame(() => {
-      document.querySelector(`#tc-root .tc-row[data-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest" });
-    });
-  }, [flash, unreadOnly, setSel, setChats, chatsRef]);
+    },
+    [flash, unreadOnly, setSel, setChats, chatsRef],
+  );
 
   // Turn the Unread filter on/off. Turning it on opens the newest unread chat
   // unless the open one is unread itself; an already-read open chat is not
   // carried into the filter.
-  const setUnreadFilter = useCallback((on: boolean): void => {
-    setUnreadOnly(on);
-    const cur = chatsRef.current.find((c) => c.id === sel);
-    setKeep(new Set(on && cur && cur.unread ? [cur.id] : []));
-    if (!on || (cur && cur.unread)) return;
-    const u = chatsRef.current.find((c) => c.unread && !c.hidden);
-    if (u) {
-      setKeep(new Set([u.id]));
-      pick(u.id);
-    }
-  }, [sel, pick, chatsRef]);
+  const setUnreadFilter = useCallback(
+    (on: boolean): void => {
+      setUnreadOnly(on);
+      const cur = chatsRef.current.find((c) => c.id === sel);
+      setKeep(new Set(on && cur && cur.unread ? [cur.id] : []));
+      if (!on || (cur && cur.unread)) return;
+      const u = chatsRef.current.find((c) => c.unread && !c.hidden);
+      if (u) {
+        setKeep(new Set([u.id]));
+        pick(u.id);
+      }
+    },
+    [sel, pick, chatsRef],
+  );
 
-  const closeMsgSearch = (): void => { setMsgSearch(""); setMsgSearchOpen(false); };
-  const toggleNotes = (): void => { setProfileMri(null); setNotesOpen((o) => !o); };
+  const closeMsgSearch = (): void => {
+    setMsgSearch("");
+    setMsgSearchOpen(false);
+  };
+  const toggleNotes = (): void => {
+    setProfileMri(null);
+    setNotesOpen((o) => !o);
+  };
 
   useShortcuts({
-    flat, sel, pick, searchRef: search, msgSearchOpen,
-    openMsgSearch: () => setMsgSearchOpen(true), closeMsgSearch, toggleNotes, unreadOnly, setUnreadFilter,
+    flat,
+    sel,
+    pick,
+    searchRef: search,
+    msgSearchOpen,
+    openMsgSearch: () => setMsgSearchOpen(true),
+    closeMsgSearch,
+    toggleNotes,
+    unreadOnly,
+    setUnreadFilter,
   });
 
   // A chat Teams opens by itself (a notification click) opens here too, ready
@@ -138,12 +160,15 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     if (!ok) console.info("teams-calm: chat row not rendered in Teams sidebar:", selChat.title);
   }
 
-  const openProfile = useCallback((mri: string): void => { if (mri) setProfileMri(mri); }, []);
+  const openProfile = useCallback((mri: string): void => {
+    if (mri) setProfileMri(mri);
+  }, []);
 
   const toggleThread = useCallback((rootId: string): void => {
     setOpenThreads((s) => {
       const n = new Set(s);
-      if (n.has(rootId)) n.delete(rootId); else n.add(rootId);
+      if (n.has(rootId)) n.delete(rootId);
+      else n.add(rootId);
       return n;
     });
   }, []);
@@ -151,33 +176,42 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   // Jump to a quoted message: scroll it into view and flash a highlight. If it's
   // not in the DOM (scrolled out / not paged in yet), page older until found.
   const { scroller, noMore, loadOlder } = m;
-  const onJumpTo = useCallback((mid: string): void => {
-    const target = String(mid);
-    const tryScroll = (): boolean => {
-      const el = scroller.current?.querySelector(`.tc-msg[data-mid="${CSS.escape(target)}"]`);
-      if (!el) return false;
-      el.scrollIntoView({ block: "center", behavior: "smooth" });
-      el.classList.add("tc-flash");
-      setTimeout(() => el.classList.remove("tc-flash"), 1400);
-      return true;
-    };
-    if (tryScroll()) return;
-    // Hidden in a collapsed channel thread: expand it, then scroll.
-    const root = msgRoot.current.get(target);
-    if (root) {
-      setOpenThreads((s) => new Set(s).add(root));
-      requestAnimationFrame(() => requestAnimationFrame(() => { tryScroll(); }));
-      return;
-    }
-    // Not loaded: page older up to a few times, then scroll.
-    let n = 0;
-    const pump = async (): Promise<void> => {
-      if (n++ > 12 || noMore.current) return;
-      await loadOlder();
-      requestAnimationFrame(() => { if (!tryScroll()) pump(); });
-    };
-    pump();
-  }, [loadOlder, scroller, noMore]);
+  const onJumpTo = useCallback(
+    (mid: string): void => {
+      const target = String(mid);
+      const tryScroll = (): boolean => {
+        const el = scroller.current?.querySelector(`.tc-msg[data-mid="${CSS.escape(target)}"]`);
+        if (!el) return false;
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+        el.classList.add("tc-flash");
+        setTimeout(() => el.classList.remove("tc-flash"), 1400);
+        return true;
+      };
+      if (tryScroll()) return;
+      // Hidden in a collapsed channel thread: expand it, then scroll.
+      const root = msgRoot.current.get(target);
+      if (root) {
+        setOpenThreads((s) => new Set(s).add(root));
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            tryScroll();
+          }),
+        );
+        return;
+      }
+      // Not loaded: page older up to a few times, then scroll.
+      let n = 0;
+      const pump = async (): Promise<void> => {
+        if (n++ > 12 || noMore.current) return;
+        await loadOlder();
+        requestAnimationFrame(() => {
+          if (!tryScroll()) pump();
+        });
+      };
+      pump();
+    },
+    [loadOlder, scroller, noMore],
+  );
 
   // Open the right-click menu for a chat row.
   const openMenu = useCallback((e: MouseEvent, chat: Chat): void => {
@@ -197,29 +231,39 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   // the filtered set so the result reads naturally.
   const mq = msgSearchOpen ? msgSearch.toLowerCase().trim() : "";
   const visible = mq
-    ? m.shown.filter((x) => !x.deleted && (
-        messageText(x).toLowerCase().includes(mq) ||
-        (x.from || "").toLowerCase().includes(mq)
-      ))
+    ? m.shown.filter(
+        (x) => !x.deleted && (messageText(x).toLowerCase().includes(mq) || (x.from || "").toLowerCase().includes(mq)),
+      )
     : m.shown;
 
   return (
     <>
       <Sidebar
-        sections={sections} selfSlot={selfSlot} sel={sel} error={error}
-        compact={compact} onToggleCompact={() => setCompact((c) => !c)}
+        sections={sections}
+        selfSlot={selfSlot}
+        sel={sel}
+        error={error}
+        compact={compact}
+        onToggleCompact={() => setCompact((c) => !c)}
         onNewChat={() => a.setNewChat({ people: [], draft: false })}
-        query={query} onQuery={setQuery} searchRef={search}
+        query={query}
+        onQuery={setQuery}
+        searchRef={search}
         onSearchEnter={() => {
           if (!flat[0]) return;
           pick(flat[0].id);
           setQuery("");
           cs.composer.current?.focus();
         }}
-        unreadOnly={unreadOnly} unreadCount={unreadCount} onUnreadFilter={setUnreadFilter}
-        onPick={pick} onOpenProfile={openProfile} onMenu={openMenu}
+        unreadOnly={unreadOnly}
+        unreadCount={unreadCount}
+        onUnreadFilter={setUnreadFilter}
+        onPick={pick}
+        onOpenProfile={openProfile}
+        onMenu={openMenu}
         onAddChannel={(c) => void a.openNewChannel(c)}
-        onHide={onHide} onError={(msg) => flash(msg, 4000)}
+        onHide={onHide}
+        onError={(msg) => flash(msg, 4000)}
       />
 
       <main className="tc-main">
@@ -228,8 +272,10 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
             <ChatHeader
               key={selChat.id}
               chat={selChat}
-              searchOpen={msgSearchOpen} onToggleSearch={() => setMsgSearchOpen((o) => !o)}
-              notesOpen={notesOpen} onToggleNotes={toggleNotes}
+              searchOpen={msgSearchOpen}
+              onToggleSearch={() => setMsgSearchOpen((o) => !o)}
+              notesOpen={notesOpen}
+              onToggleNotes={toggleNotes}
               onOpenProfile={openProfile}
               onJoinCall={(rootId) => void a.joinCall(rootId)}
               onMeetNow={() => void a.meetNow()}
@@ -244,29 +290,58 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
               onNewChannel={a.setNewChannel}
             />
             {msgSearchOpen ? (
-              <MessageSearchBar query={msgSearch} onQuery={setMsgSearch} matches={visible.length} onClose={closeMsgSearch} />
+              <MessageSearchBar
+                query={msgSearch}
+                onQuery={setMsgSearch}
+                matches={visible.length}
+                onClose={closeMsgSearch}
+              />
             ) : null}
             <div className="tc-msgs-wrap">
               {m.stickyDay && !mq ? (
-                <div className="tc-day-sticky"><span>{m.stickyDay}</span></div>
+                <div className="tc-day-sticky">
+                  <span>{m.stickyDay}</span>
+                </div>
               ) : null}
               <div
-                className="tc-msgs" ref={m.scroller} onScroll={m.onScroll}
+                className="tc-msgs"
+                ref={m.scroller}
+                onScroll={m.onScroll}
                 // At scrollTop 0 the wheel fires no scroll event: retry paging on it.
-                onWheel={(e) => { if (e.deltaY < 0 && e.currentTarget.scrollTop < 60) void m.loadOlder(); }}
+                onWheel={(e) => {
+                  if (e.deltaY < 0 && e.currentTarget.scrollTop < 60) void m.loadOlder();
+                }}
               >
                 <div className="tc-msgs-inner" ref={m.content}>
-                <Timeline
-                  visible={visible} cid={selChat.id} chat={selChat} channel={selIsChannel}
-                  pending={m.myPending} mq={mq} searchText={msgSearch}
-                  openThreads={openThreads} onToggleThread={toggleThread}
-                  replyingTo={cs.threadTo?.rootId} msgRoot={msgRoot}
-                  loading={m.loading} ready={m.ready} failed={m.failed} empty={!m.shown.length}
-                  onRetry={m.refetch} onOpenInTeams={() => void openInTeams()}
-                  onReact={m.react} onDelete={m.remove} onRemoveFile={m.removeFile} onUndo={m.undo} onEdit={m.edit}
-                  onOpenProfile={openProfile} onQuote={cs.onQuote} onJumpTo={onJumpTo}
-                  onThreadReply={cs.onThreadReply} onJoinCall={(rootId) => void a.joinCall(rootId)}
-                />
+                  <Timeline
+                    visible={visible}
+                    cid={selChat.id}
+                    chat={selChat}
+                    channel={selIsChannel}
+                    pending={m.myPending}
+                    mq={mq}
+                    searchText={msgSearch}
+                    openThreads={openThreads}
+                    onToggleThread={toggleThread}
+                    replyingTo={cs.threadTo?.rootId}
+                    msgRoot={msgRoot}
+                    loading={m.loading}
+                    ready={m.ready}
+                    failed={m.failed}
+                    empty={!m.shown.length}
+                    onRetry={m.refetch}
+                    onOpenInTeams={() => void openInTeams()}
+                    onReact={m.react}
+                    onDelete={m.remove}
+                    onRemoveFile={m.removeFile}
+                    onUndo={m.undo}
+                    onEdit={m.edit}
+                    onOpenProfile={openProfile}
+                    onQuote={cs.onQuote}
+                    onJumpTo={onJumpTo}
+                    onThreadReply={cs.onThreadReply}
+                    onJoinCall={(rootId) => void a.joinCall(rootId)}
+                  />
                 </div>
               </div>
             </div>
@@ -294,7 +369,9 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
         <NewChannel
           team={a.newChannel.team}
           known={a.knownPeople}
-          onCreate={(name, desc, priv, threads, people) => a.createChannel(a.newChannel!, name, desc, priv, threads, people)}
+          onCreate={(name, desc, priv, threads, people) =>
+            a.createChannel(a.newChannel!, name, desc, priv, threads, people)
+          }
           onClose={() => a.setNewChannel(null)}
         />
       ) : null}
@@ -304,18 +381,23 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
           mri={profileMri}
           chats={sharedChats}
           sel={sel}
-          onPick={(id) => { pick(id); setProfileMri(null); }}
+          onPick={(id) => {
+            pick(id);
+            setProfileMri(null);
+          }}
           onClose={() => setProfileMri(null)}
-          onMessage={() => { void a.startDirect(profileMri); setProfileMri(null); }}
-          onCall={(kind) => { void a.startCall([profileMri], kind); setProfileMri(null); }}
+          onMessage={() => {
+            void a.startDirect(profileMri);
+            setProfileMri(null);
+          }}
+          onCall={(kind) => {
+            void a.startCall([profileMri], kind);
+            setProfileMri(null);
+          }}
         />
       ) : null}
 
-      {notesOpen && !profileMri ? (
-        <NotesPanel
-          onClose={() => setNotesOpen(false)}
-        />
-      ) : null}
+      {notesOpen && !profileMri ? <NotesPanel onClose={() => setNotesOpen(false)} /> : null}
 
       {menu ? (
         <ChatMenu

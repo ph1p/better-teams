@@ -32,7 +32,9 @@ function ImageStage({ item }: { item: ViewerItem }): JSX.Element {
   return (
     <div className={"tc-viewer-stage image" + (zoom ? " zoomed" : "")}>
       {state === "loading" ? <LoaderCircle className="tc-viewer-spin" size={28} /> : null}
-      {state === "error" ? <NoPreview item={item} reason={t().app.imageLoadFailed} /> : (
+      {state === "error" ? (
+        <NoPreview item={item} reason={t().app.imageLoadFailed} />
+      ) : (
         <img
           src={item.image}
           alt={item.name}
@@ -84,7 +86,8 @@ function TextStage({ item, src }: { item: ViewerItem; src: string }): JSX.Elemen
       try {
         const r = await fetch(src, { credentials: "include", signal: ctl.signal });
         // A sign-in or error page instead of the file counts as a failure.
-        if (!r.ok || /text\/html/.test(r.headers.get("content-type") || "") && !/^html?$/.test(item.ext)) throw new Error();
+        if (!r.ok || (/text\/html/.test(r.headers.get("content-type") || "") && !/^html?$/.test(item.ext)))
+          throw new Error();
         // Stream only the first TEXT_MAX bytes; a huge log is never downloaded whole.
         const parts: BlobPart[] = [];
         let size = 0;
@@ -95,7 +98,11 @@ function TextStage({ item, src }: { item: ViewerItem; src: string }): JSX.Elemen
           if (done) break;
           parts.push(value);
           size += value.length;
-          if (size > TEXT_MAX) { more = true; void reader.cancel(); break; }
+          if (size > TEXT_MAX) {
+            more = true;
+            void reader.cancel();
+            break;
+          }
         }
         const body = await new Blob(parts).slice(0, TEXT_MAX).text();
         setText(more ? body + "\n\n" + t().app.textTruncated : body);
@@ -105,10 +112,19 @@ function TextStage({ item, src }: { item: ViewerItem; src: string }): JSX.Elemen
     })();
     return () => ctl.abort();
   }, [src, item.ext]);
-  if (text === null) return <div className="tc-viewer-stage"><NoPreview item={item} reason={t().app.textLoadFailed} /></div>;
+  if (text === null)
+    return (
+      <div className="tc-viewer-stage">
+        <NoPreview item={item} reason={t().app.textLoadFailed} />
+      </div>
+    );
   return (
     <div className="tc-viewer-stage text">
-      {text === undefined ? <LoaderCircle className="tc-viewer-spin" size={28} /> : <pre>{text || t().app.emptyFile}</pre>}
+      {text === undefined ? (
+        <LoaderCircle className="tc-viewer-spin" size={28} />
+      ) : (
+        <pre>{text || t().app.emptyFile}</pre>
+      )}
     </div>
   );
 }
@@ -120,8 +136,16 @@ function NoPreview({ item, reason }: { item: ViewerItem; reason?: string }): JSX
       <strong>{item.name}</strong>
       <span>{reason || (item.url || item.download ? t().app.noPreviewType : t().app.noLink)}</span>
       <div className="tc-viewer-none-acts">
-        {item.url ? <a className="tc-viewer-cta" href={item.url} target="_blank" rel="noreferrer noopener"><ExternalLink size={14} /> {t().common.openInBrowser}</a> : null}
-        {item.download ? <a className="tc-viewer-cta ghost" href={item.download} target="_blank" rel="noreferrer noopener"><Download size={14} /> {t().app.download}</a> : null}
+        {item.url ? (
+          <a className="tc-viewer-cta" href={item.url} target="_blank" rel="noreferrer noopener">
+            <ExternalLink size={14} /> {t().common.openInBrowser}
+          </a>
+        ) : null}
+        {item.download ? (
+          <a className="tc-viewer-cta ghost" href={item.download} target="_blank" rel="noreferrer noopener">
+            <Download size={14} /> {t().app.download}
+          </a>
+        ) : null}
       </div>
     </div>
   );
@@ -171,11 +195,21 @@ export function FileViewer(): JSX.Element | null {
         <KindIcon kind={item.kind} className="tc-viewer-icon" size={16} />
         <div className="tc-viewer-title">
           <strong title={item.name}>{item.name}</strong>
-          <small>{[meta(item), many ? t().app.nOfM(v.index + 1, v.items.length) : ""].filter(Boolean).join(" · ")}</small>
+          <small>
+            {[meta(item), many ? t().app.nOfM(v.index + 1, v.items.length) : ""].filter(Boolean).join(" · ")}
+          </small>
         </div>
         <div className="tc-viewer-acts">
           {item.download ? (
-            <a className="tc-viewer-btn" href={item.download} target="_blank" rel="noreferrer noopener" title={t().app.download}><Download size={17} /></a>
+            <a
+              className="tc-viewer-btn"
+              href={item.download}
+              target="_blank"
+              rel="noreferrer noopener"
+              title={t().app.download}
+            >
+              <Download size={17} />
+            </a>
           ) : item.image ? (
             <button className="tc-viewer-btn" onClick={save} disabled={saving} title={t().app.saveImage}>
               {saving ? <LoaderCircle className="tc-viewer-spin inline" size={17} /> : <Download size={17} />}
@@ -183,25 +217,48 @@ export function FileViewer(): JSX.Element | null {
           ) : null}
           {item.url ? (
             <>
-              <button className="tc-viewer-btn" onClick={() => copy(item.url!)} title={t().app.copyLink}>{copied ? <Check size={17} /> : <Link2 size={17} />}</button>
-              <a className="tc-viewer-btn" href={item.url} target="_blank" rel="noreferrer noopener" title={t().common.openInBrowser}><ExternalLink size={17} /></a>
+              <button className="tc-viewer-btn" onClick={() => copy(item.url!)} title={t().app.copyLink}>
+                {copied ? <Check size={17} /> : <Link2 size={17} />}
+              </button>
+              <a
+                className="tc-viewer-btn"
+                href={item.url}
+                target="_blank"
+                rel="noreferrer noopener"
+                title={t().common.openInBrowser}
+              >
+                <ExternalLink size={17} />
+              </a>
             </>
           ) : null}
           <span className="tc-viewer-sep" />
-          <button ref={closeBtn} className="tc-viewer-btn" onClick={closeViewer} title={t().app.closeEsc}><X size={18} /></button>
+          <button ref={closeBtn} className="tc-viewer-btn" onClick={closeViewer} title={t().app.closeEsc}>
+            <X size={18} />
+          </button>
         </div>
       </header>
 
       {/* key: reset zoom/loading state per item */}
-      {item.image ? <ImageStage key={v.index + item.image} item={item} />
-        : text ? <TextStage key={v.index + text} item={item} src={text} />
-        : item.embed ? <FrameStage key={v.index + item.embed} item={item} />
-        : <div className="tc-viewer-stage"><NoPreview item={item} /></div>}
+      {item.image ? (
+        <ImageStage key={v.index + item.image} item={item} />
+      ) : text ? (
+        <TextStage key={v.index + text} item={item} src={text} />
+      ) : item.embed ? (
+        <FrameStage key={v.index + item.embed} item={item} />
+      ) : (
+        <div className="tc-viewer-stage">
+          <NoPreview item={item} />
+        </div>
+      )}
 
       {many ? (
         <>
-          <button className="tc-viewer-nav prev" onClick={() => stepViewer(-1)} title={t().app.previous}><ChevronLeft size={22} /></button>
-          <button className="tc-viewer-nav next" onClick={() => stepViewer(1)} title={t().app.next}><ChevronRight size={22} /></button>
+          <button className="tc-viewer-nav prev" onClick={() => stepViewer(-1)} title={t().app.previous}>
+            <ChevronLeft size={22} />
+          </button>
+          <button className="tc-viewer-nav next" onClick={() => stepViewer(1)} title={t().app.next}>
+            <ChevronRight size={22} />
+          </button>
         </>
       ) : null}
     </div>

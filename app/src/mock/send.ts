@@ -24,7 +24,11 @@ function callNotice(what: string): WriteResult {
   return { ok: false, reason: "mock: calls need Teams" };
 }
 
-export async function startNativeCall(_conversationId: string, title: string, kind: "audio" | "video"): Promise<WriteResult> {
+export async function startNativeCall(
+  _conversationId: string,
+  title: string,
+  kind: "audio" | "video",
+): Promise<WriteResult> {
   return callNotice(`${kind} call with ${title}`);
 }
 
@@ -48,7 +52,10 @@ export async function openNativeDirect(upn: string, oid?: string): Promise<NewCh
   return openNativeNewChat([{ upn, ...(oid ? { oid } : {}) }]);
 }
 
-export async function sendNativeDraft(people: PickPerson[], text: string): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
+export async function sendNativeDraft(
+  people: PickPerson[],
+  text: string,
+): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
   const r = await openNativeNewChat(people);
   if (!r.ok) return r;
   const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
@@ -58,22 +65,37 @@ export async function sendNativeDraft(people: PickPerson[], text: string): Promi
 
 export async function sendMessage(conversationId: string, _title: string, text: string): Promise<WriteResult> {
   const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return store.post(conversationId, ME, `<p>${esc}</p>`) ? { ok: true, via: "mock" } : { ok: false, reason: "unknown chat" };
+  return store.post(conversationId, ME, `<p>${esc}</p>`)
+    ? { ok: true, via: "mock" }
+    : { ok: false, reason: "unknown chat" };
 }
 
 // Uploads are instant here; images preview from the picked file itself.
-export async function sendFiles(conversationId: string, _title: string, text: string, files: File[]): Promise<WriteResult> {
+export async function sendFiles(
+  conversationId: string,
+  _title: string,
+  text: string,
+  files: File[],
+): Promise<WriteResult> {
   if (!files.length) return { ok: false, reason: "empty" };
   const refs = files.map((f): FileRef => {
     const ext = extOf(f.name);
     const url = URL.createObjectURL(f);
-    return f.type.startsWith("image/") ? { name: f.name, url, ext, preview: { url, width: 0, height: 0 } } : { name: f.name, url, ext };
+    return f.type.startsWith("image/")
+      ? { name: f.name, url, ext, preview: { url, width: 0, height: 0 } }
+      : { name: f.name, url, ext };
   });
   const html = text.trim() ? formatMessage(text).html : "";
   await later(null, 600);
-  return store.post(conversationId, ME, html, undefined, refs) ? { ok: true, via: "mock" } : { ok: false, reason: "unknown chat" };
+  return store.post(conversationId, ME, html, undefined, refs)
+    ? { ok: true, via: "mock" }
+    : { ok: false, reason: "unknown chat" };
 }
 
 // No native Teams client to follow in the browser.
-export function nativeThreadId(): string { return ""; }
-export function nativeDriven(): boolean { return false; }
+export function nativeThreadId(): string {
+  return "";
+}
+export function nativeDriven(): boolean {
+  return false;
+}

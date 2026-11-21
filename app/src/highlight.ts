@@ -39,14 +39,42 @@ type ThemeInput = Parameters<typeof createHighlighterCore>[0] extends { themes: 
 
 // Map common aliases Teams/users write to the grammar name Shiki knows.
 const ALIAS: Record<string, string> = {
-  js: "javascript", mjs: "javascript", cjs: "javascript", node: "javascript",
-  ts: "typescript", py: "python", py3: "python", sh: "bash", shell: "bash",
-  zsh: "bash", console: "bash", yml: "yaml", md: "markdown", golang: "go",
-  rs: "rust", cs: "csharp", "c#": "csharp", htm: "html",
+  js: "javascript",
+  mjs: "javascript",
+  cjs: "javascript",
+  node: "javascript",
+  ts: "typescript",
+  py: "python",
+  py3: "python",
+  sh: "bash",
+  shell: "bash",
+  zsh: "bash",
+  console: "bash",
+  yml: "yaml",
+  md: "markdown",
+  golang: "go",
+  rs: "rust",
+  cs: "csharp",
+  "c#": "csharp",
+  htm: "html",
 };
 const LOADED = new Set<string>([
-  "javascript", "typescript", "jsx", "tsx", "json", "python", "bash", "html",
-  "css", "sql", "yaml", "markdown", "go", "rust", "java", "csharp",
+  "javascript",
+  "typescript",
+  "jsx",
+  "tsx",
+  "json",
+  "python",
+  "bash",
+  "html",
+  "css",
+  "sql",
+  "yaml",
+  "markdown",
+  "go",
+  "rust",
+  "java",
+  "csharp",
 ]);
 
 let hl: HighlighterCore | null = null;
@@ -54,7 +82,9 @@ let initStarted = false;
 const readyCbs = new Set<() => void>();
 
 export function normLang(lang: string): string {
-  const l = String(lang || "").toLowerCase().trim();
+  const l = String(lang || "")
+    .toLowerCase()
+    .trim();
   const name = ALIAS[l] || l;
   return LOADED.has(name) ? name : "";
 }
@@ -75,10 +105,17 @@ export function initHighlighter(): void {
   })
     .then((h) => {
       hl = h;
-      for (const cb of readyCbs) try { cb(); } catch { /* ignore */ }
+      for (const cb of readyCbs)
+        try {
+          cb();
+        } catch {
+          /* ignore */
+        }
       readyCbs.clear();
     })
-    .catch((e) => { console.warn("[teams-calm] highlighter init failed; plain <pre> renders", e); });
+    .catch((e) => {
+      console.warn("[teams-calm] highlighter init failed; plain <pre> renders", e);
+    });
 }
 
 // Highlight code to an array of {content, color, fontStyle} token lines, so the

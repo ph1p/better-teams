@@ -140,7 +140,10 @@ export async function sendMessage(i: SendInput): Promise<CdlRes<{ id: string; or
 }
 
 /** Delete one of my messages: Teams' `ComponentsMessageAutoDeleteMutation`. */
-export async function deleteMessage(convId: string, msg: { id: string; clientMessageId: string }): Promise<CdlRes<true>> {
+export async function deleteMessage(
+  convId: string,
+  msg: { id: string; clientMessageId: string },
+): Promise<CdlRes<true>> {
   const scenarioId = uuid();
   const r = await cdl<Record<string, unknown>>("ComponentsMessageAutoDeleteMutation", D.DELETE, {
     convId,
@@ -165,7 +168,10 @@ export async function setEmotion(convId: string, messageId: string, key: string,
     convId,
     key,
     messageId,
-    offlineActionOptions: { queueId: `reaction_${convId}_${messageId}`, actionType: add ? "REACTION_ADD" : "REACTION_REMOVE" },
+    offlineActionOptions: {
+      queueId: `reaction_${convId}_${messageId}`,
+      actionType: add ? "REACTION_ADD" : "REACTION_REMOVE",
+    },
   });
   const c = check(r, "updateMessageEmotion");
   return c.ok ? { ok: true, data: true } : c;
@@ -190,7 +196,10 @@ async function setHorizon(convId: string, m: MsgRef, offline = true): Promise<Cd
   return c.ok ? { ok: true, data: true } : c;
 }
 
-async function setBookmark(convId: string, message: { clientMessageId: string; originalArrivalTime: string }): Promise<CdlRes<true>> {
+async function setBookmark(
+  convId: string,
+  message: { clientMessageId: string; originalArrivalTime: string },
+): Promise<CdlRes<true>> {
   const r = await cdl<Record<string, unknown>>(
     "SimpleCollabChangeReadStatusMenuItemSetConversationConsumptionHorizonBookmarkMutation",
     D.SET_CH_BOOKMARK,
@@ -247,7 +256,10 @@ export async function listMessages(convId: string, cursor?: string): Promise<Cdl
     replyChainId: null,
     ...(cursor ? { cursor: { value: cursor, source: "CHAT_MESSAGES" }, direction: "BACKWARD" } : {}),
   });
-  const c = check<{ messages?: unknown; cursor?: { value?: unknown } | null; areMessagesAvailable?: unknown }>(r, "messages");
+  const c = check<{ messages?: unknown; cursor?: { value?: unknown } | null; areMessagesAvailable?: unknown }>(
+    r,
+    "messages",
+  );
   if (!c.ok) return c;
   const messages = Array.isArray(c.data.messages) ? c.data.messages : [];
   // Teams' cursor value is the oldest message id on the page. The worker may

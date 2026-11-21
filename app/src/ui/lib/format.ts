@@ -14,7 +14,10 @@ import { locale, t } from "../../i18n";
 export const chatTitle = (c: Chat): string => (c.kind === "notes" ? t().common.notes : c.title);
 
 export function initials(name: string): string {
-  const parts = (name || "?").replace(/[^\p{L}\p{N}\s]/gu, "").trim().split(/\s+/);
+  const parts = (name || "?")
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .trim()
+    .split(/\s+/);
   return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase() || "?";
 }
 
@@ -71,9 +74,22 @@ export function fmtDay(ts: number): string {
 }
 
 const ENTITIES: Record<string, string> = {
-  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
-  hellip: "…", mdash: "—", ndash: "–", rsquo: "’", lsquo: "‘",
-  ldquo: "“", rdquo: "”", times: "×", copy: "©", reg: "®",
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+  hellip: "…",
+  mdash: "—",
+  ndash: "–",
+  rsquo: "’",
+  lsquo: "‘",
+  ldquo: "“",
+  rdquo: "”",
+  times: "×",
+  copy: "©",
+  reg: "®",
 };
 function decodeEntities(s: string): string {
   return s
@@ -98,7 +114,7 @@ export function htmlToText(html: string): string {
       .replace(/<br\s*\/?>/gi, "\n")
       .replace(/<\/(p|div|li|tr|h[1-6]|blockquote)>/gi, "\n")
       .replace(/<li[^>]*>/gi, "• ")
-      .replace(/<[^>]+>/g, "")
+      .replace(/<[^>]+>/g, ""),
   )
     .replace(/\n{3,}/g, "\n\n")
     .replace(/[ \t]+\n/g, "\n")
@@ -116,7 +132,10 @@ function cardText(content: string): string {
     const parsed: unknown = JSON.parse(new TextDecoder().decode(bytes));
     const j = (typeof parsed === "object" && parsed !== null ? parsed : {}) as Record<string, unknown>;
     const atts = Array.isArray(j.attachments) ? j.attachments : [];
-    const c = (atts[0] && typeof atts[0] === "object" ? (atts[0] as Record<string, unknown>).content : {}) as Record<string, unknown>;
+    const c = (atts[0] && typeof atts[0] === "object" ? (atts[0] as Record<string, unknown>).content : {}) as Record<
+      string,
+      unknown
+    >;
     return [c.title, c.summary || j.summary, c.text]
       .filter((v): v is string => typeof v === "string" && !!v)
       .map(htmlToText)

@@ -5,7 +5,13 @@ import { POLL_MS } from "../lib/constants";
 import type { Chat } from "../../types";
 
 // Cheap change signature so polling doesn't re-render (and jump) when idle.
-const chatSig = (list: Chat[]): string => list.map((c) => `${c.id}:${c.time}:${c.unread}:${c.hidden}:${c.title}:${c.liveCall || ""}:${c.muted ? 1 : 0}:${c.group ? 1 : 0}:${c.left ? 1 : 0}:${c.members.length}`).join("|");
+const chatSig = (list: Chat[]): string =>
+  list
+    .map(
+      (c) =>
+        `${c.id}:${c.time}:${c.unread}:${c.hidden}:${c.title}:${c.liveCall || ""}:${c.muted ? 1 : 0}:${c.group ? 1 : 0}:${c.left ? 1 : 0}:${c.members.length}`,
+    )
+    .join("|");
 
 export interface ChatList {
   chats: Chat[];
@@ -46,7 +52,9 @@ export function useChatList(): ChatList {
     tick(true);
     const t = setInterval(tick, POLL_MS);
     const offLive = onTeamsChange(() => tick());
-    const onVis = (): void => { tick(); };
+    const onVis = (): void => {
+      tick();
+    };
     document.addEventListener("visibilitychange", onVis);
     return () => {
       alive = false;
@@ -57,7 +65,9 @@ export function useChatList(): ChatList {
   }, []);
 
   const chatsRef = useRef<Chat[]>([]);
-  useEffect(() => { chatsRef.current = chats; }, [chats]);
+  useEffect(() => {
+    chatsRef.current = chats;
+  }, [chats]);
 
   return { chats, setChats, chatsRef, error, sel, setSel };
 }

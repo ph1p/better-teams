@@ -17,7 +17,14 @@ import { inOpenFence } from "../../markdown";
 const INDENT = "  ";
 
 /** Replace [start,end) of the textarea's value with `text`; caret/selection after. */
-function replace(el: HTMLTextAreaElement, start: number, end: number, text: string, selFrom?: number, selTo?: number): void {
+function replace(
+  el: HTMLTextAreaElement,
+  start: number,
+  end: number,
+  text: string,
+  selFrom?: number,
+  selTo?: number,
+): void {
   el.focus();
   el.setSelectionRange(start, end);
   const done = typeof document.execCommand === "function" && document.execCommand("insertText", false, text);
@@ -48,7 +55,10 @@ export function wrapSelection(el: HTMLTextAreaElement, mark: string): void {
   }
   if (sel.includes("\n")) {
     // Inline marks never span lines: wrap each non-blank line on its own.
-    const out = sel.split("\n").map((l) => (l.trim() && !/^\s*```/.test(l) ? mark + l + mark : l)).join("\n");
+    const out = sel
+      .split("\n")
+      .map((l) => (l.trim() && !/^\s*```/.test(l) ? mark + l + mark : l))
+      .join("\n");
     replace(el, s, e, out, 0, out.length);
     return;
   }
@@ -78,7 +88,11 @@ export function handleFormatKey(e: KeyboardEvent<HTMLTextAreaElement>): boolean 
 
   if (mod && !e.altKey) {
     const k = e.key.toLowerCase();
-    const mark = !e.shiftKey ? ({ b: "**", i: "*", e: "`" } as Record<string, string>)[k] : k === "x" ? "~~" : undefined;
+    const mark = !e.shiftKey
+      ? ({ b: "**", i: "*", e: "`" } as Record<string, string>)[k]
+      : k === "x"
+        ? "~~"
+        : undefined;
     if (mark) {
       e.preventDefault();
       if (mark === "`" && v.slice(s, end).includes("\n")) codeBlock(el);

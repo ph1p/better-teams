@@ -16,8 +16,14 @@ export function usePeopleSearch(q: string, known: PeopleHit[], cap: number): Peo
   const index = useMemo(() => known.map((p) => [p, (p.displayName + "\n" + p.email).toLowerCase()] as const), [known]);
   useEffect(() => {
     const term = q.trim().toLowerCase();
-    if (term.length < MIN_CHARS) { setHits([]); return; }
-    const local = index.filter(([, key]) => key.includes(term)).slice(0, LOCAL_MAX).map(([p]) => p);
+    if (term.length < MIN_CHARS) {
+      setHits([]);
+      return;
+    }
+    const local = index
+      .filter(([, key]) => key.includes(term))
+      .slice(0, LOCAL_MAX)
+      .map(([p]) => p);
     setHits(local);
     let live = true;
     const h = setTimeout(() => {
@@ -27,9 +33,14 @@ export function usePeopleSearch(q: string, known: PeopleHit[], cap: number): Peo
           const seen = new Set(local.map((p) => p.mri));
           setHits([...local, ...r.filter((p) => !seen.has(p.mri))].slice(0, cap));
         })
-        .catch(() => { /* keep local hits */ });
+        .catch(() => {
+          /* keep local hits */
+        });
     }, DEBOUNCE_MS);
-    return () => { live = false; clearTimeout(h); };
+    return () => {
+      live = false;
+      clearTimeout(h);
+    };
   }, [q, index, cap]);
   return hits;
 }

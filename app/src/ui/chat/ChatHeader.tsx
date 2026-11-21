@@ -34,8 +34,14 @@ interface ChatHeaderProps {
 }
 
 // The title, as an input while renaming: Enter saves, Escape or leaving cancels.
-function RenameInput({ chat, onRename, onDone }: {
-  chat: Chat; onRename: (chat: Chat, title: string) => Promise<boolean>; onDone: () => void;
+function RenameInput({
+  chat,
+  onRename,
+  onDone,
+}: {
+  chat: Chat;
+  onRename: (chat: Chat, title: string) => Promise<boolean>;
+  onDone: () => void;
 }): JSX.Element {
   const [v, setV] = useState(chat.title);
   const save = async (): Promise<void> => {
@@ -52,8 +58,13 @@ function RenameInput({ chat, onRename, onDone }: {
       onChange={(e) => setV(e.target.value)}
       onBlur={onDone}
       onKeyDown={(e) => {
-        if (e.key === "Enter") { e.preventDefault(); void save(); }
-        else if (e.key === "Escape") { e.stopPropagation(); onDone(); }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          void save();
+        } else if (e.key === "Escape") {
+          e.stopPropagation();
+          onDone();
+        }
       }}
     />
   );
@@ -62,8 +73,23 @@ function RenameInput({ chat, onRename, onDone }: {
 // Header of the open conversation: avatar, title + subtitle, search / notes
 // toggles and the call buttons; app chats get an explanatory strip below.
 export function ChatHeader({
-  chat, searchOpen, onToggleSearch, notesOpen, onToggleNotes, onOpenProfile, onJoinCall, onMeetNow, onCall,
-  flash, knownPeople, onRename, onSetMuted, onAddMembers, onRemoveMember, onLeave, onNewChannel,
+  chat,
+  searchOpen,
+  onToggleSearch,
+  notesOpen,
+  onToggleNotes,
+  onOpenProfile,
+  onJoinCall,
+  onMeetNow,
+  onCall,
+  flash,
+  knownPeople,
+  onRename,
+  onSetMuted,
+  onAddMembers,
+  onRemoveMember,
+  onLeave,
+  onNewChannel,
 }: ChatHeaderProps): JSX.Element {
   const { statusOf } = usePresence();
   const [renaming, setRenaming] = useState(false);
@@ -76,30 +102,50 @@ export function ChatHeader({
   const audioLabel = callees.length <= 1 ? t().common.audioCall : t().chat.groupAudioCall(callees.length);
   const videoLabel = callees.length <= 1 ? t().common.videoCall : t().chat.groupVideoCall(callees.length);
   // Header subtitle: what is useful to know about the other side right now.
-  const headSub =
-    chat.isChannel ? chat.team :
-    chat.kind === "meeting" ? t().chat.meetingChat :
-    chat.kind === "notes" ? t().chat.onlyYou :
-    chat.app ? [t().chat.teamsApp, profile(chat.avatarMri).developer].filter(Boolean).join(" · ") :
-    chat.group ? t().chat.people(chat.members.length + 1) :
-    chat.avatarMri ? [statusOf(chat.avatarMri) === "Unknown" ? "" : statusLabel(statusOf(chat.avatarMri)), profile(chat.avatarMri).jobTitle].filter(Boolean).join(" · ") :
-    chat.team;
+  const headSub = chat.isChannel
+    ? chat.team
+    : chat.kind === "meeting"
+      ? t().chat.meetingChat
+      : chat.kind === "notes"
+        ? t().chat.onlyYou
+        : chat.app
+          ? [t().chat.teamsApp, profile(chat.avatarMri).developer].filter(Boolean).join(" · ")
+          : chat.group
+            ? t().chat.people(chat.members.length + 1)
+            : chat.avatarMri
+              ? [
+                  statusOf(chat.avatarMri) === "Unknown" ? "" : statusLabel(statusOf(chat.avatarMri)),
+                  profile(chat.avatarMri).jobTitle,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")
+              : chat.team;
   return (
     <>
       <div className="tc-main-head">
         {chat.isChannel ? (
-          <div className="tc-av tc-hash"><Hash size={18} /></div>
+          <div className="tc-av tc-hash">
+            <Hash size={18} />
+          </div>
         ) : chat.group ? (
           <GroupAvatar members={chat.members} />
         ) : (
-          <Avatar name={chatTitle(chat)} uri={avatarUri(chat.avatarMri)} mri={chat.avatarMri} status={statusOf(chat.avatarMri)} onOpen={onOpenProfile} />
+          <Avatar
+            name={chatTitle(chat)}
+            uri={avatarUri(chat.avatarMri)}
+            mri={chat.avatarMri}
+            status={statusOf(chat.avatarMri)}
+            onOpen={onOpenProfile}
+          />
         )}
         <div className="tc-head-text">
           <span className="tc-head-title">
             {renaming ? (
               <RenameInput chat={chat} onRename={onRename} onDone={() => setRenaming(false)} />
             ) : (
-              <span className="tc-name" onDoubleClick={chat.group && !chat.left ? () => setRenaming(true) : undefined}>{chatTitle(chat)}</span>
+              <span className="tc-name" onDoubleClick={chat.group && !chat.left ? () => setRenaming(true) : undefined}>
+                {chatTitle(chat)}
+              </span>
             )}
             {chat.muted ? <BellOff size={13} className="tc-head-muted" aria-label={t().common.muted} /> : null}
             {chat.app ? <span className="tc-app-badge">{t().common.app}</span> : null}
@@ -128,16 +174,31 @@ export function ChatHeader({
             <Video size={14} /> {t().chat.join}
           </button>
         ) : chat.isChannel ? (
-          <button className="tc-ghost tc-icon-only" onClick={onMeetNow} title={t().chat.meetNow} aria-label={t().chat.meetNow}>
+          <button
+            className="tc-ghost tc-icon-only"
+            onClick={onMeetNow}
+            title={t().chat.meetNow}
+            aria-label={t().chat.meetNow}
+          >
             <Video size={15} />
           </button>
         ) : null}
         {callable ? (
           <>
-            <button className="tc-ghost tc-icon-only" onClick={() => onCall(callees, "audio", chat)} title={audioLabel} aria-label={audioLabel}>
+            <button
+              className="tc-ghost tc-icon-only"
+              onClick={() => onCall(callees, "audio", chat)}
+              title={audioLabel}
+              aria-label={audioLabel}
+            >
               <Phone size={15} />
             </button>
-            <button className="tc-ghost tc-icon-only" onClick={() => onCall(callees, "video", chat)} title={videoLabel} aria-label={videoLabel}>
+            <button
+              className="tc-ghost tc-icon-only"
+              onClick={() => onCall(callees, "video", chat)}
+              title={videoLabel}
+              aria-label={videoLabel}
+            >
               <Video size={15} />
             </button>
           </>
@@ -203,10 +264,10 @@ export function MessageSearchBar({ query, onQuery, matches, onClose }: MessageSe
           if (e.key === "Escape") onClose();
         }}
       />
-      {query ? (
-        <span className="tc-msgsearch-n">{t().chat.matches(matches)}</span>
-      ) : null}
-      <button className="tc-msgsearch-x" onClick={onClose} aria-label={t().chat.closeSearch}><X size={14} /></button>
+      {query ? <span className="tc-msgsearch-n">{t().chat.matches(matches)}</span> : null}
+      <button className="tc-msgsearch-x" onClick={onClose} aria-label={t().chat.closeSearch}>
+        <X size={14} />
+      </button>
     </div>
   );
 }

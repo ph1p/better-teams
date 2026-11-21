@@ -45,19 +45,27 @@ export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewC
   const input = useRef<HTMLInputElement>(null);
   const msg = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => { (initialDraft ? msg : input).current?.focus(); }, [initialDraft]);
+  useEffect(() => {
+    (initialDraft ? msg : input).current?.focus();
+  }, [initialDraft]);
 
   const me = myMri();
   const shown = hits.filter((h) => h.mri !== me && !picked.some((p) => p.mri === h.mri));
 
-  const changed = (): void => { setIsDraft(false); setNote(null); };
+  const changed = (): void => {
+    setIsDraft(false);
+    setNote(null);
+  };
   const add = (p: PeopleHit): void => {
     setPicked((s) => [...s, p]);
     setQ("");
     changed();
     input.current?.focus();
   };
-  const remove = (mri: string): void => { setPicked((s) => s.filter((p) => p.mri !== mri)); changed(); };
+  const remove = (mri: string): void => {
+    setPicked((s) => s.filter((p) => p.mri !== mri));
+    changed();
+  };
 
   const submit = async (): Promise<void> => {
     if (!picked.length || busy) return;
@@ -76,25 +84,39 @@ export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewC
   };
 
   const onInputKey = (e: KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === "ArrowDown" && shown.length) { e.preventDefault(); setHi((i) => (i + 1) % shown.length); }
-    else if (e.key === "ArrowUp" && shown.length) { e.preventDefault(); setHi((i) => (i - 1 + shown.length) % shown.length); }
-    else if (e.key === "Enter") {
+    if (e.key === "ArrowDown" && shown.length) {
+      e.preventDefault();
+      setHi((i) => (i + 1) % shown.length);
+    } else if (e.key === "ArrowUp" && shown.length) {
+      e.preventDefault();
+      setHi((i) => (i - 1 + shown.length) % shown.length);
+    } else if (e.key === "Enter") {
       e.preventDefault();
       if (shown[hi]) add(shown[hi]);
       else if (!q && picked.length) msg.current?.focus();
     } else if (e.key === "Backspace" && !q && picked.length) remove(picked[picked.length - 1].mri);
-    else if (e.key === "Escape") { e.preventDefault(); onClose(); }
+    else if (e.key === "Escape") {
+      e.preventDefault();
+      onClose();
+    }
   };
 
   const s = t().sidebar;
   const label = busy ? s.opening : text.trim() || isDraft ? t().common.send : s.openChat;
 
   return (
-    <div className="tc-scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div
+      className="tc-scrim"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div className="tc-newchat" role="dialog" aria-label={s.newChat}>
         <div className="tc-newchat-head">
           <span>{s.newChat}</span>
-          <button className="tc-profile-close" onClick={onClose} title={t().common.close} aria-label={t().common.close}><X size={16} /></button>
+          <button className="tc-profile-close" onClick={onClose} title={t().common.close} aria-label={t().common.close}>
+            <X size={16} />
+          </button>
         </div>
         <div className="tc-newchat-to" onClick={() => input.current?.focus()}>
           <span className="tc-newchat-label">{s.to}</span>
@@ -102,14 +124,26 @@ export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewC
             <span key={p.mri} className="tc-chip">
               <Avatar name={p.displayName} uri={avatarUri(p.mri)} small />
               <span className="tc-chip-name">{p.displayName}</span>
-              <button onClick={(e) => { e.stopPropagation(); remove(p.mri); }} title={t().common.remove} aria-label={t().common.removeNamed(p.displayName)}><X size={12} /></button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  remove(p.mri);
+                }}
+                title={t().common.remove}
+                aria-label={t().common.removeNamed(p.displayName)}
+              >
+                <X size={12} />
+              </button>
             </span>
           ))}
           <input
             ref={input}
             value={q}
             placeholder={picked.length ? s.addMorePeople : s.typeNameOrEmail}
-            onChange={(e) => { setQ(e.target.value); setHi(0); }}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setHi(0);
+            }}
             onKeyDown={onInputKey}
           />
         </div>
@@ -122,7 +156,10 @@ export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewC
                 aria-selected={i === hi}
                 className={"tc-at-opt" + (i === hi ? " on" : "")}
                 onMouseEnter={() => setHi(i)}
-                onMouseDown={(e) => { e.preventDefault(); add(h); }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  add(h);
+                }}
               >
                 <Avatar name={h.displayName} uri={avatarUri(h.mri)} small />
                 <span className="tc-newchat-hit">
@@ -141,14 +178,23 @@ export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewC
           placeholder={isDraft ? s.firstMessage : s.firstMessageOptional}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void submit(); }
-            else if (e.key === "Escape") { e.preventDefault(); onClose(); }
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void submit();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              onClose();
+            }
           }}
         />
         {note ? <div className="tc-newchat-note">{note.kind === "draft" ? s.draftNote : note.message}</div> : null}
         <div className="tc-newchat-foot">
           <small>{picked.length > 1 ? s.groupOf(picked.length) : " "}</small>
-          <button className="tc-newchat-go" disabled={!picked.length || busy || (isDraft && !text.trim())} onClick={() => void submit()}>
+          <button
+            className="tc-newchat-go"
+            disabled={!picked.length || busy || (isDraft && !text.trim())}
+            onClick={() => void submit()}
+          >
             {label}
           </button>
         </div>

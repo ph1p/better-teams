@@ -8,8 +8,14 @@ import { t } from "../../i18n";
 import { useEffect, useState, type JSX } from "react";
 import { UserPlus, X } from "lucide-react";
 import {
-  addChannelMembers, getChannelActions, listChannelMembers, myMri, removeChannelMember,
-  type ChannelActions, type ChannelMember, type PeopleHit,
+  addChannelMembers,
+  getChannelActions,
+  listChannelMembers,
+  myMri,
+  removeChannelMember,
+  type ChannelActions,
+  type ChannelMember,
+  type PeopleHit,
 } from "../../teamsData";
 import { useDismiss } from "../lib/dismiss";
 import { useArm } from "../lib/arm";
@@ -30,7 +36,13 @@ const isGuest = (m: ChannelMember): boolean => m.role.toLowerCase() === "guest" 
 const byRole = (a: ChannelMember, b: ChannelMember): number =>
   Number(isOwner(b)) - Number(isOwner(a)) || a.displayName.localeCompare(b.displayName);
 
-export function ChannelMembersPanel({ chat, known, flash, onClose, onOpenProfile }: ChannelMembersPanelProps): JSX.Element {
+export function ChannelMembersPanel({
+  chat,
+  known,
+  flash,
+  onClose,
+  onOpenProfile,
+}: ChannelMembersPanelProps): JSX.Element {
   // undefined while Teams is asked; null when it didn't answer.
   const [acts, setActs] = useState<ChannelActions | null | undefined>(undefined);
   const [members, setMembers] = useState<ChannelMember[] | null | undefined>(undefined);
@@ -49,7 +61,9 @@ export function ChannelMembersPanel({ chat, known, flash, onClose, onOpenProfile
       const ms = a ? await listChannelMembers(a) : null;
       if (live) setMembers(ms && [...ms].sort(byRole));
     })();
-    return () => { live = false; };
+    return () => {
+      live = false;
+    };
   }, [chat.id]);
 
   const has = (mri: string): boolean => !!members?.some((m) => m.mri === mri);
@@ -60,22 +74,50 @@ export function ChannelMembersPanel({ chat, known, flash, onClose, onOpenProfile
     const people = picked.filter((p) => !has(p.mri));
     setBusy(true);
     const before = members;
-    setMembers((ms) => ms && [...ms, ...people.map((p): ChannelMember => ({
-      mri: p.mri, displayName: p.displayName, jobTitle: p.jobTitle, role: "User", objectId: "", tenantId: "",
-    }))].sort(byRole));
-    const r = await addChannelMembers(acts, people.map((p) => p.mri));
+    setMembers(
+      (ms) =>
+        ms &&
+        [
+          ...ms,
+          ...people.map((p): ChannelMember => ({
+            mri: p.mri,
+            displayName: p.displayName,
+            jobTitle: p.jobTitle,
+            role: "User",
+            objectId: "",
+            tenantId: "",
+          })),
+        ].sort(byRole),
+    );
+    const r = await addChannelMembers(
+      acts,
+      people.map((p) => p.mri),
+    );
     setBusy(false);
-    if (r.ok) { setPicked([]); flash(t().app.membersAdded(people.length), 3000); }
-    else { setMembers(before); flash(t().app.addFailed(r.reason), 5000); }
+    if (r.ok) {
+      setPicked([]);
+      flash(t().app.membersAdded(people.length), 3000);
+    } else {
+      setMembers(before);
+      flash(t().app.addFailed(r.reason), 5000);
+    }
   };
-  const remove = (m: ChannelMember): void => tryArm(m.mri, () => void (async () => {
-    if (!acts) return;
-    const before = members;
-    setMembers((ms) => ms && ms.filter((x) => x.mri !== m.mri));
-    const r = await removeChannelMember(acts, m);
-    if (r.ok) flash(t().app.memberRemoved(m.displayName), 3000);
-    else { setMembers(before); flash(t().app.removeFailed(r.reason), 5000); }
-  })());
+  const remove = (m: ChannelMember): void =>
+    tryArm(
+      m.mri,
+      () =>
+        void (async () => {
+          if (!acts) return;
+          const before = members;
+          setMembers((ms) => ms && ms.filter((x) => x.mri !== m.mri));
+          const r = await removeChannelMember(acts, m);
+          if (r.ok) flash(t().app.memberRemoved(m.displayName), 3000);
+          else {
+            setMembers(before);
+            flash(t().app.removeFailed(r.reason), 5000);
+          }
+        })(),
+    );
 
   const team = acts?.members === "team";
   const c = t().chat;
@@ -84,7 +126,9 @@ export function ChannelMembersPanel({ chat, known, flash, onClose, onOpenProfile
       <header className="tc-members-head">
         <strong>{c.channelMembers}</strong>
         <span className="tc-members-n">{members ? members.length : ""}</span>
-        <button className="tc-ghost tc-icon-only" onClick={onClose} aria-label={c.closeMembers}><X size={15} /></button>
+        <button className="tc-ghost tc-icon-only" onClick={onClose} aria-label={c.closeMembers}>
+          <X size={15} />
+        </button>
       </header>
       {team ? <div className="tc-members-note">{c.teamRosterNote(chat.team)}</div> : null}
 

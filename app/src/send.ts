@@ -15,8 +15,7 @@ import { formatMessage } from "./markdown";
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-const SEND_BUTTON =
-  '[data-tid="sendMessageCommands-send"], [data-tid="newMessageCommands-send"], button[name="send"]';
+const SEND_BUTTON = '[data-tid="sendMessageCommands-send"], [data-tid="newMessageCommands-send"], button[name="send"]';
 
 // Thread id the native composer currently targets, or "" if unknown.
 export function nativeThreadId(): string {
@@ -31,7 +30,12 @@ let driving = 0;
 let drivenAt = 0;
 async function drive<T>(fn: () => Promise<T>): Promise<T> {
   driving++;
-  try { return await fn(); } finally { driving--; drivenAt = Date.now(); }
+  try {
+    return await fn();
+  } finally {
+    driving--;
+    drivenAt = Date.now();
+  }
 }
 
 /** True while (or just after) the overlay drives Teams' native chat. */
@@ -95,7 +99,11 @@ function nativeButton(sel: string): HTMLElement | null {
  * native client, then click Teams' own call button in its header. Teams then
  * runs its whole calling flow (intent, ringing, call window) itself.
  */
-export async function startNativeCall(conversationId: string, title: string, kind: "audio" | "video"): Promise<WriteResult> {
+export async function startNativeCall(
+  conversationId: string,
+  title: string,
+  kind: "audio" | "video",
+): Promise<WriteResult> {
   if (!(await openNativeChat(conversationId, title))) return { ok: false, reason: "chat not open in Teams" };
   // Wait for the header to render, then use the direct button or the dropdown.
   await waitFor(() => nativeButton(CALL_DIRECT[kind]) || nativeButton(CALL_MENU_TOGGLE));
@@ -176,9 +184,7 @@ export interface PickPerson {
   oid?: string;
 }
 
-export type NewChatResult =
-  | { ok: true; id: string; draft: boolean }
-  | { ok: false; reason: string };
+export type NewChatResult = { ok: true; id: string; draft: boolean } | { ok: false; reason: string };
 
 function chipCount(): number {
   return [...document.querySelectorAll(PICKER_CHIP)].filter((c) => !c.closest("#tc-root")).length;
@@ -230,7 +236,10 @@ async function pickPerson(p: PickPerson): Promise<boolean> {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, query);
   input.dispatchEvent(new Event("input", { bubbles: true }));
   const opt = await waitFor(
-    () => [...document.querySelectorAll<HTMLElement>(PICKER_OPTION)].find((o) => !o.closest("#tc-root") && matchesOption(o, p)),
+    () =>
+      [...document.querySelectorAll<HTMLElement>(PICKER_OPTION)].find(
+        (o) => !o.closest("#tc-root") && matchesOption(o, p),
+      ),
     5000,
   );
   if (!opt) return false;
@@ -248,8 +257,10 @@ async function settledThreadId(ms = 3000, quiet = 700): Promise<string> {
   while (Date.now() < end) {
     await sleep(100);
     const t = nativeThreadId();
-    if (t !== last) { last = t; since = Date.now(); }
-    else if (Date.now() - since >= quiet) break;
+    if (t !== last) {
+      last = t;
+      since = Date.now();
+    } else if (Date.now() - since >= quiet) break;
   }
   return last;
 }
@@ -305,13 +316,22 @@ export async function openNativeDirect(upn: string, oid?: string): Promise<NewCh
  * `people` (by UPN), so text never goes to a different set of people.
  * Resolves with the new chat's id ("" if Teams has not switched yet).
  */
-export function sendNativeDraft(people: PickPerson[], text: string): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
+export function sendNativeDraft(
+  people: PickPerson[],
+  text: string,
+): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
   return drive(() => sendDraft(people, text));
 }
 
-async function sendDraft(people: PickPerson[], text: string): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
+async function sendDraft(
+  people: PickPerson[],
+  text: string,
+): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
   if (!text || !text.trim()) return { ok: false, reason: "empty" };
-  const want = people.map((p) => (p.upn || "").trim().toLowerCase()).filter(Boolean).sort();
+  const want = people
+    .map((p) => (p.upn || "").trim().toLowerCase())
+    .filter(Boolean)
+    .sort();
   const chipsOk = (): boolean => {
     if (nativeThreadId()) return false; // an existing chat, not the draft
     const got = [...document.querySelectorAll(PICKER_CHIP)]
@@ -321,9 +341,10 @@ async function sendDraft(people: PickPerson[], text: string): Promise<{ ok: true
     return want.length === people.length && got.length === want.length && got.every((g, i) => g === want[i]);
   };
   if (!chipsOk()) return { ok: false, reason: "draft-changed" };
-  const composer = await waitFor(() =>
-    document.querySelector<HTMLElement>('[data-tid="ckeditor"][id^="new-message-"][contenteditable="true"]') ||
-    document.querySelector<HTMLElement>('[id^="new-message-"][contenteditable="true"]'),
+  const composer = await waitFor(
+    () =>
+      document.querySelector<HTMLElement>('[data-tid="ckeditor"][id^="new-message-"][contenteditable="true"]') ||
+      document.querySelector<HTMLElement>('[id^="new-message-"][contenteditable="true"]'),
   );
   if (!composer || composer.closest("#tc-root")) return { ok: false, reason: "no-composer" };
   setComposerText(composer, text);
@@ -357,7 +378,9 @@ function clearFileWell(): void {
   document.querySelectorAll<HTMLElement>(FILE_REMOVE).forEach((b) => b.click());
 }
 
-interface CkEditor { setData(html: string): void; }
+interface CkEditor {
+  setData(html: string): void;
+}
 
 /**
  * Send `files` (and optional markdown-lite `text`) to a chat through Teams'
@@ -366,10 +389,16 @@ interface CkEditor { setData(html: string): void; }
  * Text goes in through CKEditor's API; typing into its DOM is not seen by
  * its model, and the send would go out without it. Mentions stay plain text.
  */
-export async function sendFiles(conversationId: string, title: string, text: string, files: File[]): Promise<WriteResult> {
+export async function sendFiles(
+  conversationId: string,
+  title: string,
+  text: string,
+  files: File[],
+): Promise<WriteResult> {
   if (!files.length) return { ok: false, reason: "empty" };
   const opened = await openNativeChat(conversationId, title);
-  if (!opened || nativeThreadId() !== conversationId) return { ok: false, reason: opened ? "wrong-chat" : "chat-not-open" };
+  if (!opened || nativeThreadId() !== conversationId)
+    return { ok: false, reason: opened ? "wrong-chat" : "chat-not-open" };
   const composer = await waitFor(findComposer);
   if (!composer) return { ok: false, reason: "no-composer" };
   // Files the user staged in Teams itself would go out with ours.
@@ -389,7 +418,10 @@ export async function sendFiles(conversationId: string, title: string, text: str
   // Generous: 30 s plus 20 s per MB (a slow 50 KB/s link).
   const bytes = files.reduce((n, f) => n + f.size, 0);
   const done = await waitFor(() => uploadedCount() >= files.length, 30_000 + bytes / 50, 250);
-  const fail = (reason: string): WriteResult => { clearFileWell(); return { ok: false, reason }; };
+  const fail = (reason: string): WriteResult => {
+    clearFileWell();
+    return { ok: false, reason };
+  };
   if (!done) return fail("upload-timeout");
   if (nativeThreadId() !== conversationId) return fail("wrong-chat");
 
@@ -427,9 +459,7 @@ function setComposerText(el: HTMLElement, text: string): void {
   if (!ok) {
     const dt = new DataTransfer();
     dt.setData("text/plain", text);
-    el.dispatchEvent(
-      new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })
-    );
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
   }
 }
 

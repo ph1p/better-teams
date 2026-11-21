@@ -41,7 +41,7 @@ export async function sendRemote(
   quote: Quote | null,
   mentions: readonly MentionPick[] = [],
   /** Channel thread to reply in (the root message id). Ignored for chats. */
-  rootId?: string
+  rootId?: string,
 ): Promise<WriteResult> {
   const body = (text || "").trim();
   if (!body) return { ok: false, reason: "empty" };
@@ -125,7 +125,7 @@ export async function setReaction(
   conversationId: string,
   messageId: string,
   key: string,
-  add: boolean
+  add: boolean,
 ): Promise<WriteResult> {
   if (!isChannelId(conversationId)) {
     const c = await chat.setEmotion(conversationId, messageId, key, add);
@@ -147,7 +147,10 @@ export async function setReaction(
 export async function deleteMessage(conversationId: string, messageId: string): Promise<WriteResult> {
   const ref = msgRefs.get(String(messageId));
   if (!isChannelId(conversationId)) {
-    const c = await chat.deleteMessage(conversationId, { id: String(messageId), clientMessageId: ref?.clientMessageId || "" });
+    const c = await chat.deleteMessage(conversationId, {
+      id: String(messageId),
+      clientMessageId: ref?.clientMessageId || "",
+    });
     if (c.ok) {
       deletedHere.add(String(messageId));
       remoteCache.delete(conversationId);
@@ -170,7 +173,7 @@ export async function editMessage(
   conversationId: string,
   messageId: string,
   text: string,
-  quoteHtml = ""
+  quoteHtml = "",
 ): Promise<WriteResult> {
   const content = (quoteHtml || "") + formatMessage(String(text)).html;
   const ref = msgRefs.get(String(messageId));
@@ -209,7 +212,12 @@ export async function undoDelete(conversationId: string, messageId: string): Pro
  */
 export async function removeFiles(conversationId: string, messageId: string, keep: FileRef[]): Promise<WriteResult> {
   if (keep.some((f) => f.raw === undefined)) return { ok: false, reason: "file data missing" };
-  const r = await chatsvc.putMessageProperty(conversationId, messageId, "files", JSON.stringify(keep.map((f) => f.raw)));
+  const r = await chatsvc.putMessageProperty(
+    conversationId,
+    messageId,
+    "files",
+    JSON.stringify(keep.map((f) => f.raw)),
+  );
   if (!r.ok) return toWrite(r);
   remoteCache.delete(conversationId);
   return { ok: true };

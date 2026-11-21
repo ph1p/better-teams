@@ -29,7 +29,10 @@ export function useFollowNative(
   const tryOpen = (): void => {
     const p = pending.current;
     if (!p) return;
-    if (Date.now() - p.at > PENDING_MS || p.id === selRef.current) { pending.current = null; return; }
+    if (Date.now() - p.at > PENDING_MS || p.id === selRef.current) {
+      pending.current = null;
+      return;
+    }
     if (!chatsRef.current.some((c) => c.id === p.id)) return;
     pending.current = null;
     openRef.current(p.id);
@@ -46,10 +49,15 @@ export function useFollowNative(
       tryOpen();
     };
     // Hidden window: skip the poll; the focus event below checks on return.
-    const t = setInterval(() => { if (!document.hidden) tick(); }, POLL);
+    const t = setInterval(() => {
+      if (!document.hidden) tick();
+    }, POLL);
     // Teams comes to the front on a notification click: check right away.
     window.addEventListener("focus", tick);
-    return () => { clearInterval(t); window.removeEventListener("focus", tick); };
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("focus", tick);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

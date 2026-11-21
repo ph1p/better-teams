@@ -44,7 +44,14 @@ export const profiles: Record<string, Profile> = {};
 for (const { mri, ...p } of [...PEOPLE, ...APPS]) profiles[mri] = p;
 export const nameOf = (mri: string): string => profiles[mri]?.displayName || "Unknown";
 
-const REACTION_GLYPH: Record<string, string> = { like: "👍", heart: "❤️", laugh: "😆", surprised: "😮", sad: "😢", angry: "😠" };
+const REACTION_GLYPH: Record<string, string> = {
+  like: "👍",
+  heart: "❤️",
+  laugh: "😆",
+  surprised: "😮",
+  sad: "😢",
+  angry: "😠",
+};
 
 /** Who reacted with what, per message id; Message.reactions is derived from it. */
 const reactors = new Map<string, Map<string, Set<string>>>();
@@ -62,21 +69,35 @@ function reactionsOf(id: string): Reaction[] {
 function makeMessage(from: string, html: string, time: number, extra: Partial<Message> = {}): Message {
   const id = nextId(time);
   return {
-    id, rootId: id, rootTime: time, isReply: false,
-    from: nameOf(from), fromMri: from, content: html, messageType: "RichText/Html",
-    mine: from === ME, deleted: false, edited: false, subject: "", importance: "normal",
-    reactions: [], files: [], time,
+    id,
+    rootId: id,
+    rootTime: time,
+    isReply: false,
+    from: nameOf(from),
+    fromMri: from,
+    content: html,
+    messageType: "RichText/Html",
+    mine: from === ME,
+    deleted: false,
+    edited: false,
+    subject: "",
+    importance: "normal",
+    reactions: [],
+    files: [],
+    time,
     ...extra,
   };
 }
 
 // A fake attachment: images get an SVG "photo" as their preview.
-const PHOTO = "data:image/svg+xml," + encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">`
-  + `<defs><linearGradient id="g" x2="0" y2="1"><stop offset="0" stop-color="#7aa7e6"/><stop offset="1" stop-color="#f3c79b"/></linearGradient></defs>`
-  + `<rect width="1200" height="800" fill="url(#g)"/><circle cx="900" cy="230" r="90" fill="#fff5d6"/>`
-  + `<path d="M0 640 L300 380 L520 560 L760 330 L1200 700 L1200 800 L0 800Z" fill="#3d5a73"/></svg>`,
-);
+const PHOTO =
+  "data:image/svg+xml," +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">` +
+      `<defs><linearGradient id="g" x2="0" y2="1"><stop offset="0" stop-color="#7aa7e6"/><stop offset="1" stop-color="#f3c79b"/></linearGradient></defs>` +
+      `<rect width="1200" height="800" fill="url(#g)"/><circle cx="900" cy="230" r="90" fill="#fff5d6"/>` +
+      `<path d="M0 640 L300 380 L520 560 L760 330 L1200 700 L1200 800 L0 800Z" fill="#3d5a73"/></svg>`,
+  );
 
 function mockFile(name: string): FileRef {
   const ext = extOf(name);
@@ -105,7 +126,8 @@ for (const seed of CHATS) {
     messages.push(m);
   }
   chats.set(seed.id, {
-    seed, messages,
+    seed,
+    messages,
     group: seed.kind === "chat" && !isOneToOneId(seed.id),
     readMs: at(seed.readAgo ?? 0) + 1,
     marked: false,
@@ -123,8 +145,7 @@ const withReactions = (m: Message): Message => ({ ...m, reactions: reactionsOf(m
 
 function sortThread(list: Message[], channel: boolean): Message[] {
   if (!channel) return [...list].sort((a, b) => a.time - b.time);
-  return [...list].sort((a, b) =>
-    a.rootTime - b.rootTime || Number(a.isReply) - Number(b.isReply) || a.time - b.time);
+  return [...list].sort((a, b) => a.rootTime - b.rootTime || Number(a.isReply) - Number(b.isReply) || a.time - b.time);
 }
 
 // --- Subscriptions ---------------------------------------------------------
@@ -189,8 +210,16 @@ export function listChats(): Chat[] {
     const time = last ? last.time : t0;
     const others = seed.members.filter((m) => m !== ME);
     const names = others.map(nameOf);
-    const title = seed.kind === "notes" ? "Notes"
-      : seed.topic || (names.length === 1 ? names[0] : names.slice(0, 3).map((n) => n.split(" ")[0]).join(", "));
+    const title =
+      seed.kind === "notes"
+        ? "Notes"
+        : seed.topic ||
+          (names.length === 1
+            ? names[0]
+            : names
+                .slice(0, 3)
+                .map((n) => n.split(" ")[0])
+                .join(", "));
     const lastFromMe = !!last && last.fromMri === ME;
     // A message newer than the hide time brings a hidden chat back, as in Teams.
     out.push({
@@ -251,15 +280,26 @@ function find(convId: string, messageId: string): { c: MockChat; m: Message } | 
   return c && m ? { c, m } : null;
 }
 
-export function post(convId: string, from: string, html: string, rootId?: string, files: FileRef[] = []): Message | null {
+export function post(
+  convId: string,
+  from: string,
+  html: string,
+  rootId?: string,
+  files: FileRef[] = [],
+): Message | null {
   const c = chats.get(convId);
   if (!c) return null;
   const time = Date.now();
   const root = rootId ? c.messages.find((m) => m.id === rootId) : undefined;
-  const m = makeMessage(from, html, time,
-    { files, ...(root ? { rootId: root.id, rootTime: root.rootTime, isReply: true } : {}) });
+  const m = makeMessage(from, html, time, {
+    files,
+    ...(root ? { rootId: root.id, rootTime: root.rootTime, isReply: true } : {}),
+  });
   c.messages.push(m);
-  if (from === ME) { c.readMs = time + 1; c.marked = false; }
+  if (from === ME) {
+    c.readMs = time + 1;
+    c.marked = false;
+  }
   if (time > c.readMs || from === ME) c.hidden = false;
   emit(convId, "NewMessage", m.id);
   if (from === ME) scheduleReply(c, root?.id);
@@ -336,7 +376,10 @@ export function setMembers(convId: string, add: string[], remove: string[]): boo
   const c = chats.get(convId);
   if (!c?.group) return false;
   c.seed.members = [...new Set([...c.seed.members.filter((m) => !remove.includes(m)), ...add])];
-  if (remove.includes(ME)) { c.left = true; c.hidden = true; }
+  if (remove.includes(ME)) {
+    c.left = true;
+    c.hidden = true;
+  }
   poke();
   return true;
 }
@@ -384,7 +427,18 @@ export function addChannel(convId: string, topic: string, isPrivate: boolean): s
   if (!c || c.seed.kind !== "channel") return "";
   const id = `19:mock-${isPrivate ? "private-" : ""}${Date.now().toString(36)}@thread.tacv2`;
   const seed: SeedChat = { id, kind: "channel", topic, team: c.seed.team, members: [...c.seed.members], messages: [] };
-  chats.set(id, { seed, group: false, messages: [], readMs: Date.now(), marked: false, hidden: false, favorite: false, pinned: false, floor: 0, cursor: 0 });
+  chats.set(id, {
+    seed,
+    group: false,
+    messages: [],
+    readMs: Date.now(),
+    marked: false,
+    hidden: false,
+    favorite: false,
+    pinned: false,
+    floor: 0,
+    cursor: 0,
+  });
   poke();
   return id;
 }
@@ -397,7 +451,18 @@ export function chatWith(mris: string[]): string {
   }
   const id = `19:mock-${Date.now().toString(36)}@unq.gbl.spaces`;
   const seed: SeedChat = { id, kind: "chat", members: want.split(","), messages: [] };
-  chats.set(id, { seed, group: false, messages: [], readMs: Date.now(), marked: false, hidden: false, favorite: false, pinned: false, floor: 0, cursor: 0 });
+  chats.set(id, {
+    seed,
+    group: false,
+    messages: [],
+    readMs: Date.now(),
+    marked: false,
+    hidden: false,
+    favorite: false,
+    pinned: false,
+    floor: 0,
+    cursor: 0,
+  });
   return id;
 }
 
@@ -419,13 +484,19 @@ function scheduleReply(c: MockChat, rootId?: string): void {
   const channel = c.seed.kind === "channel";
   // Channels only answer in threads; a new top-level post stays quiet.
   if (channel && !rootId) return;
-  setTimeout(() => {
-    if (!channel) setTyping(convId, [who]);
-    setTimeout(() => {
-      if (!channel) setTyping(convId, []);
-      post(convId, who, `<p>${pick(REPLIES)}</p>`, rootId);
-    }, 1800 + Math.random() * 1500);
-  }, 900 + Math.random() * 800);
+  setTimeout(
+    () => {
+      if (!channel) setTyping(convId, [who]);
+      setTimeout(
+        () => {
+          if (!channel) setTyping(convId, []);
+          post(convId, who, `<p>${pick(REPLIES)}</p>`, rootId);
+        },
+        1800 + Math.random() * 1500,
+      );
+    },
+    900 + Math.random() * 800,
+  );
 }
 
 let started = false;
@@ -434,7 +505,9 @@ export function startSimulation(): void {
   if (started) return;
   started = true;
   setInterval(() => {
-    const candidates = [...chats.values()].filter((c) => c.seed.kind === "chat" && c.seed.members.length && !c.seed.members.some(isAppMri));
+    const candidates = [...chats.values()].filter(
+      (c) => c.seed.kind === "chat" && c.seed.members.length && !c.seed.members.some(isAppMri),
+    );
     const c = pick(candidates);
     post(c.seed.id, pick(c.seed.members), `<p>${pick(CHATTER)}</p>`);
   }, 45_000);

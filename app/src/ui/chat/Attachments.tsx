@@ -16,16 +16,31 @@ function RemoveBtn({ name, armed, onClick }: { name: string; armed: boolean; onC
   return (
     <button
       className={"tc-x-btn tc-attach-x" + (armed ? " armed" : "")}
-      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
       title={armed ? undefined : t().chat.removeFile}
       aria-label={armed ? t().chat.removeFileConfirm(name) : t().common.removeNamed(name)}
     >
-      {armed ? <><Trash2 size={13} /> {t().common.remove}</> : <X size={13} />}
+      {armed ? (
+        <>
+          <Trash2 size={13} /> {t().common.remove}
+        </>
+      ) : (
+        <X size={13} />
+      )}
     </button>
   );
 }
 
-export function Attachments({ files, onRemove }: { files: FileRef[]; onRemove?: (index: number) => void }): JSX.Element | null {
+export function Attachments({
+  files,
+  onRemove,
+}: {
+  files: FileRef[];
+  onRemove?: (index: number) => void;
+}): JSX.Element | null {
   const { armed, tryArm } = useArm<number>();
   if (!files.length) return null;
   const items = files.map(fileItem);
@@ -42,8 +57,12 @@ export function Attachments({ files, onRemove }: { files: FileRef[]; onRemove?: 
         <div className={"tc-thumbs" + (single ? " single" : "")}>
           {thumbs.map(([it, i]) => (
             <div key={i} className="tc-thumb-wrap">
-              <button className="tc-thumb" onClick={() => open(i)} title={it.name}
-                style={single && it.width && it.height ? { aspectRatio: `${it.width} / ${it.height}` } : undefined}>
+              <button
+                className="tc-thumb"
+                onClick={() => open(i)}
+                title={it.name}
+                style={single && it.width && it.height ? { aspectRatio: `${it.width} / ${it.height}` } : undefined}
+              >
                 <img src={it.image} alt={it.name} loading="lazy" draggable={false} />
               </button>
               {onRemove ? <RemoveBtn name={it.name} armed={armed === i} onClick={() => remove(i)} /> : null}
@@ -64,7 +83,13 @@ export function Attachments({ files, onRemove }: { files: FileRef[]; onRemove?: 
               </button>
               <span className="tc-card-acts">
                 {it.url ? (
-                  <a className="tc-card-out" href={it.url} target="_blank" rel="noreferrer noopener" title={t().common.openInBrowser}>
+                  <a
+                    className="tc-card-out"
+                    href={it.url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    title={t().common.openInBrowser}
+                  >
                     <ExternalLink size={14} />
                   </a>
                 ) : null}

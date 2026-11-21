@@ -63,21 +63,27 @@ const renderPending = (p: Pending): JSX.Element => (
         <span className="who">{t().common.you}</span>
         <span className="when">{t().chat.sending}</span>
       </div>
-      {p.text ? <div className="tc-msg-content rich"><RichHtml html={formatMessage(p.text, [], () => "pending-" + p.key).html} /></div> : null}
+      {p.text ? (
+        <div className="tc-msg-content rich">
+          <RichHtml html={formatMessage(p.text, [], () => "pending-" + p.key).html} />
+        </div>
+      ) : null}
       {p.files?.length ? (
-        <div className="tc-attach"><div className="tc-cards">
-          {p.files.map((name, i) => (
-            <div key={i} className="tc-card uploading">
-              <span className="tc-card-main">
-                <KindIcon kind={fileKind(extOf(name))} className="tc-card-icon" size={18} />
-                <span className="tc-card-text">
-                  <span className="tc-card-name">{name}</span>
-                  <span className="tc-card-ext">{t().chat.uploading}</span>
+        <div className="tc-attach">
+          <div className="tc-cards">
+            {p.files.map((name, i) => (
+              <div key={i} className="tc-card uploading">
+                <span className="tc-card-main">
+                  <KindIcon kind={fileKind(extOf(name))} className="tc-card-icon" size={18} />
+                  <span className="tc-card-text">
+                    <span className="tc-card-name">{name}</span>
+                    <span className="tc-card-ext">{t().chat.uploading}</span>
+                  </span>
                 </span>
-              </span>
-            </div>
-          ))}
-        </div></div>
+              </div>
+            ))}
+          </div>
+        </div>
       ) : null}
     </div>
   </div>
@@ -89,15 +95,32 @@ export function Timeline(p: TimelineProps): JSX.Element {
   const { visible, cid, chat, channel, pending: myPending, mq, openThreads } = p;
   const body: JSX.Element[] = [];
   const renderMsg = (m: Msg, first: boolean): JSX.Element => (
-    <Message key={m.id} m={m} first={first} channel={channel} cid={cid} onReact={p.onReact} onDelete={p.onDelete} onRemoveFile={p.onRemoveFile}
-      onUndo={p.onUndo} onEdit={p.onEdit} onOpenProfile={p.onOpenProfile} onQuote={p.onQuote} onJumpTo={p.onJumpTo}
-      onThreadReply={channel ? p.onThreadReply : undefined} />
+    <Message
+      key={m.id}
+      m={m}
+      first={first}
+      channel={channel}
+      cid={cid}
+      onReact={p.onReact}
+      onDelete={p.onDelete}
+      onRemoveFile={p.onRemoveFile}
+      onUndo={p.onUndo}
+      onEdit={p.onEdit}
+      onOpenProfile={p.onOpenProfile}
+      onQuote={p.onQuote}
+      onJumpTo={p.onJumpTo}
+      onThreadReply={channel ? p.onThreadReply : undefined}
+    />
   );
   // A meeting's end marker renders as one quiet line, not a message.
   const renderReply = (m: Msg, first: boolean): JSX.Element =>
     m.call === "end" ? (
-      <div key={m.id} className="tc-call-end"><Video size={13} /> {messageText(m)} · {fmtClock(m.time)}</div>
-    ) : renderMsg(m, first);
+      <div key={m.id} className="tc-call-end">
+        <Video size={13} /> {messageText(m)} · {fmtClock(m.time)}
+      </div>
+    ) : (
+      renderMsg(m, first)
+    );
   // Pending thread replies render inside their thread; the rest at the bottom.
   const threadPending = new Set<number>();
   if (channel) {
@@ -125,7 +148,11 @@ export function Timeline(p: TimelineProps): JSX.Element {
       const at = th.at;
       const day = new Date(at).toDateString();
       if (day !== lastDay) {
-        body.push(<div key={"d" + th.root} className="tc-day"><span>{fmtDay(at)}</span></div>);
+        body.push(
+          <div key={"d" + th.root} className="tc-day">
+            <span>{fmtDay(at)}</span>
+          </div>,
+        );
         lastDay = day;
       }
       const rootMsg = head.isReply ? null : head;
@@ -139,11 +166,21 @@ export function Timeline(p: TimelineProps): JSX.Element {
       // Live: Teams' own live state on the conversation (Chat.liveCall) names
       // the running call's root. Without the chat row, fall back to the posts:
       // a start without an end marker, younger than LIVE_CALL_MS.
-      const live = chat ? chat.liveCall === th.root
-        : rootMsg?.call === "start" && !th.msgs.some((m) => m.call === "end") && Date.now() - rootMsg.time < LIVE_CALL_MS;
+      const live = chat
+        ? chat.liveCall === th.root
+        : rootMsg?.call === "start" &&
+          !th.msgs.some((m) => m.call === "end") &&
+          Date.now() - rootMsg.time < LIVE_CALL_MS;
       body.push(
-        <div key={"t" + th.root} className={"tc-thread" + (p.replyingTo === th.root ? " replying" : "") + (live ? " live" : "")}>
-          {live ? <span className="tc-live-badge"><span className="tc-live-dot" /> {t().chat.live}</span> : null}
+        <div
+          key={"t" + th.root}
+          className={"tc-thread" + (p.replyingTo === th.root ? " replying" : "") + (live ? " live" : "")}
+        >
+          {live ? (
+            <span className="tc-live-badge">
+              <span className="tc-live-dot" /> {t().chat.live}
+            </span>
+          ) : null}
           {rootMsg ? renderMsg(rootMsg, true) : <div className="tc-thread-orphan">{t().chat.olderPost}</div>}
           {replies.length || mine.length ? (
             <div className="tc-thread-replies">
@@ -172,7 +209,7 @@ export function Timeline(p: TimelineProps): JSX.Element {
               </button>
             ) : null}
           </div>
-        </div>
+        </div>,
       );
     }
   } else {
@@ -180,7 +217,9 @@ export function Timeline(p: TimelineProps): JSX.Element {
     for (const m of visible) {
       if (!prev || new Date(prev.time).toDateString() !== new Date(m.time).toDateString()) {
         body.push(
-          <div key={"d" + m.id} className="tc-day"><span>{fmtDay(m.time)}</span></div>
+          <div key={"d" + m.id} className="tc-day">
+            <span>{fmtDay(m.time)}</span>
+          </div>,
         );
         prev = null;
       }
@@ -192,26 +231,36 @@ export function Timeline(p: TimelineProps): JSX.Element {
   return (
     <>
       {mq && !body.length ? (
-        <div className="tc-empty"><p className="tc-sub">{t().chat.noMatch(p.searchText)}</p></div>
+        <div className="tc-empty">
+          <p className="tc-sub">{t().chat.noMatch(p.searchText)}</p>
+        </div>
       ) : null}
       {body}
       {myPending.filter((x) => !threadPending.has(x.key)).map(renderPending)}
       {p.loading && !myPending.length ? (
-        <div className="tc-empty"><p className="tc-sub">{t().chat.loading}</p></div>
+        <div className="tc-empty">
+          <p className="tc-sub">{t().chat.loading}</p>
+        </div>
       ) : null}
       {p.failed && p.empty && !myPending.length ? (
         <div className="tc-empty">
           <p>{t().chat.loadFailed}</p>
           <p className="tc-sub">{t().chat.loadFailedSub}</p>
           <div className="tc-empty-actions">
-            <button className="tc-ghost" onClick={p.onRetry}><RotateCw size={14} /> {t().chat.retry}</button>
-            <button className="tc-ghost" onClick={p.onOpenInTeams}><ExternalLink size={14} /> {t().chat.openInTeams}</button>
+            <button className="tc-ghost" onClick={p.onRetry}>
+              <RotateCw size={14} /> {t().chat.retry}
+            </button>
+            <button className="tc-ghost" onClick={p.onOpenInTeams}>
+              <ExternalLink size={14} /> {t().chat.openInTeams}
+            </button>
           </div>
         </div>
       ) : p.ready && p.empty && !myPending.length ? (
         <div className="tc-empty">
           <p>{t().chat.empty}</p>
-          <button className="tc-ghost" onClick={p.onOpenInTeams}>{t().chat.openInTeams}</button>
+          <button className="tc-ghost" onClick={p.onOpenInTeams}>
+            {t().chat.openInTeams}
+          </button>
         </div>
       ) : null}
     </>

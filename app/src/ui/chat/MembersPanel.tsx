@@ -35,9 +35,26 @@ interface MembersPanelProps {
  * One row: avatar, name and job title (from the cached profile unless given),
  * an optional badge, and a remove button that arms on the first click.
  */
-export function Person({ mri, name, sub, badge, you, armed, removeTitle, onOpen, onRemove }: {
-  mri: string; name?: string; sub?: string; badge?: string; you?: boolean; armed?: boolean;
-  removeTitle?: string; onOpen: (mri: string) => void; onRemove?: () => void;
+export function Person({
+  mri,
+  name,
+  sub,
+  badge,
+  you,
+  armed,
+  removeTitle,
+  onOpen,
+  onRemove,
+}: {
+  mri: string;
+  name?: string;
+  sub?: string;
+  badge?: string;
+  you?: boolean;
+  armed?: boolean;
+  removeTitle?: string;
+  onOpen: (mri: string) => void;
+  onRemove?: () => void;
 }): JSX.Element {
   const p = profile(mri);
   const shown = p.displayName || name || t().common.unknown;
@@ -46,7 +63,10 @@ export function Person({ mri, name, sub, badge, you, armed, removeTitle, onOpen,
     <li className="tc-member">
       <Avatar name={shown} uri={avatarUri(mri)} mri={mri} small onOpen={onOpen} />
       <span className="tc-member-text">
-        <span className="tc-member-name">{shown}{you ? <span className="tc-member-you">{t().chat.youSuffix}</span> : null}</span>
+        <span className="tc-member-name">
+          {shown}
+          {you ? <span className="tc-member-you">{t().chat.youSuffix}</span> : null}
+        </span>
         {job ? <span className="tc-member-sub">{job}</span> : null}
       </span>
       {badge ? <span className="tc-member-badge">{badge}</span> : null}
@@ -57,7 +77,13 @@ export function Person({ mri, name, sub, badge, you, armed, removeTitle, onOpen,
           title={armed ? t().chat.removeConfirm : removeTitle || t().chat.removeFromChat}
           aria-label={armed ? t().chat.removePersonConfirm(shown) : t().common.removeNamed(shown)}
         >
-          {armed ? <><Trash2 size={13} /> {t().common.remove}</> : <X size={14} />}
+          {armed ? (
+            <>
+              <Trash2 size={13} /> {t().common.remove}
+            </>
+          ) : (
+            <X size={14} />
+          )}
         </button>
       ) : null}
     </li>
@@ -70,7 +96,13 @@ export function Person({ mri, name, sub, badge, you, armed, removeTitle, onOpen,
  * match, Backspace in an empty box drops the last chip. `exclude` hides people
  * who are in already.
  */
-export function PeoplePicker({ known, exclude, picked, setPicked, autoFocus }: {
+export function PeoplePicker({
+  known,
+  exclude,
+  picked,
+  setPicked,
+  autoFocus,
+}: {
   known: () => PeopleHit[];
   exclude: (mri: string) => boolean;
   picked: PeopleHit[];
@@ -84,14 +116,23 @@ export function PeoplePicker({ known, exclude, picked, setPicked, autoFocus }: {
   const input = useRef<HTMLInputElement>(null);
   const me = myMri();
   const shown = hits.filter((h) => h.mri !== me && !exclude(h.mri) && !picked.some((p) => p.mri === h.mri));
-  const pick = (p: PeopleHit): void => { setPicked((s) => [...s, p]); setQ(""); input.current?.focus(); };
+  const pick = (p: PeopleHit): void => {
+    setPicked((s) => [...s, p]);
+    setQ("");
+    input.current?.focus();
+  };
   return (
     <>
       <div className="tc-newchat-to" onClick={() => input.current?.focus()}>
         {picked.map((p) => (
           <span key={p.mri} className="tc-chip">
             <span className="tc-chip-name">{p.displayName}</span>
-            <button onClick={() => setPicked((s) => s.filter((x) => x.mri !== p.mri))} aria-label={t().chat.dontAdd(p.displayName)}><X size={12} /></button>
+            <button
+              onClick={() => setPicked((s) => s.filter((x) => x.mri !== p.mri))}
+              aria-label={t().chat.dontAdd(p.displayName)}
+            >
+              <X size={12} />
+            </button>
           </span>
         ))}
         <input
@@ -101,8 +142,10 @@ export function PeoplePicker({ known, exclude, picked, setPicked, autoFocus }: {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && shown[0]) { e.preventDefault(); pick(shown[0]); }
-            else if (e.key === "Backspace" && !q && picked.length) setPicked((s) => s.slice(0, -1));
+            if (e.key === "Enter" && shown[0]) {
+              e.preventDefault();
+              pick(shown[0]);
+            } else if (e.key === "Backspace" && !q && picked.length) setPicked((s) => s.slice(0, -1));
           }}
         />
       </div>
@@ -148,15 +191,31 @@ export function MembersPanel({ chat, known, onClose, onOpenProfile, onAdd, onRem
       <header className="tc-members-head">
         <strong>{t().chat.members}</strong>
         <span className="tc-members-n">{chat.members.length + 1}</span>
-        <button className="tc-ghost tc-icon-only" onClick={onClose} aria-label={t().chat.closeMembers}><X size={15} /></button>
+        <button className="tc-ghost tc-icon-only" onClick={onClose} aria-label={t().chat.closeMembers}>
+          <X size={15} />
+        </button>
       </header>
 
       <div className="tc-members-add">
-        <PeoplePicker known={known} exclude={(m) => chat.members.includes(m)} picked={picked} setPicked={setPicked} autoFocus />
+        <PeoplePicker
+          known={known}
+          exclude={(m) => chat.members.includes(m)}
+          picked={picked}
+          setPicked={setPicked}
+          autoFocus
+        />
         {picked.length ? (
           <div className="tc-members-go">
-            <select value={history} onChange={(e) => setHistory(Number(e.target.value))} aria-label={t().chat.historyLabel}>
-              {HISTORY.map((h) => <option key={h.days} value={h.days}>{h.label()}</option>)}
+            <select
+              value={history}
+              onChange={(e) => setHistory(Number(e.target.value))}
+              aria-label={t().chat.historyLabel}
+            >
+              {HISTORY.map((h) => (
+                <option key={h.days} value={h.days}>
+                  {h.label()}
+                </option>
+              ))}
             </select>
             <button className="tc-newchat-go" disabled={busy} onClick={() => void add()}>
               <UserPlus size={14} /> {addLabel(picked)}

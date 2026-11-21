@@ -1,8 +1,6 @@
 import { memo, useEffect, useRef, useState, type JSX } from "react";
 import { t } from "../../i18n";
-import {
-  SmilePlus, Pencil, Trash2, Undo2, X, Reply, Copy, Check, MessageSquareReply,
-} from "lucide-react";
+import { SmilePlus, Pencil, Trash2, Undo2, X, Reply, Copy, Check, MessageSquareReply } from "lucide-react";
 import { splitQuote } from "../../quote";
 import { RichHtml } from "../../richText";
 import { Avatar } from "../shared/Avatar";
@@ -38,7 +36,21 @@ interface MessageProps {
 // One rendered message: avatar + meta on the first of a group, content (rich
 // HTML or linkified text), files, reactions, and a hover toolbar (react / quote
 // / edit / delete). Edit swaps the content for a textarea with a quote chip.
-export const Message = memo(function Message({ m, first, channel, cid, onReact, onDelete, onRemoveFile, onUndo, onEdit, onOpenProfile, onQuote, onJumpTo, onThreadReply }: MessageProps): JSX.Element {
+export const Message = memo(function Message({
+  m,
+  first,
+  channel,
+  cid,
+  onReact,
+  onDelete,
+  onRemoveFile,
+  onUndo,
+  onEdit,
+  onOpenProfile,
+  onQuote,
+  onJumpTo,
+  onThreadReply,
+}: MessageProps): JSX.Element {
   const { statusOf } = usePresence();
   const [pick, setPick] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -52,7 +64,9 @@ export const Message = memo(function Message({ m, first, channel, cid, onReact, 
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!pick) return;
-    const onDoc = (e: MouseEvent) => { if (!root.current?.contains(e.target as Node)) setPick(false); };
+    const onDoc = (e: MouseEvent) => {
+      if (!root.current?.contains(e.target as Node)) setPick(false);
+    };
     document.addEventListener("mousedown", onDoc, true);
     return () => document.removeEventListener("mousedown", onDoc, true);
   }, [pick]);
@@ -80,9 +94,20 @@ export const Message = memo(function Message({ m, first, channel, cid, onReact, 
   };
   const copyText = (): void => copy(bodyText || text);
   return (
-    <div ref={root} data-mid={m.id} className={"tc-msg" + (first ? " first" : "") + (m.isReply && channel ? " reply" : "")}>
+    <div
+      ref={root}
+      data-mid={m.id}
+      className={"tc-msg" + (first ? " first" : "") + (m.isReply && channel ? " reply" : "")}
+    >
       {first ? (
-        <Avatar name={m.from} uri={avatarUri(m.fromMri)} small={m.isReply && channel} mri={m.mine ? "" : m.fromMri} status={statusOf(m.fromMri)} onOpen={onOpenProfile} />
+        <Avatar
+          name={m.from}
+          uri={avatarUri(m.fromMri)}
+          small={m.isReply && channel}
+          mri={m.mine ? "" : m.fromMri}
+          status={statusOf(m.fromMri)}
+          onOpen={onOpenProfile}
+        />
       ) : (
         // Continuation: the avatar column shows the time on hover instead.
         <span className={"tc-msg-gutter" + (m.isReply && channel ? " sm" : "")}>{fmtClock(m.time)}</span>
@@ -92,7 +117,9 @@ export const Message = memo(function Message({ m, first, channel, cid, onReact, 
           <div className="tc-msg-meta">
             <span className="who">{m.from || (m.mine ? t().common.you : t().common.unknown)}</span>
             {isAppMri(m.fromMri) ? <span className="tc-app-badge">{t().common.app}</span> : null}
-            <span className="when" title={fmtFull(m.time)}>{fmtClock(m.time)}</span>
+            <span className="when" title={fmtFull(m.time)}>
+              {fmtClock(m.time)}
+            </span>
             {m.importance === "high" || m.importance === "urgent" ? (
               <span className="tc-imp">{t().chat.importance[m.importance]}</span>
             ) : null}
@@ -102,7 +129,11 @@ export const Message = memo(function Message({ m, first, channel, cid, onReact, 
         {m.deleted ? (
           <div className="tc-deleted">
             {t().chat.deleted}
-            {m.mine ? <button className="tc-undo" onClick={() => onUndo(cid, m.id)}><Undo2 size={13} /> {t().chat.undo}</button> : null}
+            {m.mine ? (
+              <button className="tc-undo" onClick={() => onUndo(cid, m.id)}>
+                <Undo2 size={13} /> {t().chat.undo}
+              </button>
+            ) : null}
           </div>
         ) : editing ? (
           <div className="tc-edit">
@@ -112,7 +143,14 @@ export const Message = memo(function Message({ m, first, channel, cid, onReact, 
                 <div className="tc-quote-chip-body">
                   <span className="tc-quote-chip-text">{oneLine(editQuote)}</span>
                 </div>
-                <button className="tc-quote-chip-x" onClick={() => setEditQuote("")} title={t().chat.removeQuote} aria-label={t().chat.removeQuote}><X size={13} /></button>
+                <button
+                  className="tc-quote-chip-x"
+                  onClick={() => setEditQuote("")}
+                  title={t().chat.removeQuote}
+                  aria-label={t().chat.removeQuote}
+                >
+                  <X size={13} />
+                </button>
               </div>
             ) : null}
             <textarea
@@ -122,13 +160,20 @@ export const Message = memo(function Message({ m, first, channel, cid, onReact, 
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (handleFormatKey(e)) return;
-                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); saveEdit(); }
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  saveEdit();
+                }
                 if (e.key === "Escape") setEditing(false);
               }}
             />
             <div className="tc-edit-actions">
-              <button className="tc-edit-save" onClick={saveEdit}>{t().common.save}</button>
-              <button className="tc-edit-cancel" onClick={() => setEditing(false)}>{t().common.cancel}</button>
+              <button className="tc-edit-save" onClick={saveEdit}>
+                {t().common.save}
+              </button>
+              <button className="tc-edit-cancel" onClick={() => setEditing(false)}>
+                {t().common.cancel}
+              </button>
             </div>
           </div>
         ) : (
@@ -137,12 +182,18 @@ export const Message = memo(function Message({ m, first, channel, cid, onReact, 
             onClick={(e) => {
               // Click a quoted reply's blockquote to jump to the original.
               const bq = (e.target as Element).closest?.("blockquote.tc-reply");
-              if (bq) { const id = bq.getAttribute("data-reply-id"); if (id) onJumpTo?.(id); }
+              if (bq) {
+                const id = bq.getAttribute("data-reply-id");
+                if (id) onJumpTo?.(id);
+              }
               // Click an inline image to view it large, with the message's other images.
               const img = (e.target as Element).closest?.("img.tc-inline-img");
               if (img) {
                 const all = [...e.currentTarget.querySelectorAll<HTMLImageElement>("img.tc-inline-img")];
-                openViewer(all.map((el) => imageItem(el.currentSrc || el.src, el.alt)), all.indexOf(img as HTMLImageElement));
+                openViewer(
+                  all.map((el) => imageItem(el.currentSrc || el.src, el.alt)),
+                  all.indexOf(img as HTMLImageElement),
+                );
               }
             }}
           >
@@ -150,7 +201,12 @@ export const Message = memo(function Message({ m, first, channel, cid, onReact, 
             {m.edited ? <span className="tc-edited">{t().chat.edited}</span> : null}
           </div>
         )}
-        {m.files.length ? <Attachments files={m.files} onRemove={m.mine && !m.deleted ? (i) => onRemoveFile(cid, m.id, i) : undefined} /> : null}
+        {m.files.length ? (
+          <Attachments
+            files={m.files}
+            onRemove={m.mine && !m.deleted ? (i) => onRemoveFile(cid, m.id, i) : undefined}
+          />
+        ) : null}
         {!m.deleted && m.reactions.length ? (
           <div className="tc-reacts">
             {m.reactions.map((r) => (
@@ -169,20 +225,45 @@ export const Message = memo(function Message({ m, first, channel, cid, onReact, 
       {!m.deleted && !editing ? (
         <div className="tc-tools">
           <div className="tc-tool-row">
-            <button className="tc-tool" title={t().chat.addReaction} onClick={() => setPick((p) => !p)}><SmilePlus size={16} /></button>
-            <button className="tc-tool" title={copied ? t().chat.copied : t().chat.copyText} onClick={copyText}>{copied ? <Check size={15} /> : <Copy size={15} />}</button>
+            <button className="tc-tool" title={t().chat.addReaction} onClick={() => setPick((p) => !p)}>
+              <SmilePlus size={16} />
+            </button>
+            <button className="tc-tool" title={copied ? t().chat.copied : t().chat.copyText} onClick={copyText}>
+              {copied ? <Check size={15} /> : <Copy size={15} />}
+            </button>
             {channel && onThreadReply ? (
-              <button className="tc-tool" title={t().chat.replyInThread} onClick={() => onThreadReply(m)}><MessageSquareReply size={16} /></button>
+              <button className="tc-tool" title={t().chat.replyInThread} onClick={() => onThreadReply(m)}>
+                <MessageSquareReply size={16} />
+              </button>
             ) : null}
-            <button className="tc-tool" title={t().chat.replyQuote} onClick={() => onQuote(m)}><Reply size={16} /></button>
-            {m.mine ? <button className="tc-tool" title={t().chat.edit} onClick={startEdit}><Pencil size={15} /></button> : null}
-            {m.mine ? <button className="tc-tool" title={t().chat.delete} onClick={() => onDelete(cid, m.id)}><Trash2 size={15} /></button> : null}
+            <button className="tc-tool" title={t().chat.replyQuote} onClick={() => onQuote(m)}>
+              <Reply size={16} />
+            </button>
+            {m.mine ? (
+              <button className="tc-tool" title={t().chat.edit} onClick={startEdit}>
+                <Pencil size={15} />
+              </button>
+            ) : null}
+            {m.mine ? (
+              <button className="tc-tool" title={t().chat.delete} onClick={() => onDelete(cid, m.id)}>
+                <Trash2 size={15} />
+              </button>
+            ) : null}
           </div>
           {pick ? (
             <div className="tc-react-pop">
               {PICKER.map(([k, g]) => (
-                <button key={k} className="tc-react-opt" title={k}
-                  onClick={() => { setPick(false); onReact(cid, m.id, k, true); }}>{g}</button>
+                <button
+                  key={k}
+                  className="tc-react-opt"
+                  title={k}
+                  onClick={() => {
+                    setPick(false);
+                    onReact(cid, m.id, k, true);
+                  }}
+                >
+                  {g}
+                </button>
               ))}
             </div>
           ) : null}

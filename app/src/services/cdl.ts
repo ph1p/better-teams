@@ -114,7 +114,8 @@ function listen(s: State, w: Worker): void {
 }
 
 function learn(s: State, w: Worker, msg: unknown): void {
-  if (typeof msg !== "string" || msg.indexOf('"type":"graphql"') < 0 || msg.indexOf("cdlOperationCustomContext") < 0) return;
+  if (typeof msg !== "string" || msg.indexOf('"type":"graphql"') < 0 || msg.indexOf("cdlOperationCustomContext") < 0)
+    return;
   const m = JSON.parse(msg) as {
     rendererId?: string;
     windowId?: string;
@@ -199,7 +200,14 @@ function nextId(s: State, kind: "q" | "m" | "s"): string {
   return `${kind}-${900_000 + ++s.seq}`;
 }
 
-function envelope(ctx: Ctx, requestId: string, operationName: string, query: string, variables: unknown, callerInfo?: string) {
+function envelope(
+  ctx: Ctx,
+  requestId: string,
+  operationName: string,
+  query: string,
+  variables: unknown,
+  callerInfo?: string,
+) {
   return {
     requestId,
     rendererId: ctx.rendererId,
@@ -222,11 +230,17 @@ export type CdlRes<T> = { ok: true; data: T } | { ok: false; reason: string };
  */
 export function check<T>(r: CdlRes<Record<string, unknown>>, field: string, bad?: RegExp): CdlRes<T> {
   if (!r.ok) return r;
-  const v = r.data[field] as { __typename?: string; errorCode?: string; errorType?: string; errorMessage?: string } | null | undefined;
+  const v = r.data[field] as
+    | { __typename?: string; errorCode?: string; errorType?: string; errorMessage?: string }
+    | null
+    | undefined;
   if (!v) return { ok: false, reason: `no ${field}` };
   if (bad && v.__typename && bad.test(v.__typename)) {
     const code = v.errorCode || v.errorType;
-    return { ok: false, reason: `${v.__typename}${code ? ": " + code : ""}${v.errorMessage ? " " + v.errorMessage : ""}` };
+    return {
+      ok: false,
+      reason: `${v.__typename}${code ? ": " + code : ""}${v.errorMessage ? " " + v.errorMessage : ""}`,
+    };
   }
   return { ok: true, data: v as T };
 }
@@ -353,7 +367,10 @@ export function cdlSubscribe<T = Record<string, unknown>>(
       }
     });
     try {
-      s.post!.call(ctx.worker, JSON.stringify(envelope(ctx, requestId, operationName, query, variables, opts.callerInfo)));
+      s.post!.call(
+        ctx.worker,
+        JSON.stringify(envelope(ctx, requestId, operationName, query, variables, opts.callerInfo)),
+      );
     } catch {
       s.subs.delete(requestId);
       return;

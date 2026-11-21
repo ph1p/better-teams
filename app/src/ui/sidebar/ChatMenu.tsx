@@ -7,7 +7,11 @@ import { t } from "../../i18n";
 import { ChannelLeaveItem, ChannelPresets } from "../chat/ChannelItems";
 
 // Right-click chat menu position + target.
-export interface Menu { x: number; y: number; chat: Chat; }
+export interface Menu {
+  x: number;
+  y: number;
+  chat: Chat;
+}
 
 interface ChatMenuProps {
   menu: Menu;
@@ -22,7 +26,16 @@ interface ChatMenuProps {
 
 // The right-click menu for a chat row: read state, mute and hide/unhide.
 // Channels get their notification presets (whose "Off" mutes) and leave.
-export function ChatMenu({ menu, onClose, onSetUnread, onSetHidden, onSetMuted, onLeave, onNewChannel, flash }: ChatMenuProps): JSX.Element {
+export function ChatMenu({
+  menu,
+  onClose,
+  onSetUnread,
+  onSetHidden,
+  onSetMuted,
+  onLeave,
+  onNewChannel,
+  flash,
+}: ChatMenuProps): JSX.Element {
   // Close the menu on any click, scroll, Escape, or resize.
   useDismiss(true, "#tc-root .tc-menu", onClose);
   const s = t().sidebar;
@@ -42,7 +55,10 @@ export function ChatMenu({ menu, onClose, onSetUnread, onSetHidden, onSetMuted, 
       {menu.chat.isChannel && !menu.chat.unread ? null : (
         <button
           className="tc-menu-item"
-          onClick={() => { onSetUnread(menu.chat, !menu.chat.unread); onClose(); }}
+          onClick={() => {
+            onSetUnread(menu.chat, !menu.chat.unread);
+            onClose();
+          }}
         >
           {menu.chat.unread ? <MailOpen size={14} /> : <Mail size={14} />}
           {menu.chat.unread ? s.markRead : s.markUnread}
@@ -51,7 +67,10 @@ export function ChatMenu({ menu, onClose, onSetUnread, onSetHidden, onSetMuted, 
       {menu.chat.isChannel || menu.chat.kind === "notes" ? null : (
         <button
           className="tc-menu-item"
-          onClick={() => { onSetMuted(menu.chat, !menu.chat.muted); onClose(); }}
+          onClick={() => {
+            onSetMuted(menu.chat, !menu.chat.muted);
+            onClose();
+          }}
         >
           {menu.chat.muted ? <Bell size={14} /> : <BellOff size={14} />}
           {menu.chat.muted ? t().common.unmute : t().common.mute}
@@ -60,7 +79,10 @@ export function ChatMenu({ menu, onClose, onSetUnread, onSetHidden, onSetMuted, 
       {menu.chat.isChannel ? null : (
         <button
           className="tc-menu-item"
-          onClick={() => { onSetHidden(menu.chat, !menu.chat.hidden); onClose(); }}
+          onClick={() => {
+            onSetHidden(menu.chat, !menu.chat.hidden);
+            onClose();
+          }}
         >
           {menu.chat.hidden ? <Eye size={14} /> : <EyeOff size={14} />}
           {menu.chat.hidden ? s.unhide : s.hide}

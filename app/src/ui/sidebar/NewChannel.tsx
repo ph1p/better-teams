@@ -13,7 +13,13 @@ interface NewChannelProps {
    * Create it, with `people` added to a private one; resolves to an error
    * text, or null once done (App closes the dialog).
    */
-  onCreate: (name: string, description: string, isPrivate: boolean, threads: boolean, people: PeopleHit[]) => Promise<string | null>;
+  onCreate: (
+    name: string,
+    description: string,
+    isPrivate: boolean,
+    threads: boolean,
+    people: PeopleHit[],
+  ) => Promise<string | null>;
   onClose: () => void;
 }
 
@@ -30,7 +36,9 @@ export function NewChannel({ team, known, onCreate, onClose }: NewChannelProps):
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
-  useEffect(() => { input.current?.focus(); }, []);
+  useEffect(() => {
+    input.current?.focus();
+  }, []);
 
   const submit = async (): Promise<void> => {
     if (!name.trim() || busy) return;
@@ -41,16 +49,26 @@ export function NewChannel({ team, known, onCreate, onClose }: NewChannelProps):
     if (err) setError(err);
   };
   const onKey = (e: { key: string; shiftKey?: boolean; preventDefault: () => void }): void => {
-    if (e.key === "Escape") { e.preventDefault(); onClose(); }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      onClose();
+    }
   };
 
   const c = t().chat;
   return (
-    <div className="tc-scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div
+      className="tc-scrim"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div className="tc-newchat" role="dialog" aria-label={c.newChannelIn(team)} onKeyDown={onKey}>
         <div className="tc-newchat-head">
           <span>{c.newChannelIn(team)}</span>
-          <button className="tc-profile-close" onClick={onClose} title={t().common.close} aria-label={t().common.close}><X size={16} /></button>
+          <button className="tc-profile-close" onClick={onClose} title={t().common.close} aria-label={t().common.close}>
+            <X size={16} />
+          </button>
         </div>
         <div className="tc-newchat-to" onClick={() => input.current?.focus()}>
           <input
@@ -59,8 +77,16 @@ export function NewChannel({ team, known, onCreate, onClose }: NewChannelProps):
             maxLength={50}
             placeholder={c.channelName}
             aria-label={c.channelName}
-            onChange={(e) => { setName(e.target.value); setError(null); }}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void submit(); } }}
+            onChange={(e) => {
+              setName(e.target.value);
+              setError(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void submit();
+              }
+            }}
           />
         </div>
         <textarea

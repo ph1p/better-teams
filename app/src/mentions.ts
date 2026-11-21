@@ -43,9 +43,7 @@ export interface MentionSpan {
 export function claimMentions(text: string, picks: readonly MentionPick[]): MentionSpan[] {
   if (!picks.length) return [];
   // Longest display name first; keep original order as tiebreak for stable itemids.
-  const ordered = picks
-    .map((p, i) => ({ p, i }))
-    .sort((a, b) => b.p.name.length - a.p.name.length || a.i - b.i);
+  const ordered = picks.map((p, i) => ({ p, i })).sort((a, b) => b.p.name.length - a.p.name.length || a.i - b.i);
   const spans: MentionSpan[] = [];
   const taken: boolean[] = new Array(text.length).fill(false);
   for (const { p } of ordered) {
@@ -57,7 +55,11 @@ export function claimMentions(text: string, picks: readonly MentionPick[]): Ment
       const end = at + token.length;
       // Skip if any char already claimed by another (longer) mention.
       let free = true;
-      for (let j = at; j < end; j++) if (taken[j]) { free = false; break; }
+      for (let j = at; j < end; j++)
+        if (taken[j]) {
+          free = false;
+          break;
+        }
       if (free) {
         for (let j = at; j < end; j++) taken[j] = true;
         spans.push({ start: at, end, pick: p });

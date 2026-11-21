@@ -27,7 +27,9 @@ export function buildQuoteHtml(quote: Quote | null): string {
 // Reply blockquote (kept verbatim so an edit can preserve it) and the rest.
 // No quote → { quoteHtml: "", body: content }.
 export function splitQuote(content: string): { quoteHtml: string; body: string } {
-  const m = /^\s*(<blockquote[^>]*itemtype="http:\/\/schema\.skype\.com\/Reply"[\s\S]*?<\/blockquote>)\s*/i.exec(content || "");
+  const m = /^\s*(<blockquote[^>]*itemtype="http:\/\/schema\.skype\.com\/Reply"[\s\S]*?<\/blockquote>)\s*/i.exec(
+    content || "",
+  );
   if (!m) return { quoteHtml: "", body: content || "" };
   return { quoteHtml: m[1], body: (content || "").slice(m[0].length) };
 }

@@ -85,7 +85,10 @@ export function EmojiPicker({ onPick, className }: EmojiPickerProps): JSX.Elemen
         value={q}
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && list[0]) { e.preventDefault(); onPick(list[0][0]); }
+          if (e.key === "Enter" && list[0]) {
+            e.preventDefault();
+            onPick(list[0][0]);
+          }
         }}
       />
       <div className="tc-emoji-grid">

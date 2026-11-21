@@ -11,7 +11,9 @@ export function useDismiss(open: boolean, inside: string, onClose: () => void): 
       if (e.target instanceof Element && e.target.closest(inside)) return;
       onClose();
     };
-    const onKey = (e: KeyboardEvent): void => { if (e.key === "Escape") onClose(); };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") onClose();
+    };
     document.addEventListener("mousedown", close, true);
     document.addEventListener("scroll", close, true);
     window.addEventListener("resize", close, true);

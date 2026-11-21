@@ -16,7 +16,9 @@ export function useCopied(): [boolean, (text: string) => void] {
         clearTimeout(timer.current);
         timer.current = setTimeout(() => setCopied(false), SHOW_MS);
       })
-      .catch(() => { /* clipboard blocked; ignore */ });
+      .catch(() => {
+        /* clipboard blocked; ignore */
+      });
   };
   return [copied, copy];
 }

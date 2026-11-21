@@ -3,7 +3,16 @@
 import type { Message } from "../types";
 import { chat, chatsvc } from "../services";
 import { getByPrefix, open } from "./idb";
-import { asCallRoot, hiddenDeleted, normCdlMessage, normMessage, parseRemotePage, skipType, sortMessages, type ChainCtx } from "./normalize";
+import {
+  asCallRoot,
+  hiddenDeleted,
+  normCdlMessage,
+  normMessage,
+  parseRemotePage,
+  skipType,
+  sortMessages,
+  type ChainCtx,
+} from "./normalize";
 import { get, obj, str } from "./raw";
 import { REMOTE_TTL, remoteCache } from "./state";
 
@@ -15,7 +24,7 @@ interface ListOptions {
 
 export async function listMessages(
   conversationId: string,
-  { channel = false, limit = 300, remoteLimit = limit }: ListOptions = {}
+  { channel = false, limit = 300, remoteLimit = limit }: ListOptions = {},
 ): Promise<Message[] | null> {
   const db = await open("replychain");
   const stores = [...db.objectStoreNames].filter((s) => s.startsWith("replychains"));
@@ -63,11 +72,7 @@ export async function listMessages(
 // Fetch messages for a conversation straight from chatsvc — the exact endpoint
 // Teams itself calls — using Teams' own live token. Returns normalized messages,
 // or null if no token is available or the request fails.
-async function fetchRemoteMessages(
-  conversationId: string,
-  limit: number,
-  channel = false
-): Promise<Message[] | null> {
+async function fetchRemoteMessages(conversationId: string, limit: number, channel = false): Promise<Message[] | null> {
   const cached = remoteCache.get(conversationId);
   if (cached && Date.now() - cached.at < REMOTE_TTL) return cached.msgs;
   const r = await chatsvc.getMessages(conversationId, limit);
@@ -95,7 +100,9 @@ const pagedFrom = new Map<string, string>();
 // One CDL page, oldest first. null when the worker failed or holds nothing for
 // the chat (uncached: it answers an empty page), so callers fall back to REST.
 async function cdlPage(
-  conversationId: string, cursor?: string, channel = false
+  conversationId: string,
+  cursor?: string,
+  channel = false,
 ): Promise<{ msgs: Message[]; older: string | null } | null> {
   const r = await chat.listMessages(conversationId, cursor);
   if (!r.ok) return null;
@@ -125,7 +132,11 @@ const backwardLinks = new Map<string, string | null>();
 // than one scroll allowed and left the view stuck at the top in real chats.
 // Returns older messages ([] = nothing yet, retry later), or null at the start
 // of history.
-export async function fetchOlderRemote(conversationId: string, channel = false, before?: string): Promise<Message[] | null> {
+export async function fetchOlderRemote(
+  conversationId: string,
+  channel = false,
+  before?: string,
+): Promise<Message[] | null> {
   // Scrolled up before the chat's priming finished: get a cursor first rather
   // than reporting "no history".
   if (!cdlCursors.has(conversationId) && !backwardLinks.has(conversationId)) await primeRemote(conversationId, channel);
@@ -147,7 +158,10 @@ export async function fetchOlderRemote(conversationId: string, channel = false, 
       if (cursor === before) pagedFrom.set(conversationId, before);
       if (!p.msgs.length && !p.older) {
         // An empty raw page for `before`: the worker doesn't know that id.
-        if (cursor === before && stored && stored !== before) { cursor = stored; continue; }
+        if (cursor === before && stored && stored !== before) {
+          cursor = stored;
+          continue;
+        }
         cdlCursors.set(conversationId, null);
         return null;
       }

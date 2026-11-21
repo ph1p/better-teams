@@ -51,7 +51,10 @@ function mount(): NonNullable<Window["__teamsCalmApp"]> {
   // Re-injecting a new build replaces the running one in place (no reload).
   const prev = window.__teamsCalmApp;
   if (prev) {
-    if (prev.version === __BUILD__) { prev.show(); return prev; }
+    if (prev.version === __BUILD__) {
+      prev.show();
+      return prev;
+    }
     try {
       prev.destroy();
     } catch {
@@ -71,10 +74,19 @@ function mount(): NonNullable<Window["__teamsCalmApp"]> {
   pill.id = PILL_ID;
   pill.type = "button";
   Object.assign(pill.style, {
-    position: "fixed", zIndex: "2147483000", height: "26px", padding: "0 12px",
-    border: "0", borderRadius: "13px", background: "#4f6bed", color: "#fff",
-    font: "600 12px/26px -apple-system, system-ui, sans-serif", cursor: "pointer",
-    boxShadow: "0 1px 4px rgba(0,0,0,.25)", display: "none", whiteSpace: "nowrap",
+    position: "fixed",
+    zIndex: "2147483000",
+    height: "26px",
+    padding: "0 12px",
+    border: "0",
+    borderRadius: "13px",
+    background: "#4f6bed",
+    color: "#fff",
+    font: "600 12px/26px -apple-system, system-ui, sans-serif",
+    cursor: "pointer",
+    boxShadow: "0 1px 4px rgba(0,0,0,.25)",
+    display: "none",
+    whiteSpace: "nowrap",
   } as Partial<CSSStyleDeclaration>);
   pill.style.setProperty("-webkit-app-region", "no-drag");
   const placePill = (): void => {
@@ -109,7 +121,10 @@ function mount(): NonNullable<Window["__teamsCalmApp"]> {
   };
   pill.addEventListener("click", () => show());
   window.addEventListener("resize", placePill);
-  const toggle = (): void => { if (suppressed) return; visible ? hide() : show(); };
+  const toggle = (): void => {
+    if (suppressed) return;
+    visible ? hide() : show();
+  };
 
   const root = createRoot(el);
   root.render(<App onHide={hide} />);

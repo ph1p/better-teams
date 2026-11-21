@@ -18,13 +18,19 @@ export function NotesPanel({ onClose }: NotesPanelProps): JSX.Element {
   const [text, setText] = usePref<string>(KEY, "");
   const area = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => { area.current?.focus(); }, []);
+  useEffect(() => {
+    area.current?.focus();
+  }, []);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent): void => {
       if (e.key !== "teams-calm:" + KEY || e.newValue === null) return;
       if (document.activeElement === area.current) return;
-      try { setText(JSON.parse(e.newValue) as string); } catch { /* malformed: ignore */ }
+      try {
+        setText(JSON.parse(e.newValue) as string);
+      } catch {
+        /* malformed: ignore */
+      }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -34,7 +40,14 @@ export function NotesPanel({ onClose }: NotesPanelProps): JSX.Element {
     <aside className="tc-profile tc-notes">
       <div className="tc-notes-head">
         <span className="tc-notes-title">{t().common.notes}</span>
-        <button className="tc-profile-close" onClick={onClose} title={t().app.closeNotesTitle} aria-label={t().app.closeNotes}><X size={16} /></button>
+        <button
+          className="tc-profile-close"
+          onClick={onClose}
+          title={t().app.closeNotesTitle}
+          aria-label={t().app.closeNotes}
+        >
+          <X size={16} />
+        </button>
       </div>
       <textarea
         ref={area}
@@ -43,7 +56,12 @@ export function NotesPanel({ onClose }: NotesPanelProps): JSX.Element {
         value={text}
         spellCheck
         onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); onClose(); } }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.preventDefault();
+            onClose();
+          }
+        }}
       />
     </aside>
   );

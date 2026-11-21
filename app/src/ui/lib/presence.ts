@@ -15,21 +15,14 @@ import { myMri } from "../../teamsData";
 import { watchPresence, type PresenceEvent } from "../../services/presence";
 import { t } from "../../i18n";
 
-export type Status =
-  | "Available"
-  | "Away"
-  | "BeRightBack"
-  | "Busy"
-  | "DoNotDisturb"
-  | "Offline"
-  | "Unknown";
+export type Status = "Available" | "Away" | "BeRightBack" | "Busy" | "DoNotDisturb" | "Offline" | "Unknown";
 
 // aria-label (lower-cased) -> status. Covers English + German (the two locales
 // observed). Keys are matched case-insensitively.
 const LABELS: Record<string, Status> = {
   // Available
   available: "Available",
-  "verfügbar": "Available",
+  verfügbar: "Available",
   // Away
   away: "Away",
   abwesend: "Away",
@@ -50,7 +43,7 @@ const LABELS: Record<string, Status> = {
   berightback: "BeRightBack",
   "nicht stören": "DoNotDisturb",
   presenting: "DoNotDisturb",
-  "focusing": "DoNotDisturb",
+  focusing: "DoNotDisturb",
   // Offline / away-from-keyboard
   offline: "Offline",
   "appears offline": "Offline",
@@ -130,10 +123,16 @@ function refresh(): void {
   let changed = false;
   for (const [mri, st] of scrape()) {
     if (live.has(mri)) continue;
-    if (cache.get(mri) !== st) { cache.set(mri, st); changed = true; }
+    if (cache.get(mri) !== st) {
+      cache.set(mri, st);
+      changed = true;
+    }
   }
   const self = readSelf();
-  if (self !== "Unknown" && self !== selfStatus) { selfStatus = self; changed = true; }
+  if (self !== "Unknown" && self !== selfStatus) {
+    selfStatus = self;
+    changed = true;
+  }
   if (changed) for (const f of subs) f();
 }
 
@@ -150,8 +149,12 @@ export function onPresence(cb: () => void): () => void {
   return () => {
     subs.delete(cb);
     if (!subs.size && unsub) {
-      unsub(); unsub = null;
-      if (poll) { clearInterval(poll); poll = 0; }
+      unsub();
+      unsub = null;
+      if (poll) {
+        clearInterval(poll);
+        poll = 0;
+      }
       stopStreams();
     }
   };
@@ -179,7 +182,9 @@ interface PresenceSink {
   push: (mri: string, availability: string) => void;
 }
 declare global {
-  interface Window { __tcPresence?: PresenceSink }
+  interface Window {
+    __tcPresence?: PresenceSink;
+  }
 }
 (() => {
   const sink: PresenceSink = {
@@ -189,15 +194,21 @@ declare global {
       if (!st || !mri) return;
       sink.map[mri] = st;
       if (live.has(mri)) return;
-      if (cache.get(mri) !== st) { cache.set(mri, st); for (const f of subs) f(); }
+      if (cache.get(mri) !== st) {
+        cache.set(mri, st);
+        for (const f of subs) f();
+      }
     },
   };
   // Keep any statuses the injector pushed before the bundle (re)loaded, and seed
   // the cache so they survive a hot reload without waiting for the next push.
   const prev = window.__tcPresence;
-  if (prev && prev.map) for (const mri in prev.map) {
-    const st = prev.map[mri]; sink.map[mri] = st; cache.set(mri, st);
-  }
+  if (prev && prev.map)
+    for (const mri in prev.map) {
+      const st = prev.map[mri];
+      sink.map[mri] = st;
+      cache.set(mri, st);
+    }
   window.__tcPresence = sink;
 })();
 
@@ -233,7 +244,10 @@ function onBatch(batch: PresenceEvent[]): void {
     const st = CDL_STATUS[e.availability];
     if (!st) continue;
     live.add(e.id);
-    if (cache.get(e.id) !== st) { cache.set(e.id, st); changed = true; }
+    if (cache.get(e.id) !== st) {
+      cache.set(e.id, st);
+      changed = true;
+    }
   }
   if (changed) for (const f of subs) f();
 }
@@ -253,7 +267,10 @@ function want(mri: string): void {
 }
 
 function stopStreams(): void {
-  if (flushTimer) { clearTimeout(flushTimer); flushTimer = 0; }
+  if (flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = 0;
+  }
   for (const stop of streams.splice(0)) stop();
   queue = [];
   wanted.clear();

@@ -43,10 +43,15 @@ interface CallRes {
   __timeout?: true;
 }
 type Call = (method: string, params?: object) => Promise<CallRes>;
-interface Conn { ws: WebSocket; call: Call; targetId?: string }
+interface Conn {
+  ws: WebSocket;
+  call: Call;
+  targetId?: string;
+}
 type Log = (...a: unknown[]) => void;
 
-const listTargets = async (): Promise<CdpTarget[]> => (await fetch(`http://localhost:${PORT}/json`)).json() as Promise<CdpTarget[]>;
+const listTargets = async (): Promise<CdpTarget[]> =>
+  (await fetch(`http://localhost:${PORT}/json`)).json() as Promise<CdpTarget[]>;
 const timeout = (ms: number) => new Promise<never>((_, x) => setTimeout(x, ms));
 
 function connect(wsUrl: string): Promise<Conn> {
@@ -55,18 +60,35 @@ function connect(wsUrl: string): Promise<Conn> {
     let id = 0;
     const pend = new Map<number, (r: CallRes) => void>();
     ws.addEventListener("message", (e) => {
-      let j: CdpMsg; try { j = JSON.parse(String(e.data)); } catch { return; }
+      let j: CdpMsg;
+      try {
+        j = JSON.parse(String(e.data));
+      } catch {
+        return;
+      }
       const r = j.id ? pend.get(j.id) : undefined;
-      if (r) { r((j.result || j.error) as CallRes); pend.delete(j.id!); }
+      if (r) {
+        r((j.result || j.error) as CallRes);
+        pend.delete(j.id!);
+      }
     });
     ws.addEventListener("error", reject);
-    ws.addEventListener("close", () => { for (const r of pend.values()) r({ __closed: true }); });
+    ws.addEventListener("close", () => {
+      for (const r of pend.values()) r({ __closed: true });
+    });
     ws.addEventListener("open", () => {
-      const call: Call = (method, params = {}) => new Promise((r) => {
-        const n = ++id; pend.set(n, r);
-        ws.send(JSON.stringify({ id: n, method, params }));
-        setTimeout(() => { if (pend.has(n)) { pend.delete(n); r({ __timeout: true }); } }, 5000);
-      });
+      const call: Call = (method, params = {}) =>
+        new Promise((r) => {
+          const n = ++id;
+          pend.set(n, r);
+          ws.send(JSON.stringify({ id: n, method, params }));
+          setTimeout(() => {
+            if (pend.has(n)) {
+              pend.delete(n);
+              r({ __timeout: true });
+            }
+          }, 5000);
+        });
       resolve({ ws, call });
     });
   });
@@ -100,19 +122,28 @@ const TAP_FN = `function(){
 
 async function findTrouterWorker(): Promise<Conn | null> {
   let list: CdpTarget[];
-  try { list = await listTargets(); }
-  catch { return null; }
+  try {
+    list = await listTargets();
+  } catch {
+    return null;
+  }
   const workers = list.filter((x) => x.type === "worker" && x.webSocketDebuggerUrl);
   for (const w of workers) {
     let c: Conn;
-    try { c = await Promise.race([connect(w.webSocketDebuggerUrl), timeout(3000)]); }
-    catch { continue; }
+    try {
+      c = await Promise.race([connect(w.webSocketDebuggerUrl), timeout(3000)]);
+    } catch {
+      continue;
+    }
     await c.call("Runtime.enable");
     const r = await c.call("Runtime.evaluate", {
       expression: `performance.getEntriesByType("resource").some(x=>/trouter/i.test(x.name))`,
       returnByValue: true,
     });
-    if (r.result && r.result.value === true) { c.targetId = w.id; return c; }
+    if (r.result && r.result.value === true) {
+      c.targetId = w.id;
+      return c;
+    }
     c.ws.close();
   }
   return null;
@@ -160,7 +191,11 @@ function tapWorkerAuth(worker: Conn, page: Conn, logFn: Log) {
 
   worker.ws.addEventListener("message", (e) => {
     let j: CdpMsg;
-    try { j = JSON.parse(String(e.data)); } catch { return; }
+    try {
+      j = JSON.parse(String(e.data));
+    } catch {
+      return;
+    }
     if (j.method === "Network.requestWillBeSent") {
       const p = j.params || {};
       const url = (p.request && p.request.url) || "";
@@ -183,13 +218,19 @@ function tapWorkerAuth(worker: Conn, page: Conn, logFn: Log) {
 // connections so stop() can close them. Re-run to pick up workers spawned later.
 async function tapAllWorkersAuth(page: Conn, known: Map<string, Conn>, logFn: Log) {
   let list: CdpTarget[];
-  try { list = await listTargets(); }
-  catch { return; }
+  try {
+    list = await listTargets();
+  } catch {
+    return;
+  }
   for (const w of list.filter((x) => x.type === "worker" && x.webSocketDebuggerUrl)) {
     if (known.has(w.id)) continue;
     let c: Conn;
-    try { c = await Promise.race([connect(w.webSocketDebuggerUrl), timeout(3000)]); }
-    catch { continue; }
+    try {
+      c = await Promise.race([connect(w.webSocketDebuggerUrl), timeout(3000)]);
+    } catch {
+      continue;
+    }
     known.set(w.id, c);
     c.ws.addEventListener("close", () => known.delete(w.id));
     await tapWorkerAuth(c, page, logFn);
@@ -198,8 +239,11 @@ async function tapAllWorkersAuth(page: Conn, known: Map<string, Conn>, logFn: Lo
 
 async function findPage(): Promise<Conn | null> {
   let list: CdpTarget[];
-  try { list = await listTargets(); }
-  catch { return null; }
+  try {
+    list = await listTargets();
+  } catch {
+    return null;
+  }
   const t = list.find((x) => x.type === "page" && /teams\.microsoft\.com/.test(x.url || ""));
   if (!t) return null;
   const c = await connect(t.webSocketDebuggerUrl);
@@ -219,16 +263,28 @@ async function retap(worker: Conn): Promise<number> {
   const q = await worker.call("Runtime.queryObjects", { prototypeObjectId: proto.result.objectId });
   if (!q.objects || !q.objects.objectId) return 0;
   const r = await worker.call("Runtime.callFunctionOn", {
-    objectId: q.objects.objectId, returnByValue: true, functionDeclaration: TAP_FN,
+    objectId: q.objects.objectId,
+    returnByValue: true,
+    functionDeclaration: TAP_FN,
   });
   return (r.result?.value as number | undefined) || 0;
 }
 
-export async function startPresenceBridge(logFn: Log = () => {}, onStop: () => void = () => {}): Promise<(() => void) | null> {
+export async function startPresenceBridge(
+  logFn: Log = () => {},
+  onStop: () => void = () => {},
+): Promise<(() => void) | null> {
   const worker = await findTrouterWorker();
-  if (!worker) { logFn("presence: no trouter worker found"); return null; }
+  if (!worker) {
+    logFn("presence: no trouter worker found");
+    return null;
+  }
   const page = await findPage();
-  if (!page) { logFn("presence: no Teams page found"); worker.ws.close(); return null; }
+  if (!page) {
+    logFn("presence: no Teams page found");
+    worker.ws.close();
+    return null;
+  }
 
   const tapped = await retap(worker);
   logFn(`presence: tapped ${tapped} trouter socket(s)`);
@@ -257,23 +313,44 @@ export async function startPresenceBridge(logFn: Log = () => {}, onStop: () => v
         });
       }
       if (items.length) logFn(`presence: forwarded ${items.length}`);
-    } catch { /* worker or page went away; retap timer recovers */ }
+    } catch {
+      /* worker or page went away; retap timer recovers */
+    }
   }, 1000);
 
   const retapTimer = setInterval(async () => {
     if (stopped) return;
-    try { await retap(worker); } catch { /* ignore */ }
-    try { await tapAllWorkersAuth(page, authConns, logFn); } catch { /* ignore */ }
+    try {
+      await retap(worker);
+    } catch {
+      /* ignore */
+    }
+    try {
+      await tapAllWorkersAuth(page, authConns, logFn);
+    } catch {
+      /* ignore */
+    }
   }, 5000);
 
   const stop = () => {
     if (stopped) return;
     stopped = true;
-    clearInterval(drainTimer); clearInterval(retapTimer);
-    try { worker.ws.close(); } catch {}
-    for (const c of authConns.values()) { try { c.ws.close(); } catch {} }
-    try { page.ws.close(); } catch {}
-    try { onStop(); } catch {}
+    clearInterval(drainTimer);
+    clearInterval(retapTimer);
+    try {
+      worker.ws.close();
+    } catch {}
+    for (const c of authConns.values()) {
+      try {
+        c.ws.close();
+      } catch {}
+    }
+    try {
+      page.ws.close();
+    } catch {}
+    try {
+      onStop();
+    } catch {}
   };
   worker.ws.addEventListener("close", stop);
   page.ws.addEventListener("close", stop);
@@ -286,5 +363,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const stop = await startPresenceBridge(log);
   if (!stop) process.exit(1);
   log("bridge running; Ctrl+C to stop");
-  process.on("SIGINT", () => { stop(); process.exit(0); });
+  process.on("SIGINT", () => {
+    stop();
+    process.exit(0);
+  });
 }

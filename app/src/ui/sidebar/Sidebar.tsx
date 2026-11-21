@@ -41,8 +41,12 @@ export function Sidebar(p: SidebarProps): JSX.Element {
     <aside className="tc-side">
       <div className="tc-side-head">
         <div className="tc-side-spacer" />
-        <button className="tc-side-btn" onClick={p.onToggleCompact}
-          title={compact ? s.showPreviews : s.compactList} aria-label={compact ? s.showPreviews : s.compactList}>
+        <button
+          className="tc-side-btn"
+          onClick={p.onToggleCompact}
+          title={compact ? s.showPreviews : s.compactList}
+          aria-label={compact ? s.showPreviews : s.compactList}
+        >
           {compact ? <Rows2 size={16} /> : <Rows3 size={16} />}
         </button>
         <button className="tc-side-btn" onClick={p.onNewChat} title={s.newChat} aria-label={s.newChat}>
@@ -73,7 +77,8 @@ export function Sidebar(p: SidebarProps): JSX.Element {
           onClick={() => p.onUnreadFilter(!unreadOnly)}
           title={s.unreadFilterTitle}
         >
-          {s.unread}{unreadCount ? <span className="tc-unread-n">{unreadCount}</span> : null}
+          {s.unread}
+          {unreadCount ? <span className="tc-unread-n">{unreadCount}</span> : null}
         </button>
       </div>
       <div className="tc-list">
@@ -85,28 +90,51 @@ export function Sidebar(p: SidebarProps): JSX.Element {
           </div>
         ) : null}
         {sections.map((sec) => (
-          <Section key={sec.id} id={sec.id} title={sec.id === "search" || sec.id === "unread" ? "" : s.sections[sec.id]}
-            rows={sec.rows} sel={sel} compact={compact}
-            capped={sec.capped} groupByTeam={sec.groupByTeam} defaultCollapsed={sec.defaultCollapsed}
-            onPick={p.onPick} onOpenProfile={p.onOpenProfile} onMenu={p.onMenu} onAddChannel={p.onAddChannel} />
+          <Section
+            key={sec.id}
+            id={sec.id}
+            title={sec.id === "search" || sec.id === "unread" ? "" : s.sections[sec.id]}
+            rows={sec.rows}
+            sel={sel}
+            compact={compact}
+            capped={sec.capped}
+            groupByTeam={sec.groupByTeam}
+            defaultCollapsed={sec.defaultCollapsed}
+            onPick={p.onPick}
+            onOpenProfile={p.onOpenProfile}
+            onMenu={p.onMenu}
+            onAddChannel={p.onAddChannel}
+          />
         ))}
         {!error && !sections.length ? (
           <div className="tc-list-empty">
-            {query ? s.noMatch(query) : unreadOnly ? (
+            {query ? (
+              s.noMatch(query)
+            ) : unreadOnly ? (
               <div className="tc-caught-up">
                 <CheckCheck size={28} className="tc-caught-up-icon" />
                 <strong>{s.caughtUp}</strong>
                 <span>{s.noUnread}</span>
-                <button className="tc-more" onClick={() => p.onUnreadFilter(false)}>{s.showAll}</button>
+                <button className="tc-more" onClick={() => p.onUnreadFilter(false)}>
+                  {s.showAll}
+                </button>
               </div>
-            ) : s.noChats}
+            ) : (
+              s.noChats
+            )}
           </div>
         ) : null}
       </div>
       {selfSlot ? (
         <div className="tc-self-slot">
-          <Row chat={selfSlot} compact selected={selfSlot.id === sel} onClick={() => p.onPick(selfSlot.id)}
-            onOpenProfile={p.onOpenProfile} onMenu={p.onMenu} />
+          <Row
+            chat={selfSlot}
+            compact
+            selected={selfSlot.id === sel}
+            onClick={() => p.onPick(selfSlot.id)}
+            onOpenProfile={p.onOpenProfile}
+            onMenu={p.onMenu}
+          />
         </div>
       ) : null}
       <MeBar onSwitchToTeams={p.onHide} onError={p.onError} />

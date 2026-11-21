@@ -31,8 +31,24 @@ export { sendRemote, setReaction, deleteMessage, editMessage, undoDelete, remove
 export { searchPeople, type PeopleHit } from "./data/people";
 export { setChatHidden, markRead, markUnread } from "./data/readState";
 export {
-  renameChat, addChatMembers, removeChatMember, leaveChat, setChatMuted,
-  getChannelNotifications, setChannelNotifications, type ChannelNotifications, type ChannelPreset,
-  getChannelActions, leaveChannel, leaveTeam, deleteChannel, createChannel, type ChannelActions, type CreateResult,
-  listChannelMembers, addChannelMembers, removeChannelMember, type ChannelMember,
+  renameChat,
+  addChatMembers,
+  removeChatMember,
+  leaveChat,
+  setChatMuted,
+  getChannelNotifications,
+  setChannelNotifications,
+  type ChannelNotifications,
+  type ChannelPreset,
+  getChannelActions,
+  leaveChannel,
+  leaveTeam,
+  deleteChannel,
+  createChannel,
+  type ChannelActions,
+  type CreateResult,
+  listChannelMembers,
+  addChannelMembers,
+  removeChannelMember,
+  type ChannelMember,
 } from "./data/groups";

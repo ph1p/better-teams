@@ -20,9 +20,12 @@ function label(users: TypingUser[]): string {
   const native = users[0]?.typingUsersLabel;
   if (native) return native.replace(/[.…]+$/, "");
   const names = users.map((u) => firstName(u.id));
-  const who = names.length === 1 ? names[0]
-    : names.length === 2 ? t().chat.typingTwo(names[0], names[1])
-    : t().chat.typingMore(names[0], names[1], names.length - 2);
+  const who =
+    names.length === 1
+      ? names[0]
+      : names.length === 2
+        ? t().chat.typingTwo(names[0], names[1])
+        : t().chat.typingMore(names[0], names[1], names.length - 2);
   return t().chat.isTyping(who, names.length > 1);
 }
 
@@ -40,7 +43,10 @@ export function TypingIndicator({ chatId }: { chatId: string }): JSX.Element | n
 
   // Keep the last typers on screen while the pill fades out.
   useEffect(() => {
-    if (users.length) { setShown(users); return; }
+    if (users.length) {
+      setShown(users);
+      return;
+    }
     const h = setTimeout(() => setShown([]), LINGER_MS);
     return () => clearTimeout(h);
   }, [users]);
@@ -54,7 +60,11 @@ export function TypingIndicator({ chatId }: { chatId: string }): JSX.Element | n
           <Avatar key={u.id} name={profile(u.id).displayName || ""} uri={u.avatarUrl || avatarUri(u.id)} small />
         ))}
       </span>
-      <span className="tc-typing-dots" aria-hidden="true"><i /><i /><i /></span>
+      <span className="tc-typing-dots" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
       <span className="tc-typing-text">{text}</span>
     </div>
   );

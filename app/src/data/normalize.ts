@@ -28,14 +28,31 @@ export function asCallRoot(n: Message, raw: Record<string, unknown>): Message {
   if (isCallEnd(html)) {
     const secs = [...html.matchAll(/<duration>(\d+)<\/duration>/g)].map((x) => Number(x[1]));
     const d = secs.length ? Math.max(...secs) : 0;
-    return { ...n, call: "end", from: n.from || "Meeting", content: "<p>Meeting ended" + (d ? " · " + fmtCallDuration(d) : "") + "</p>" };
+    return {
+      ...n,
+      call: "end",
+      from: n.from || "Meeting",
+      content: "<p>Meeting ended" + (d ? " · " + fmtCallDuration(d) : "") + "</p>",
+    };
   }
   // CDL nests the meeting object; IDB/REST keep it as a JSON string in properties.meeting.
   let pm: unknown = get(raw.properties, "meeting");
-  if (typeof pm === "string") { try { pm = JSON.parse(pm); } catch { pm = undefined; } }
-  const title = str(get(raw.meeting, "meetingTitle")) || str(get(pm, "meetingtitle")) || str(get(raw.properties, "meetingtitle"));
+  if (typeof pm === "string") {
+    try {
+      pm = JSON.parse(pm);
+    } catch {
+      pm = undefined;
+    }
+  }
+  const title =
+    str(get(raw.meeting, "meetingTitle")) || str(get(pm, "meetingtitle")) || str(get(raw.properties, "meetingtitle"));
   const esc = title.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return { ...n, call: "start", from: n.from || "Meeting", content: "<p>Meeting" + (esc ? ": <b>" + esc + "</b>" : " started") + "</p>" };
+  return {
+    ...n,
+    call: "start",
+    from: n.from || "Meeting",
+    content: "<p>Meeting" + (esc ? ": <b>" + esc + "</b>" : " started") + "</p>",
+  };
 }
 
 /** The https site URL when it is on SharePoint Online, else "". */
@@ -68,7 +85,8 @@ function parseFiles(raw: unknown): FileRef[] {
         const pv = obj(get(f, "filePreview"));
         // Only AMS previews: they load with the page's cookies.
         const pvUrl = allowedUrl(str(pv.previewUrl))?.href;
-        if (pvUrl) ref.preview = { url: pvUrl, width: Number(pv.previewWidth) || 0, height: Number(pv.previewHeight) || 0 };
+        if (pvUrl)
+          ref.preview = { url: pvUrl, width: Number(pv.previewWidth) || 0, height: Number(pv.previewHeight) || 0 };
         const site = sharePointSite(str(info.siteUrl) || str(ids.siteUrl) || str(get(f, "baseUrl")));
         const uniqueId = (str(ids.listItemUniqueId) || str(get(f, "itemid"))).replace(/[{}]/g, "");
         if (site && /^[0-9a-f-]{36}$/i.test(uniqueId)) {
@@ -90,7 +108,11 @@ function parseFiles(raw: unknown): FileRef[] {
 function reactionGlyph(key: string): string {
   const m = /^([0-9a-f]{4,6})(?:_|$)/i.exec(key);
   if (m) {
-    try { return String.fromCodePoint(parseInt(m[1], 16)); } catch { /* fall through */ }
+    try {
+      return String.fromCodePoint(parseInt(m[1], 16));
+    } catch {
+      /* fall through */
+    }
   }
   return key;
 }
@@ -101,7 +123,13 @@ function reactionsOf(m: Dict): Reaction[] {
   // ([{key, users:[{mri,...}]}]). Merge both into {key, glyph, count, mine}.
   const em = obj(get(m.annotationsSummary, "emotions"));
   let detail: unknown = get(m.properties, "emotions");
-  if (typeof detail === "string") { try { detail = JSON.parse(detail); } catch { detail = null; } }
+  if (typeof detail === "string") {
+    try {
+      detail = JSON.parse(detail);
+    } catch {
+      detail = null;
+    }
+  }
   const me = myMri();
   const mineOf = (key: string): boolean => {
     const row = Array.isArray(detail) ? detail.find((d) => get(d, "key") === key) : null;
@@ -113,11 +141,9 @@ function reactionsOf(m: Dict): Reaction[] {
     .filter((r) => r.count > 0);
 }
 
-
 // A soft-deleted message stays visible (as an Undo stub) only while Teams holds
 // undo state for it, or it was deleted from this overlay (see deletedHere).
-export const hiddenDeleted = (m: Dict, n: Message): boolean =>
-  n.deleted && !m.deletionInfo && !deletedHere.has(n.id);
+export const hiddenDeleted = (m: Dict, n: Message): boolean => n.deleted && !m.deletionInfo && !deletedHere.has(n.id);
 
 // A minimal reply-chain context: a cached replychain row, or a synthesized one
 // for a remote channel message (built from its rootMessageId).
@@ -168,7 +194,7 @@ export function sortMessages(msgs: Message[], channel: boolean): void {
   msgs.sort(
     channel
       ? (a, b) => a.rootTime - b.rootTime || Number(a.isReply) - Number(b.isReply) || a.time - b.time
-      : (a, b) => a.time - b.time
+      : (a, b) => a.time - b.time,
   );
 }
 
@@ -204,7 +230,8 @@ export function normCdlMessage(raw: unknown, channel = false): Message | null {
   const m = obj(raw);
   const messageType = str(m.messageType);
   const id = String(m.id);
-  if (m.content === undefined || skipType(messageType, id, channel ? str(m.parentMessageId) : null, str(m.content))) return null;
+  if (m.content === undefined || skipType(messageType, id, channel ? str(m.parentMessageId) : null, str(m.content)))
+    return null;
   const time = toMs(m.originalArrivalTime);
   const fromMri = str(get(m.fromUser, "mri")) || str(m.fromUserId) || mriOf(m.from);
   const deleted = Number(m.deleteTime) > 0;
@@ -231,22 +258,25 @@ export function normCdlMessage(raw: unknown, channel = false): Message | null {
       };
     })
     .filter((r) => r.key && r.count > 0);
-  return asCallRoot({
-    id,
-    rootId: isReply ? parent : id,
-    rootTime: isReply ? Number(parent) || time : time,
-    isReply,
-    from: str(m.imDisplayName) || str(get(m.fromUser, "displayName")) || profile(fromMri).displayName || "",
-    fromMri,
-    content: str(m.content),
-    messageType,
-    mine: !!fromMri && fromMri === me,
-    deleted,
-    edited: Number(m.editTime) > 0,
-    subject: str(m.subject),
-    importance: asImportance(str(m.importance).toLowerCase()),
-    reactions,
-    files: parseFiles(m.files),
-    time,
-  }, m);
+  return asCallRoot(
+    {
+      id,
+      rootId: isReply ? parent : id,
+      rootTime: isReply ? Number(parent) || time : time,
+      isReply,
+      from: str(m.imDisplayName) || str(get(m.fromUser, "displayName")) || profile(fromMri).displayName || "",
+      fromMri,
+      content: str(m.content),
+      messageType,
+      mine: !!fromMri && fromMri === me,
+      deleted,
+      edited: Number(m.editTime) > 0,
+      subject: str(m.subject),
+      importance: asImportance(str(m.importance).toLowerCase()),
+      reactions,
+      files: parseFiles(m.files),
+      time,
+    },
+    m,
+  );
 }

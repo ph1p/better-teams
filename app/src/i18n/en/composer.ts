@@ -7,7 +7,8 @@ export const composer = {
   attachTitle: "Attach files (or paste / drop them here)",
   attach: "Attach files",
   emoji: "Emoji",
-  codeBlockTitle: "Code block (⌘⇧C)\n**bold** ⌘B · *italic* ⌘I · `code` ⌘E · ~~strike~~ ⌘⇧X\n```lang for highlighted code · - lists · > quotes",
+  codeBlockTitle:
+    "Code block (⌘⇧C)\n**bold** ⌘B · *italic* ⌘I · `code` ⌘E · ~~strike~~ ⌘⇧X\n```lang for highlighted code · - lists · > quotes",
   insertCodeBlock: "Insert code block",
   placeholderThread: "Reply in thread…",
   placeholderChannel: (channel: string) => `Start a new post in #${channel}`,

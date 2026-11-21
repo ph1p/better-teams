@@ -11,7 +11,11 @@ import type { Chat, Message as Msg, Quote } from "../../types";
 import type { MentionPick } from "../../mentions";
 
 // Channel thread the composer answers in.
-export interface ThreadTo { rootId: string; from: string; text: string; }
+export interface ThreadTo {
+  rootId: string;
+  from: string;
+  text: string;
+}
 
 export interface ComposerState {
   composer: RefObject<HTMLTextAreaElement | null>;
@@ -35,7 +39,12 @@ export interface ComposerState {
 
 // Per-chat drafts and @mention picks, the quote / thread-reply target, and the
 // send itself (optimistic, restored on failure).
-export function useComposerState(sel: string | null, selChat: Chat | undefined, m: Messages, flash: Flash): ComposerState {
+export function useComposerState(
+  sel: string | null,
+  selChat: Chat | undefined,
+  m: Messages,
+  flash: Flash,
+): ComposerState {
   const composer = useRef<HTMLTextAreaElement>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   // @mention picks for the open chat's draft: the members the user has inserted.
@@ -79,14 +88,24 @@ export function useComposerState(sel: string | null, selChat: Chat | undefined, 
 
   // Start a quote-reply: remember the target message and focus the composer.
   const onQuote = useCallback((msg: Msg): void => {
-    setQuote({ id: msg.id, from: msg.from || (msg.mine ? t().common.you : t().common.unknown), text: oneLine(splitQuote(msg.content).body).slice(0, 280), time: msg.time, fromMri: msg.fromMri });
+    setQuote({
+      id: msg.id,
+      from: msg.from || (msg.mine ? t().common.you : t().common.unknown),
+      text: oneLine(splitQuote(msg.content).body).slice(0, 280),
+      time: msg.time,
+      fromMri: msg.fromMri,
+    });
     requestAnimationFrame(() => composer.current?.focus());
   }, []);
 
   // Answer in a channel thread: the composer posts into m's thread until sent
   // or cancelled. Replies target their thread's root.
   const onThreadReply = useCallback((msg: Msg): void => {
-    setThreadTo({ rootId: msg.rootId || msg.id, from: msg.from || (msg.mine ? t().common.you : t().common.unknown), text: oneLine(splitQuote(msg.content).body).slice(0, 200) });
+    setThreadTo({
+      rootId: msg.rootId || msg.id,
+      from: msg.from || (msg.mine ? t().common.you : t().common.unknown),
+      text: oneLine(splitQuote(msg.content).body).slice(0, 200),
+    });
     requestAnimationFrame(() => composer.current?.focus());
   }, []);
 
@@ -110,7 +129,14 @@ export function useComposerState(sel: string | null, selChat: Chat | undefined, 
     setThreadTo(null);
     setMentionPicks((mp) => ({ ...mp, [chat.id]: [] }));
     setStaged((st) => ({ ...st, [chat.id]: [] }));
-    m.addPending({ key, chatId: chat.id, text, time: Date.now(), rootId: thread?.rootId, files: sending.map((f) => f.name) });
+    m.addPending({
+      key,
+      chatId: chat.id,
+      text,
+      time: Date.now(),
+      rootId: thread?.rootId,
+      files: sending.map((f) => f.name),
+    });
     m.stickToBottom();
     // Prefer the direct chatsvc endpoint (works for any chat, cached or not).
     // Fall back to driving Teams' native composer only when no token is captured.
@@ -130,5 +156,20 @@ export function useComposerState(sel: string | null, selChat: Chat | undefined, 
     }
   }
 
-  return { composer, draft, setDraft, addPick, files, addFiles, removeFile, quote, setQuote, threadTo, setThreadTo, onQuote, onThreadReply, send };
+  return {
+    composer,
+    draft,
+    setDraft,
+    addPick,
+    files,
+    addFiles,
+    removeFile,
+    quote,
+    setQuote,
+    threadTo,
+    setThreadTo,
+    onQuote,
+    onThreadReply,
+    send,
+  };
 }

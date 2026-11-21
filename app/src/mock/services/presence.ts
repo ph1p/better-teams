@@ -22,5 +22,8 @@ export function watchPresence(userIds: string[], cb: (batch: PresenceEvent[]) =>
   const off = onPresence((id, availability) => {
     if (want.has(id)) cb([{ id, availability }]);
   });
-  return () => { clearTimeout(t); off(); };
+  return () => {
+    clearTimeout(t);
+    off();
+  };
 }

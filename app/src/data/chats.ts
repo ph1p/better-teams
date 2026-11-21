@@ -10,7 +10,10 @@ import { isOneToOneId, lastByConv } from "./state";
 
 // Teams conversation types we show, mapped to our sections.
 const KIND: Record<string, ChatKind> = {
-  Chat: "chat", Meeting: "meeting", Topic: "channel", StreamOfNotes: "notes",
+  Chat: "chat",
+  Meeting: "meeting",
+  Topic: "channel",
+  StreamOfNotes: "notes",
 };
 
 const firstName = (n: string): string => n.split(/[\s,]+/)[0];
@@ -65,7 +68,11 @@ function liveCallRoot(tp: Dict): string {
   for (const [k, v] of Object.entries(tp)) {
     if (!k.startsWith("awareness_conversationLiveState:")) continue;
     let j: Dict;
-    try { j = obj(typeof v === "string" ? JSON.parse(v) : v); } catch { continue; }
+    try {
+      j = obj(typeof v === "string" ? JSON.parse(v) : v);
+    } catch {
+      continue;
+    }
     if (j.status === "Active" && Number(j.expiration) * 1000 > now) return k.slice(k.indexOf(":") + 1);
   }
   return "";
@@ -101,8 +108,11 @@ export async function listChats(): Promise<Chat[]> {
     if (!c.lastMessage && kind !== "channel") continue;
     const props = obj(c.properties);
     const lm = obj(c.lastMessage);
-    const time = toMs(c.lastMessageTimeUtc) || toMs(lm.originalarrivaltime) || toMs(lm.composetime)
-      || (kind === "channel" ? toMs(tp.createdat) : 0);
+    const time =
+      toMs(c.lastMessageTimeUtc) ||
+      toMs(lm.originalarrivaltime) ||
+      toMs(lm.composetime) ||
+      (kind === "channel" ? toMs(tp.createdat) : 0);
     if (!time) continue;
     const lmTime = toMs(lm.originalarrivaltime) || time;
     if (lm.id) lastByConv.set(str(c.id), { id: String(lm.id), clientMessageId: str(lm.clientmessageid), time: lmTime });
@@ -130,41 +140,52 @@ export async function listChats(): Promise<Chat[]> {
     // Hidden standard channel (Teams' "Hide"): Teams lists a channel other
     // than General only while its favorite property is "true". A missing one
     // is kept, to stay on the safe side.
-    if (kind === "channel" && c.id !== teamKey && props.favorite != null && String(props.favorite).toLowerCase() !== "true") continue;
+    if (
+      kind === "channel" &&
+      c.id !== teamKey &&
+      props.favorite != null &&
+      String(props.favorite).toLowerCase() !== "true"
+    )
+      continue;
     // Hidden (Teams' "Hide"): the worker keeps the hide time in the user
     // property unpinnedTime; a newer message brings the chat back.
     const hiddenAt = Number(props.unpinnedTime) || 0;
     const hidden = effectiveHidden(str(c.id), hiddenAt > 0 && time <= hiddenAt);
 
-    chats.push(withPending(str(c.id), {
-      ...(liveCallRoot(tp) ? { liveCall: liveCallRoot(tp) } : {}),
-      id: str(c.id),
-      kind,
-      title: chatTitle(c, kind, others),
-      team: teamName,
-      isChannel: kind === "channel",
-      // 1:1 chats get the other person's photo.
-      avatarMri: kind === "chat" && others.length === 1 ? others[0] : "",
-      // Other participants' MRIs — powers the "chats with this user" panel.
-      members: others,
-      app: kind === "chat" && others.length === 1 && isAppMri(others[0]),
-      favorite: favs.has(str(c.id)),
-      pinned: props.ispinned === "true" || props.ispinned === true,
-      hidden,
-      // The worker's setMuteChat writes the conversation property alerts = String(!mute).
-      muted: kind !== "channel" && (props.alerts === "false" || props.alerts === false),
-      // Everything of kind chat that isn't 1:1 is a group chat.
-      group: kind === "chat" && !isOneToOneId(str(c.id))
-        && tp.uniquerosterthread !== "true" && tp.uniquerosterthread !== true,
-      left,
-      time,
-      unread: !left && (effectiveMarked(str(c.id), props) || (!lastFromMe && horizon > 0 && time > horizon)),
-      last: {
-        from: lastFromMe ? "You" : str(lm.imdisplayname),
-        content: str(lm.content),
-        type: str(lm.messagetype),
-      },
-    }));
+    chats.push(
+      withPending(str(c.id), {
+        ...(liveCallRoot(tp) ? { liveCall: liveCallRoot(tp) } : {}),
+        id: str(c.id),
+        kind,
+        title: chatTitle(c, kind, others),
+        team: teamName,
+        isChannel: kind === "channel",
+        // 1:1 chats get the other person's photo.
+        avatarMri: kind === "chat" && others.length === 1 ? others[0] : "",
+        // Other participants' MRIs — powers the "chats with this user" panel.
+        members: others,
+        app: kind === "chat" && others.length === 1 && isAppMri(others[0]),
+        favorite: favs.has(str(c.id)),
+        pinned: props.ispinned === "true" || props.ispinned === true,
+        hidden,
+        // The worker's setMuteChat writes the conversation property alerts = String(!mute).
+        muted: kind !== "channel" && (props.alerts === "false" || props.alerts === false),
+        // Everything of kind chat that isn't 1:1 is a group chat.
+        group:
+          kind === "chat" &&
+          !isOneToOneId(str(c.id)) &&
+          tp.uniquerosterthread !== "true" &&
+          tp.uniquerosterthread !== true,
+        left,
+        time,
+        unread: !left && (effectiveMarked(str(c.id), props) || (!lastFromMe && horizon > 0 && time > horizon)),
+        last: {
+          from: lastFromMe ? "You" : str(lm.imdisplayname),
+          content: str(lm.content),
+          type: str(lm.messagetype),
+        },
+      }),
+    );
   }
   chats.sort((a, b) => b.time - a.time);
   return chats;

@@ -32,8 +32,18 @@ interface SectionProps {
 // older ones sit behind "Show N older". Unread rows and the open chat always
 // show — even in a collapsed section, so collapsing never hides new messages.
 export function Section({
-  id, title, rows, sel, compact, capped = true, defaultCollapsed = false, groupByTeam = false,
-  onPick, onOpenProfile, onMenu, onAddChannel,
+  id,
+  title,
+  rows,
+  sel,
+  compact,
+  capped = true,
+  defaultCollapsed = false,
+  groupByTeam = false,
+  onPick,
+  onOpenProfile,
+  onMenu,
+  onAddChannel,
 }: SectionProps): JSX.Element {
   const [collapsed, setCollapsed] = usePref<boolean>("sec:" + id, defaultCollapsed);
   const [all, setAll] = useState(false);
@@ -57,8 +67,12 @@ export function Section({
         <div key={"t:" + c.team} className="tc-team-label">
           <span>{name}</span>
           {onAddChannel && c.team ? (
-            <button className="tc-team-add" title={t().chat.newChannel} aria-label={t().chat.newChannel + ": " + name}
-              onClick={() => onAddChannel(c)}>
+            <button
+              className="tc-team-add"
+              title={t().chat.newChannel}
+              aria-label={t().chat.newChannel + ": " + name}
+              onClick={() => onAddChannel(c)}
+            >
               <Plus size={13} />
             </button>
           ) : null}
@@ -66,8 +80,16 @@ export function Section({
       );
     }
     body.push(
-      <Row key={c.id} chat={c} compact={compact} showTeam={!groupByTeam} selected={c.id === sel}
-        onClick={() => onPick(c.id)} onOpenProfile={onOpenProfile} onMenu={onMenu} />
+      <Row
+        key={c.id}
+        chat={c}
+        compact={compact}
+        showTeam={!groupByTeam}
+        selected={c.id === sel}
+        onClick={() => onPick(c.id)}
+        onOpenProfile={onOpenProfile}
+        onMenu={onMenu}
+      />,
     );
   }
 
@@ -78,7 +100,11 @@ export function Section({
           {open ? <ChevronDown size={13} className="tc-caret" /> : <ChevronRight size={13} className="tc-caret" />}
           <span className="tc-sec-title">{title}</span>
           {/* One number only, and only when it says something: unread count. */}
-          {unread ? <span className="tc-sec-count" title={t().sidebar.unreadCount(unread)}>{unread}</span> : null}
+          {unread ? (
+            <span className="tc-sec-count" title={t().sidebar.unreadCount(unread)}>
+              {unread}
+            </span>
+          ) : null}
         </button>
       ) : null}
       {body}

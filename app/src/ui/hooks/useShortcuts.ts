@@ -55,8 +55,11 @@ export function useShortcuts(opts: Shortcuts): void {
         const i = flat.findIndex((c) => c.id === sel);
         const n = flat.length;
         for (let k = 1; k <= n; k++) {
-          const c = flat[(((i < 0 ? (up ? 0 : -1) : i) + (up ? -k : k)) % n + n) % n];
-          if (c && c.unread && c.id !== sel) { pick(c.id); break; }
+          const c = flat[((((i < 0 ? (up ? 0 : -1) : i) + (up ? -k : k)) % n) + n) % n];
+          if (c && c.unread && c.id !== sel) {
+            pick(c.id);
+            break;
+          }
         }
       } else if (e.altKey && !e.metaKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
         e.preventDefault();

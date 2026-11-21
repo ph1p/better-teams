@@ -116,7 +116,8 @@ export async function flushPendingHorizons(): Promise<void> {
     const res = await writeHorizon(id, v);
     // Re-queue only transient failures (network, token gone, 5xx); a 4xx would
     // fail forever. Skip if a newer write for this chat was queued meanwhile.
-    const transient = !res.ok && (res.reason === "fetch-failed" || res.reason === "no-token" || /^http-5/.test(res.reason));
+    const transient =
+      !res.ok && (res.reason === "fetch-failed" || res.reason === "no-token" || /^http-5/.test(res.reason));
     if (transient && !pendingHorizon.has(id)) pendingHorizon.set(id, v);
     else if (!res.ok) horizonOverride.delete(id);
   }
@@ -129,7 +130,9 @@ export async function markRead(conversationId: string, lastMessageMs?: number): 
   const ms = lastMessageMs ? lastMessageMs + 1 : Date.now();
   const last = lastByConv.get(conversationId);
   if (last) {
-    const r = isChannelId(conversationId) ? await chat.markChannelRead(conversationId, last) : await chat.markRead(conversationId, last);
+    const r = isChannelId(conversationId)
+      ? await chat.markChannelRead(conversationId, last)
+      : await chat.markRead(conversationId, last);
     if (r.ok) {
       pendingHorizon.delete(conversationId);
       horizonOverride.set(conversationId, { ms: Math.max(ms, last.time + 1) });

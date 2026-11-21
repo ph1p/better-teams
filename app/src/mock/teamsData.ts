@@ -33,7 +33,12 @@ export async function loadProfiles(): Promise<Record<string, Profile>> {
 }
 
 const EMPTY_PROFILE: Profile = {
-  displayName: "", imageUri: "", email: "", jobTitle: "", department: "", officeLocation: "",
+  displayName: "",
+  imageUri: "",
+  email: "",
+  jobTitle: "",
+  department: "",
+  officeLocation: "",
 };
 export function profile(mri: string): Profile {
   return store.profiles[mri] || EMPTY_PROFILE;
@@ -50,7 +55,11 @@ export async function listMessages(
   return store.recent(conversationId);
 }
 
-export async function fetchOlderRemote(conversationId: string, _channel = false, _before?: string): Promise<Message[] | null> {
+export async function fetchOlderRemote(
+  conversationId: string,
+  _channel = false,
+  _before?: string,
+): Promise<Message[] | null> {
   return later(store.older(conversationId), 300);
 }
 
@@ -78,10 +87,16 @@ export async function sendRemote(
 export async function searchPeople(query: string, size = 8): Promise<PeopleHit[]> {
   const q = query.trim().toLowerCase();
   if (!q) return [];
-  const hits = PEOPLE
-    .filter((p) => p.mri !== ME)
-    .filter((p) => p.displayName.toLowerCase().split(/\s+/).some((w) => w.startsWith(q))
-      || p.displayName.toLowerCase().startsWith(q) || p.email.startsWith(q))
+  const hits = PEOPLE.filter((p) => p.mri !== ME)
+    .filter(
+      (p) =>
+        p.displayName
+          .toLowerCase()
+          .split(/\s+/)
+          .some((w) => w.startsWith(q)) ||
+        p.displayName.toLowerCase().startsWith(q) ||
+        p.email.startsWith(q),
+    )
     .slice(0, size)
     .map((p) => ({ mri: p.mri, displayName: p.displayName, email: p.email, jobTitle: p.jobTitle }));
   return later(hits, 200);
@@ -122,8 +137,7 @@ export async function editMessage(
   text: string,
   quoteHtml = "",
 ): Promise<WriteResult> {
-  return store.edit(conversationId, messageId, quoteHtml + formatMessage(text).html)
-    ? ok : fail("not yours");
+  return store.edit(conversationId, messageId, quoteHtml + formatMessage(text).html) ? ok : fail("not yours");
 }
 
 export async function undoDelete(conversationId: string, messageId: string): Promise<WriteResult> {
@@ -139,7 +153,11 @@ export async function renameChat(conversationId: string, title: string): Promise
   return later(store.setTopic(conversationId, t) ? ok : fail("not a group chat"));
 }
 
-export async function addChatMembers(conversationId: string, mris: string[], _shareHistoryDays = 0): Promise<WriteResult> {
+export async function addChatMembers(
+  conversationId: string,
+  mris: string[],
+  _shareHistoryDays = 0,
+): Promise<WriteResult> {
   return later(store.setMembers(conversationId, mris, []) ? ok : fail("not a group chat"));
 }
 
@@ -161,7 +179,9 @@ export async function getChannelNotifications(channelId: string): Promise<Channe
 }
 
 export async function setChannelNotifications(
-  channelId: string, preset: ChannelPreset, _current?: ChannelNotifications | null,
+  channelId: string,
+  preset: ChannelPreset,
+  _current?: ChannelNotifications | null,
 ): Promise<WriteResult> {
   return later(store.channelPreset(channelId, preset) ? ok : fail("not a channel"));
 }
@@ -172,11 +192,23 @@ export async function setChannelNotifications(
 export async function getChannelActions(channelId: string): Promise<ChannelActions | null> {
   const general = /-general@/.test(channelId);
   const channel = general ? null : /private/.test(channelId) ? "leave" : "hide";
-  return later(store.channelPreset(channelId)
-    ? {
-      channel, team: true, rename: true, delete: !general, create: true, channelId, teamId: channelId, groupId: "",
-      members: channel === "leave" ? "channel" : "team", addMembers: true, removeMembers: true,
-    } : null);
+  return later(
+    store.channelPreset(channelId)
+      ? {
+          channel,
+          team: true,
+          rename: true,
+          delete: !general,
+          create: true,
+          channelId,
+          teamId: channelId,
+          groupId: "",
+          members: channel === "leave" ? "channel" : "team",
+          addMembers: true,
+          removeMembers: true,
+        }
+      : null,
+  );
 }
 
 export async function deleteChannel(a: ChannelActions): Promise<WriteResult> {
@@ -185,7 +217,11 @@ export async function deleteChannel(a: ChannelActions): Promise<WriteResult> {
 }
 
 export async function createChannel(
-  a: ChannelActions, name: string, _description: string, isPrivate: boolean, _threads: boolean,
+  a: ChannelActions,
+  name: string,
+  _description: string,
+  isPrivate: boolean,
+  _threads: boolean,
 ): Promise<CreateResult> {
   void _description;
   void _threads;
@@ -204,10 +240,20 @@ export async function leaveTeam(a: ChannelActions): Promise<WriteResult> {
 
 export async function listChannelMembers(a: ChannelActions): Promise<ChannelMember[] | null> {
   const ms = store.channelMembers(a.channelId);
-  return later(ms && ms.filter((m) => m.startsWith("8:")).map((mri, i) => ({
-    mri, displayName: profile(mri).displayName || mri, jobTitle: profile(mri).jobTitle,
-    role: mri === ME || i === 0 ? "Admin" : "User", objectId: "", tenantId: "",
-  })), 250);
+  return later(
+    ms &&
+      ms
+        .filter((m) => m.startsWith("8:"))
+        .map((mri, i) => ({
+          mri,
+          displayName: profile(mri).displayName || mri,
+          jobTitle: profile(mri).jobTitle,
+          role: mri === ME || i === 0 ? "Admin" : "User",
+          objectId: "",
+          tenantId: "",
+        })),
+    250,
+  );
 }
 
 export async function addChannelMembers(a: ChannelActions, mris: string[]): Promise<WriteResult> {

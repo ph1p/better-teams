@@ -19,7 +19,10 @@ export function onTeamsChange(cb: () => void): () => void {
   liveSubs.add(cb);
   if (!liveObs) {
     let timer: ReturnType<typeof setTimeout> | 0 = 0;
-    const fire = (): void => { timer = 0; for (const f of liveSubs) f(); };
+    const fire = (): void => {
+      timer = 0;
+      for (const f of liveSubs) f();
+    };
     liveObs = new MutationObserver((recs) => {
       if (timer) return;
       const root = document.getElementById("tc-root");
@@ -33,6 +36,9 @@ export function onTeamsChange(cb: () => void): () => void {
   }
   return () => {
     liveSubs.delete(cb);
-    if (!liveSubs.size && liveObs) { liveObs.disconnect(); liveObs = null; }
+    if (!liveSubs.size && liveObs) {
+      liveObs.disconnect();
+      liveObs = null;
+    }
   };
 }

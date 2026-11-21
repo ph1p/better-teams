@@ -16,7 +16,10 @@ export function useArm<K>(): {
     return () => clearTimeout(h);
   }, [armed]);
   const tryArm = (key: K, act: () => void): void => {
-    if (armed !== key) { setArmed(key); return; }
+    if (armed !== key) {
+      setArmed(key);
+      return;
+    }
     setArmed(null);
     act();
   };
