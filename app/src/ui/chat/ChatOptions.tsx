@@ -52,7 +52,7 @@ export function ChatOptions({ chat, flash, onRename, onMembers, onSetMuted, onLe
           {chat.isChannel ? (
             <>
               <ChannelPresets chat={chat} flash={flash} onDone={close} />
-              <ChannelLeaveItem chat={chat} onLeave={onLeave} onNewChannel={onNewChannel} onRename={onRename} onDone={close} />
+              <ChannelLeaveItem chat={chat} onLeave={onLeave} onNewChannel={onNewChannel} onRename={onRename} onMembers={onMembers} onDone={close} />
             </>
           ) : (
             <>

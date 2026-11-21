@@ -10,6 +10,7 @@ import { MAX_CALL } from "../lib/constants";
 import type { Flash } from "../lib/toast";
 import { ChatOptions } from "./ChatOptions";
 import { MembersPanel } from "./MembersPanel";
+import { ChannelMembersPanel } from "./ChannelMembersPanel";
 import type { Chat } from "../../types";
 
 interface ChatHeaderProps {
@@ -159,6 +160,14 @@ export function ChatHeader({
           onOpenProfile={onOpenProfile}
           onAdd={onAddMembers}
           onRemove={onRemoveMember}
+        />
+      ) : membersOpen && chat.isChannel && !chat.left ? (
+        <ChannelMembersPanel
+          chat={chat}
+          known={knownPeople}
+          flash={flash}
+          onClose={() => setMembersOpen(false)}
+          onOpenProfile={onOpenProfile}
         />
       ) : null}
       {chat.app ? (

@@ -50,6 +50,8 @@ export const app: Messages["app"] = {
   cantAddChannel: "In diesem Team kannst du keine Kanäle hinzufügen",
   createChannelFailed: (reason) => `Kanal konnte nicht erstellt werden (${reason})`,
   deleteChannelFailed: (reason) => `Kanal konnte nicht gelöscht werden (${reason})`,
+  membersAdded: (n) => (n === 1 ? "1 Person hinzugefügt." : `${n} Personen hinzugefügt.`),
+  memberRemoved: (name) => `${name} entfernt.`,
 
   // Messages (toasts)
   reactionFailed: (reason) => `Reaktion fehlgeschlagen (${reason})`,

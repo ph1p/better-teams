@@ -928,3 +928,10 @@
 #tc-root .tc-me-lang { cursor: default; }
 #tc-root .tc-me-lang select { margin-left: auto; max-width: 150px; border: 1px solid var(--tc-line); border-radius: 7px;
   background: var(--tc-bg); color: var(--tc-fg); font: 12.5px var(--tc-font); padding: 3px 4px; }
+#tc-root .tc-member-badge { flex: none; color: var(--tc-fg2); font-size: 11px; padding: 1px 6px;
+  border: 1px solid var(--tc-line); border-radius: 999px; }
+#tc-root .tc-members-note { color: var(--tc-fg2); font-size: 12px; padding: 0 14px 8px; }
+#tc-root .tc-members-go.end { justify-content: flex-end; }
+#tc-root .tc-newchat-people { margin-top: 8px; }
+#tc-root .tc-newchat-people > small { display: block; margin-bottom: 4px; opacity: 0.7; }
+#tc-root .tc-newchat-people .tc-newchat-hits { max-height: 180px; }

@@ -13,12 +13,18 @@
 //   editChannel            a channel's name (Teams' "Edit channel")
 //   deleteChannel          the channel, for everyone in the team
 //   createChannelV2        a new standard or private channel in a team
+//   threadMembersByRole    a team's or private channel's roster
+//   addBulkMembersToTeam / addBulkMembersToPrivateChannel  add people
+//   removeThreadMembership remove one person from a team or private channel
 // Teams follows leaveChat with a hide; so do we (data/groups.ts). Standard
 // channels can't be left on their own, only hidden; General can't be either,
 // only left with its team. Whether we may rename or delete a channel is the
 // channel's own canEdit / canDelete: Teams derives both from our team role
 // and the team's settings (false for General's delete). Adding a channel is
-// the team's canAddChannel, read alongside.
+// the team's canAddChannel, read alongside. Standard channels share their
+// team's roster; a private channel has its own (its people must be in the
+// team). Teams lets owners (memberRole ADMIN) add and remove people; a private
+// channel's canAddMembers says whether we may add to it.
 
 import { cdl, check, type CdlRes } from "./cdl";
 
@@ -73,7 +79,9 @@ const CHANNEL_INFO = `query channelLeaveInfoQuery($channelId: ID!) {
     canDelete
     displayName
     isHidden
-    owningTeam { internalId groupId canLeave canAddChannel __typename }
+    canAddMembers
+    memberRole
+    owningTeam { internalId groupId canLeave canAddChannel canAddMember memberRole __typename }
   }
 }`;
 
@@ -116,6 +124,32 @@ const EDIT_CHANNEL = `mutation editChannelMutation($channelId: ID!, $details: Ed
 
 const DELETE_CHANNEL = `mutation deleteChannelMutation($input: DeleteChannelInput!) {
   deleteChannel(input: $input) { id __typename }
+}`;
+
+// Teams' own members-tab query (docs/cdl-catalog.json), trimmed to what we show.
+const MEMBERS = `query ComponentsThreadMembersTableGetMembersQuery($threadId: ID!, $roles: [TeamMemberRole!]!, $nextLink: String, $orderBy: [ThreadMemberOrderByInput!]) {
+  threadMembersByRole(threadId: $threadId, roles: $roles, nextLink: $nextLink, orderBy: $orderBy) {
+    id
+    members { __typename user { id displayName jobTitle tenantId objectId __typename } role }
+    totalCount
+    nextLink
+    error
+    __typename
+  }
+}`;
+
+const UPDATED_MEMBERS = `members { user { id __typename } role __typename } erroredMembers { id error __typename } __typename`;
+
+const ADD_TEAM_MEMBERS = `mutation addBulkMembersToTeamMutation($teamId: ID!, $groupId: ID!, $users: [UserCompactInput!]!) {
+  addBulkMembersToTeam(teamId: $teamId, groupId: $groupId, users: $users, allowAsyncAddition: false) { ${UPDATED_MEMBERS} }
+}`;
+
+const ADD_CHANNEL_MEMBERS = `mutation addBulkMembersToPrivateChannelMutation($teamId: ID!, $channelId: ID!, $users: [UserCompactInput!]!) {
+  addBulkMembersToPrivateChannel(teamId: $teamId, channelId: $channelId, users: $users) { ${UPDATED_MEMBERS} }
+}`;
+
+const REMOVE_THREAD_MEMBER = `mutation removeThreadMembershipMutation($threadId: ID!, $groupId: String, $userMri: String, $objectId: String, $userTenantId: String) {
+  removeThreadMembership(threadId: $threadId, groupId: $groupId, userMri: $userMri, objectId: $objectId, userTenantId: $userTenantId)
 }`;
 
 type Data = Record<string, unknown>;
@@ -216,6 +250,12 @@ export interface ChannelInfo {
   canDelete: boolean;
   displayName: string;
   isHidden: boolean;
+  /** Teams' memberRole for us in the channel and its team: "ADMIN" for owners. */
+  channelRole: string;
+  teamRole: string;
+  /** May add people to this (private/shared) channel, or to the team. */
+  canAddMembers: boolean;
+  canAddTeamMember: boolean;
 }
 
 export async function getChannelInfo(channelId: string): Promise<CdlRes<ChannelInfo>> {
@@ -238,6 +278,10 @@ export async function getChannelInfo(channelId: string): Promise<CdlRes<ChannelI
       canDelete: ch.canDelete === true,
       displayName: String(ch.displayName ?? ""),
       isHidden: ch.isHidden === true,
+      channelRole: String(ch.memberRole ?? ""),
+      teamRole: String(team.memberRole ?? ""),
+      canAddMembers: ch.canAddMembers === true,
+      canAddTeamMember: team.canAddMember === true,
     },
   };
 }
@@ -312,4 +356,77 @@ export async function createChannel(
   const d = r.data;
   if (d.__typename === "CreateK2ChannelResponse") return { ok: true, data: d.threadId || "" };
   return { ok: true, data: d.id || "" };
+}
+
+/** One person on a team's or private channel's roster. */
+export interface ThreadMember {
+  mri: string;
+  displayName: string;
+  jobTitle: string;
+  /** Teams' TeamMemberRole: "Admin" (owner), "User", "Guest". */
+  role: string;
+  objectId: string;
+  tenantId: string;
+}
+
+/** A team's (thread id) or private channel's roster, owners first in Teams' order. */
+export async function listThreadMembers(threadId: string): Promise<CdlRes<ThreadMember[]>> {
+  const out: ThreadMember[] = [];
+  let nextLink: string | null = null;
+  // Teams pages by 100; a few pages cover any team we'd show in a panel.
+  for (let page = 0; page < 10; page++) {
+    const r: CdlRes<{ members?: Data[]; nextLink?: string | null; error?: string | null }> = check(
+      await cdl<Data>("ComponentsThreadMembersTableGetMembersQuery", MEMBERS, {
+        threadId, roles: ["Admin", "User", "Guest"], nextLink,
+      }, { timeoutMs: 30_000 }), "threadMembersByRole");
+    if (!r.ok) return r;
+    if (r.data.error) return { ok: false, reason: r.data.error };
+    for (const m of r.data.members ?? []) {
+      const u = (m.user ?? {}) as Data;
+      out.push({
+        mri: String(u.id ?? ""), displayName: String(u.displayName ?? ""), jobTitle: String(u.jobTitle ?? ""),
+        role: String(m.role ?? ""), objectId: String(u.objectId ?? ""), tenantId: String(u.tenantId ?? ""),
+      });
+    }
+    nextLink = r.data.nextLink || null;
+    if (!nextLink) break;
+  }
+  return { ok: true, data: out };
+}
+
+/** People Teams couldn't add, by MRI with its error type; empty when all went in. */
+export type AddFailures = { mri: string; error: string }[];
+
+/**
+ * Add people as members to a team, or to a private channel when `channelId`
+ * is given (they must already be in its team).
+ */
+export async function addThreadMembers(
+  team: { teamId: string; groupId: string }, channelId: string | null, mris: string[],
+): Promise<CdlRes<AddFailures>> {
+  const users = mris.map((userMri) => ({ userMri, role: "User" }));
+  const name = channelId ? "addBulkMembersToPrivateChannel" : "addBulkMembersToTeam";
+  const r = check<{ erroredMembers?: Data[] }>(channelId
+    ? await cdl<Data>("addBulkMembersToPrivateChannelMutation", ADD_CHANNEL_MEMBERS,
+      { teamId: team.teamId, channelId, users }, { timeoutMs: 60_000 })
+    : await cdl<Data>("addBulkMembersToTeamMutation", ADD_TEAM_MEMBERS,
+      { teamId: team.teamId, groupId: team.groupId, users }, { timeoutMs: 60_000 }), name);
+  if (!r.ok) return r;
+  return {
+    ok: true,
+    data: (r.data.erroredMembers ?? []).filter(Boolean).map((e) => ({ mri: String(e.id ?? ""), error: String(e.error ?? "") })),
+  };
+}
+
+/**
+ * Remove someone from a team (`threadId` its thread, `groupId` its M365
+ * group) or a private channel (`threadId` the channel). The worker picks the
+ * right service from the thread's type.
+ */
+export async function removeThreadMember(threadId: string, groupId: string | null, m: ThreadMember): Promise<CdlRes<true>> {
+  const r = await cdl<Data>("removeThreadMembershipMutation", REMOVE_THREAD_MEMBER, {
+    threadId, groupId, userMri: m.mri, objectId: m.objectId || null, userTenantId: m.tenantId || null,
+  }, { timeoutMs: 30_000 });
+  if (!r.ok) return r;
+  return r.data.removeThreadMembership === true ? { ok: true, data: true } : { ok: false, reason: "removeThreadMembership refused" };
 }

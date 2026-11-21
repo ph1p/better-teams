@@ -1,23 +1,32 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 import { X } from "lucide-react";
 import { t } from "../../i18n";
+import type { PeopleHit } from "../../teamsData";
+import { PeoplePicker } from "../chat/MembersPanel";
 
 interface NewChannelProps {
   /** Team the channel goes into, for the title. */
   team: string;
-  /** Create it; resolves to an error text, or null once done (App closes the dialog). */
-  onCreate: (name: string, description: string, isPrivate: boolean, threads: boolean) => Promise<string | null>;
+  /** People for the private channel's picker (known chats, then the directory). */
+  known: () => PeopleHit[];
+  /**
+   * Create it, with `people` added to a private one; resolves to an error
+   * text, or null once done (App closes the dialog).
+   */
+  onCreate: (name: string, description: string, isPrivate: boolean, threads: boolean, people: PeopleHit[]) => Promise<string | null>;
   onClose: () => void;
 }
 
 // "Add channel" dialog, as Teams' own: a name, an optional description,
 // standard or private access and the layout (threads, Teams' default, or
-// posts). Shared channels are left to Teams.
-export function NewChannel({ team, onCreate, onClose }: NewChannelProps): JSX.Element {
+// posts). A private channel can get its first members right away. Shared
+// channels are left to Teams.
+export function NewChannel({ team, known, onCreate, onClose }: NewChannelProps): JSX.Element {
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [priv, setPriv] = useState(false);
   const [threads, setThreads] = useState(true);
+  const [people, setPeople] = useState<PeopleHit[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -27,7 +36,7 @@ export function NewChannel({ team, onCreate, onClose }: NewChannelProps): JSX.El
     if (!name.trim() || busy) return;
     setBusy(true);
     setError(null);
-    const err = await onCreate(name, desc, priv, threads);
+    const err = await onCreate(name, desc, priv, threads, priv ? people : []);
     setBusy(false);
     if (err) setError(err);
   };
@@ -67,6 +76,12 @@ export function NewChannel({ team, onCreate, onClose }: NewChannelProps): JSX.El
           <input type="checkbox" checked={priv} onChange={(e) => setPriv(e.target.checked)} />
           <span>{c.channelPrivate}</span>
         </label>
+        {priv ? (
+          <div className="tc-newchat-people" aria-label={c.channelAddPeople}>
+            <small>{c.channelAddPeople}</small>
+            <PeoplePicker known={known} exclude={() => false} picked={people} setPicked={setPeople} />
+          </div>
+        ) : null}
         <div className="tc-newchat-layout" role="radiogroup" aria-label={c.channelLayout}>
           <span>{c.channelLayout}</span>
           <label className="tc-newchat-check">

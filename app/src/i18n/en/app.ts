@@ -49,6 +49,8 @@ export const app = {
   cantAddChannel: "You can't add channels to this team",
   createChannelFailed: (reason: string) => `Couldn't create the channel (${reason})`,
   deleteChannelFailed: (reason: string) => `Couldn't delete the channel (${reason})`,
+  membersAdded: (n: number) => (n === 1 ? "1 person added." : `${n} people added.`),
+  memberRemoved: (name: string) => `${name} removed.`,
 
   // Messages (toasts)
   reactionFailed: (reason: string) => `Reaction failed (${reason})`,

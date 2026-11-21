@@ -1,6 +1,6 @@
 import { useCallback, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import {
-  addChatMembers, createChannel, deleteChannel, getChannelActions, leaveChannel, leaveChat, leaveTeam, markRead, markUnread, myMri, profile, removeChatMember, renameChat, sendRemote, setChatHidden,
+  addChannelMembers, addChatMembers, createChannel, deleteChannel, getChannelActions, leaveChannel, leaveChat, leaveTeam, markRead, markUnread, myMri, profile, removeChatMember, renameChat, sendRemote, setChatHidden,
   setChatMuted, type PeopleHit,
 } from "../../teamsData";
 import {
@@ -252,9 +252,12 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
 
   // Add a channel to `from`'s team, then open it once the list has it. A
   // private channel may come back without its id: it shows up with a later
-  // poll, so find it there by team and name (unique within a team). Resolves
-  // to an error text for the dialog, or null.
-  const addChannel = useCallback(async (from: Chat, name: string, desc: string, priv: boolean, threads: boolean): Promise<string | null> => {
+  // poll, so find it there by team and name (unique within a team). People
+  // picked for a private channel are added once it is listed. Resolves to an
+  // error text for the dialog, or null.
+  const addChannel = useCallback(async (
+    from: Chat, name: string, desc: string, priv: boolean, threads: boolean, people: PeopleHit[] = [],
+  ): Promise<string | null> => {
     const acts = await getChannelActions(from.id);
     if (!acts) return t().app.createChannelFailed("no channel info");
     const r = await createChannel(acts, name, desc, priv, threads);
@@ -263,9 +266,16 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
     const title = name.trim();
     flash(r.id ? t().app.channelCreated(title) : t().app.channelCreatedSoon(title), r.id ? 4000 : 5000);
     const byName = (c: Chat) => c.kind === from.kind && c.team === from.team && c.title === title;
-    void pickWhenListed(r.id || byName, 60000);
+    void (async () => {
+      const listed = await pickWhenListed(r.id || byName, 60000);
+      const id = r.id || chatsRef.current.find(byName)?.id;
+      if (!people.length || !listed || !id) return;
+      const created = await getChannelActions(id);
+      const added = created ? await addChannelMembers(created, people.map((p) => p.mri)) : { ok: false as const, reason: "no channel info" };
+      flash(added.ok ? t().app.membersAdded(people.length) : t().app.addFailed(added.reason), added.ok ? 3000 : 5000);
+    })();
     return null;
-  }, [flash, pickWhenListed]);
+  }, [flash, pickWhenListed, chatsRef]);
 
   // The team label's "+": open the dialog only where Teams lets us add one.
   const openNewChannel = useCallback(async (from: Chat): Promise<void> => {

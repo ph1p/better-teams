@@ -8,16 +8,19 @@ import { groups } from "../services";
 import { setChatHidden } from "./readState";
 import { isChannelId } from "./state";
 import { toWrite } from "./raw";
-import type { ChannelNotifications, ChannelPreset } from "../services/groups";
+import type { ChannelNotifications, ChannelPreset, ThreadMember } from "../services/groups";
 
 export type { ChannelNotifications, ChannelPreset };
+/** One person on a team's or private channel's roster. */
+export type ChannelMember = ThreadMember;
 
 /**
  * What the channel menus offer, as in Teams: a private or shared channel is
  * left on its own, a standard one only hidden, General neither. The team can
  * be left from any of its channels, General included. Renaming and deleting
  * follow Teams' own canEdit / canDelete for the channel, adding a channel the
- * team's canAddChannel.
+ * team's canAddChannel. Members: a standard channel (General too) shows its
+ * team's roster, a private one its own; shared channels none.
  */
 export interface ChannelActions {
   channel: "leave" | "hide" | null;
@@ -30,6 +33,11 @@ export interface ChannelActions {
   /** Team thread id (19:…@thread.tacv2) and its M365 group id. */
   teamId: string;
   groupId: string;
+  /** Whose roster the members panel shows; null for none (shared channels). */
+  members: "team" | "channel" | null;
+  /** We may add people to that roster, or remove them (owners only). */
+  addMembers: boolean;
+  removeMembers: boolean;
 }
 
 const OVERRIDE_MS = 60_000;
@@ -143,7 +151,14 @@ export async function getChannelActions(channelId: string): Promise<ChannelActio
     delete: i.canDelete && !i.isGeneral,
     create: i.canAddChannel && !!i.teamId && !!i.groupId,
     channelId, teamId: i.teamId, groupId: i.groupId,
+    members: null, addMembers: false, removeMembers: false,
   };
+  const teamOwner = i.teamRole === "ADMIN";
+  if (i.channelType === "STANDARD" || i.isGeneral) {
+    if (i.teamId) Object.assign(v, { members: "team", addMembers: teamOwner && i.canAddTeamMember && !!i.groupId, removeMembers: teamOwner && !!i.groupId });
+  } else if (i.channelType === "PRIVATE") {
+    Object.assign(v, { members: "channel", addMembers: i.canAddMembers && !!i.teamId, removeMembers: i.channelRole === "ADMIN" });
+  }
   actionsCache.set(channelId, { at: Date.now(), v });
   return v;
 }
@@ -183,6 +198,31 @@ export async function createChannel(
     { displayName, description: description.trim(), isPrivate, threads },
   );
   return r.ok ? { ok: true, id: r.data } : { ok: false, reason: r.reason };
+}
+
+/** The roster `a.members` names: people only, bots and apps left out. Null when Teams doesn't say. */
+export async function listChannelMembers(a: ChannelActions): Promise<ChannelMember[] | null> {
+  if (!a.members) return null;
+  const r = await groups.listThreadMembers(a.members === "team" ? a.teamId : a.channelId);
+  return r.ok ? r.data.filter((m) => m.mri.startsWith("8:")) : null;
+}
+
+/** Add people to the roster `a.members` names. */
+export async function addChannelMembers(a: ChannelActions, mris: string[]): Promise<WriteResult> {
+  if (!a.addMembers || !a.members) return { ok: false, reason: "can't add members here" };
+  if (!mris.length) return { ok: true };
+  const r = await groups.addThreadMembers(
+    { teamId: a.teamId, groupId: a.groupId }, a.members === "channel" ? a.channelId : null, mris);
+  if (!r.ok) return toWrite(r, "cdl");
+  if (r.data.length) return { ok: false, reason: [...new Set(r.data.map((e) => e.error))].join(", ") };
+  return { ok: true, via: "cdl" };
+}
+
+/** Remove someone from the roster `a.members` names. */
+export async function removeChannelMember(a: ChannelActions, m: ChannelMember): Promise<WriteResult> {
+  if (!a.removeMembers || !a.members) return { ok: false, reason: "can't remove members here" };
+  const team = a.members === "team";
+  return toWrite(await groups.removeThreadMember(team ? a.teamId : a.channelId, team ? a.groupId : null, m), "cdl");
 }
 
 /** Leave the channel's whole team, all its channels with it. */

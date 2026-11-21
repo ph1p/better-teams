@@ -291,7 +291,8 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
       {a.newChannel ? (
         <NewChannel
           team={a.newChannel.team}
-          onCreate={(name, desc, priv, threads) => a.createChannel(a.newChannel!, name, desc, priv, threads)}
+          known={a.knownPeople}
+          onCreate={(name, desc, priv, threads, people) => a.createChannel(a.newChannel!, name, desc, priv, threads, people)}
           onClose={() => a.setNewChannel(null)}
         />
       ) : null}

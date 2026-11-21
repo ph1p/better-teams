@@ -1,6 +1,6 @@
 // Channel entries shared by the header "…" menu and the sidebar's right-click
 // menu: the notification preset (Teams' "Channel notifications", whose "Off"
-// is the channel's mute), then rename, leave or hide, and delete. As in Teams,
+// is the channel's mute), then members, rename, leave or hide, and delete. As in Teams,
 // a private or shared channel is left on its own, a standard one hidden,
 // General neither; the team can be left from any of its channels. Rename,
 // delete and adding a channel to the team show only where Teams allows them
@@ -8,7 +8,7 @@
 
 import { t } from "../../i18n";
 import { useEffect, useState, type JSX } from "react";
-import { AtSign, Bell, BellOff, Check, EyeOff, LogOut, Pencil, Plus, Trash2 } from "lucide-react";
+import { AtSign, Bell, BellOff, Check, EyeOff, LogOut, Pencil, Plus, Trash2, Users } from "lucide-react";
 import {
   getChannelActions, getChannelNotifications, setChannelNotifications,
   type ChannelActions, type ChannelNotifications, type ChannelPreset,
@@ -63,19 +63,21 @@ export function ChannelPresets({ chat, flash, onDone }: { chat: Chat; flash: Fla
 type Departure = "channel" | "team" | "delete";
 
 /**
- * Add a channel to the team, rename the channel (when `onRename` is given),
+ * Add a channel to the team, show its members (when `onMembers` is given),
+ * rename the channel (when `onRename` is given),
  * leave or hide it, leave its team, delete it; the last three arm on the first
  * click. Nothing shows while Teams is asked or when none is possible.
  */
-export function ChannelLeaveItem({ chat, onLeave, onNewChannel, onRename, onDone }: {
+export function ChannelLeaveItem({ chat, onLeave, onNewChannel, onRename, onMembers, onDone }: {
   chat: Chat; onLeave: (chat: Chat, what: Departure) => void; onNewChannel: (chat: Chat) => void;
-  onRename?: () => void; onDone: () => void;
+  onRename?: () => void; onMembers?: () => void; onDone: () => void;
 }): JSX.Element | null {
   const acts = useLoad<ChannelActions | null>(chat.id, getChannelActions);
   const { armed, tryArm } = useArm<Departure>();
   if (!acts || chat.left) return null;
   const rename = acts.rename && !!onRename;
-  if (!acts.channel && !acts.team && !acts.delete && !acts.create && !rename) return null;
+  const members = !!acts.members && !!onMembers;
+  if (!acts.channel && !acts.team && !acts.delete && !acts.create && !rename && !members) return null;
   const run = (what: Departure): void => tryArm(what, () => { onDone(); onLeave(chat, what); });
   const hide = acts.channel === "hide";
   return (
@@ -84,6 +86,11 @@ export function ChannelLeaveItem({ chat, onLeave, onNewChannel, onRename, onDone
       {acts.create ? (
         <button className="tc-menu-item" role="menuitem" onClick={() => { onDone(); onNewChannel(chat); }}>
           <Plus size={14} /> {t().chat.newChannel}
+        </button>
+      ) : null}
+      {members ? (
+        <button className="tc-menu-item" role="menuitem" onClick={() => { onDone(); onMembers!(); }}>
+          <Users size={14} /> {t().chat.channelMembers}
         </button>
       ) : null}
       {rename ? (

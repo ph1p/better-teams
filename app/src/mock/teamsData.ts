@@ -7,7 +7,7 @@ import { buildQuoteHtml } from "../quote";
 import { ME, ME_OID, PEOPLE } from "./fixtures";
 import * as store from "./store";
 import type { ChannelNotifications, ChannelPreset } from "../services/groups";
-import type { ChannelActions, CreateResult } from "../data/groups";
+import type { ChannelActions, ChannelMember, CreateResult } from "../data/groups";
 
 export interface PeopleHit {
   mri: string;
@@ -131,7 +131,7 @@ export async function undoDelete(conversationId: string, messageId: string): Pro
 }
 
 // Group chat management and notifications (src/data/groups.ts).
-export type { ChannelNotifications, ChannelPreset, ChannelActions, CreateResult };
+export type { ChannelNotifications, ChannelPreset, ChannelActions, ChannelMember, CreateResult };
 
 export async function renameChat(conversationId: string, title: string): Promise<WriteResult> {
   const t = title.trim();
@@ -168,12 +168,15 @@ export async function setChannelNotifications(
 
 // General can only be left with its team, and not deleted; ids with "private"
 // act as private channels (left on their own), the rest as standard ones
-// (hidden). Every channel can be renamed.
+// (hidden). Every channel can be renamed, and its members managed.
 export async function getChannelActions(channelId: string): Promise<ChannelActions | null> {
   const general = /-general@/.test(channelId);
   const channel = general ? null : /private/.test(channelId) ? "leave" : "hide";
   return later(store.channelPreset(channelId)
-    ? { channel, team: true, rename: true, delete: !general, create: true, channelId, teamId: channelId, groupId: "" } : null);
+    ? {
+      channel, team: true, rename: true, delete: !general, create: true, channelId, teamId: channelId, groupId: "",
+      members: channel === "leave" ? "channel" : "team", addMembers: true, removeMembers: true,
+    } : null);
 }
 
 export async function deleteChannel(a: ChannelActions): Promise<WriteResult> {
@@ -197,4 +200,22 @@ export async function leaveChannel(a: ChannelActions): Promise<WriteResult> {
 
 export async function leaveTeam(a: ChannelActions): Promise<WriteResult> {
   return later(store.leaveChannel(a.channelId, true) ? ok : fail("not a channel"));
+}
+
+export async function listChannelMembers(a: ChannelActions): Promise<ChannelMember[] | null> {
+  const ms = store.channelMembers(a.channelId);
+  return later(ms && ms.filter((m) => m.startsWith("8:")).map((mri, i) => ({
+    mri, displayName: profile(mri).displayName || mri, jobTitle: profile(mri).jobTitle,
+    role: mri === ME || i === 0 ? "Admin" : "User", objectId: "", tenantId: "",
+  })), 250);
+}
+
+export async function addChannelMembers(a: ChannelActions, mris: string[]): Promise<WriteResult> {
+  if (!a.addMembers) return later(fail("can't add members here"));
+  return later(store.channelMembers(a.channelId, mris) ? ok : fail("not a channel"), 400);
+}
+
+export async function removeChannelMember(a: ChannelActions, m: ChannelMember): Promise<WriteResult> {
+  if (!a.removeMembers) return later(fail("can't remove members here"));
+  return later(store.channelMembers(a.channelId, [], [m.mri]) ? ok : fail("not a channel"), 400);
 }

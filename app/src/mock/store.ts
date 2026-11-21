@@ -356,6 +356,17 @@ export function channelPreset(convId: string, preset?: string): string | null {
   return c.preset || "ALL_NEW_MSGS";
 }
 
+/** A channel's members; with `add`/`remove` changes them first. Null for no channel. */
+export function channelMembers(convId: string, add: string[] = [], remove: string[] = []): string[] | null {
+  const c = chats.get(convId);
+  if (!c || c.seed.kind !== "channel") return null;
+  if (add.length || remove.length) {
+    c.seed.members = [...new Set([...c.seed.members.filter((m) => !remove.includes(m)), ...add])];
+    poke();
+  }
+  return c.seed.members;
+}
+
 /** Leave a channel, or with `team` every channel of its team. */
 export function leaveChannel(convId: string, team: boolean): boolean {
   const c = chats.get(convId);
