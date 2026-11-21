@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type JSX } from "react";
+import { memo, useEffect, useRef, useState, type JSX } from "react";
 import { t } from "../../i18n";
 import {
   SmilePlus, Pencil, Trash2, Undo2, X, Reply, Copy, Check, MessageSquareReply,
@@ -38,7 +38,7 @@ interface MessageProps {
 // One rendered message: avatar + meta on the first of a group, content (rich
 // HTML or linkified text), files, reactions, and a hover toolbar (react / quote
 // / edit / delete). Edit swaps the content for a textarea with a quote chip.
-export function Message({ m, first, channel, cid, onReact, onDelete, onRemoveFile, onUndo, onEdit, onOpenProfile, onQuote, onJumpTo, onThreadReply }: MessageProps): JSX.Element {
+export const Message = memo(function Message({ m, first, channel, cid, onReact, onDelete, onRemoveFile, onUndo, onEdit, onOpenProfile, onQuote, onJumpTo, onThreadReply }: MessageProps): JSX.Element {
   const { statusOf } = usePresence();
   const [pick, setPick] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -190,4 +190,4 @@ export function Message({ m, first, channel, cid, onReact, onDelete, onRemoveFil
       ) : null}
     </div>
   );
-}
+});

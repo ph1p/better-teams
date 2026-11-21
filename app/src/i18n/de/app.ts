@@ -7,10 +7,8 @@ export const app: Messages["app"] = {
   markReadFailed: (reason) => `Als gelesen markieren fehlgeschlagen (${reason})`,
   pill: [
     "Lass mich hier raus",
-    "Zu viele Knöpfe",
     "Mach, dass es aufhört",
     "Wo war nochmal der Chat?",
-    "Weniger Pixel, bitte",
     "Notausgang",
     "Genug gesehen",
     "Zurück zur Vernunft",
@@ -18,7 +16,8 @@ export const app: Messages["app"] = {
   pillTitle: "Zurück zur ruhigen Ansicht (⌥⌘T)",
 
   // Chat actions (toasts)
-  sentFailedAfterOpen: (reason) => `Chat geöffnet, aber die Nachricht wurde nicht gesendet (${reason})`,
+  sentFailedAfterOpen: (reason) =>
+    `Chat geöffnet, aber die Nachricht wurde nicht gesendet (${reason})`,
   noEmail: (name) => `Keine E-Mail-Adresse für ${name} hinterlegt.`,
   thisPerson: "diese Person",
   chatOpenedSoon: "Chat in Teams geöffnet. Er erscheint hier in Kürze.",
@@ -31,11 +30,15 @@ export const app: Messages["app"] = {
   meetingFailed: (reason) => `Besprechung konnte nicht gestartet werden (${reason})`,
   readStateFailed: (reason) => `Lesestatus konnte nicht geändert werden (${reason})`,
   hideFailed: (hidden, reason) =>
-    hidden ? `Chat konnte nicht ausgeblendet werden (${reason})` : `Chat konnte nicht eingeblendet werden (${reason})`,
+    hidden
+      ? `Chat konnte nicht ausgeblendet werden (${reason})`
+      : `Chat konnte nicht eingeblendet werden (${reason})`,
   chatHidden: "Chat ausgeblendet. Die Suche findet ihn; eine neue Nachricht holt ihn zurück.",
   renameFailed: (reason) => `Umbenennen fehlgeschlagen (${reason})`,
   muteFailed: (muted, reason) =>
-    muted ? `Chat konnte nicht stummgeschaltet werden (${reason})` : `Stummschaltung konnte nicht aufgehoben werden (${reason})`,
+    muted
+      ? `Chat konnte nicht stummgeschaltet werden (${reason})`
+      : `Stummschaltung konnte nicht aufgehoben werden (${reason})`,
   addFailed: (reason) => `Personen konnten nicht hinzugefügt werden (${reason})`,
   removeFailed: (reason) => `Person konnte nicht entfernt werden (${reason})`,
   leaveFailed: (reason) => `Chat konnte nicht verlassen werden (${reason})`,

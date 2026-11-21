@@ -255,6 +255,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                 // At scrollTop 0 the wheel fires no scroll event: retry paging on it.
                 onWheel={(e) => { if (e.deltaY < 0 && e.currentTarget.scrollTop < 60) void m.loadOlder(); }}
               >
+                <div className="tc-msgs-inner" ref={m.content}>
                 <Timeline
                   visible={visible} cid={selChat.id} chat={selChat} channel={selIsChannel}
                   pending={m.myPending} mq={mq} searchText={msgSearch}
@@ -266,6 +267,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                   onOpenProfile={openProfile} onQuote={cs.onQuote} onJumpTo={onJumpTo}
                   onThreadReply={cs.onThreadReply} onJoinCall={(rootId) => void a.joinCall(rootId)}
                 />
+                </div>
               </div>
             </div>
             <Composer chat={selChat} cs={cs} atBottom={m.atBottom} onScrollToBottom={m.scrollToBottom} />

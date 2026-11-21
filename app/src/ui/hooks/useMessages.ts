@@ -48,6 +48,8 @@ export interface Messages {
   /** Backend never answered for the open chat. */
   failed: boolean;
   scroller: RefObject<HTMLDivElement | null>;
+  /** Wrapper around the rendered list; its size changes keep the view pinned. */
+  content: RefObject<HTMLDivElement | null>;
   onScroll: () => void;
   stickyDay: string;
   atBottom: boolean;
@@ -76,6 +78,10 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
   const oldestId = useRef("");
   const [pending, setPending] = useState<Pending[]>([]);
   const scroller = useRef<HTMLDivElement>(null);
+  const content = useRef<HTMLDivElement>(null);
+  // Set by loadOlder before prepending a page: the scroll metrics to restore
+  // against, applied in a layout effect so the shifted frame is never painted.
+  const anchor = useRef<{ h: number; top: number } | null>(null);
   const stick = useRef(true);
   const paging = useRef(false);
   const noMore = useRef(false);
@@ -167,7 +173,8 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
   // markdown and the synced copy HTML, so both go through the same renderer
   // and compare as plain text without whitespace or "@"; a suffix match
   // allows for the quote Teams puts in front of a reply.
-  useEffect(() => {
+  // Layout effect: the synced copy and its pending bubble never paint together.
+  useLayoutEffect(() => {
     if (!pending.length) return;
     const mine = msgs.list.filter((m) => m.mine);
     const texts = mine.map((m) => bare(htmlToText(m.content)));
@@ -184,18 +191,32 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     }));
   }, [msgs]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Keep the view pinned to the bottom only if the user was already there.
+  // Keep the view pinned to the bottom only if the user was already there;
+  // after a paged-in older page, keep the same message under the cursor.
   useLayoutEffect(() => {
     const el = scroller.current;
-    if (el && stick.current) el.scrollTop = el.scrollHeight;
-  }, [msgs, pending]);
+    if (!el) return;
+    const a = anchor.current;
+    if (a) {
+      anchor.current = null;
+      el.scrollTop = a.top + (el.scrollHeight - a.h);
+    } else if (stick.current) el.scrollTop = el.scrollHeight;
+  }, [msgs, older, pending]);
+  // Content that grows after render (images, link previews, avatars, fonts)
+  // would otherwise push the newest message out of view.
+  useEffect(() => {
+    const el = scroller.current;
+    const box = content.current;
+    if (!el || !box || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => { if (stick.current) el.scrollTop = el.scrollHeight; });
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [sel]);
   const loadOlder = useCallback(async (): Promise<void> => {
     if (paging.current || noMore.current) return;
     const el = scroller.current;
     const cid = sel;
     paging.current = true;
-    const prevH = el ? el.scrollHeight : 0;
-    const prevTop = el ? el.scrollTop : 0;
     try {
       // Older pages can overlap what the local cache already shows; keep
       // paging (bounded) until one brings something new, or the view stays
@@ -209,16 +230,12 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
         if (!page) { noMore.current = true; return; }
       } while (page.length && page.every((m) => shownIds.current.has(m.id)) && ++hops < 20);
       if (!page.length) return;
+      if (el) anchor.current = { h: el.scrollHeight, top: el.scrollTop };
       setOlder((o) => {
         const base = o.id === cid ? o.list : [];
         const seen = new Set(base.map((m) => m.id));
         const add = page.filter((m) => !seen.has(m.id));
         return { id: cid, list: [...add, ...base] };
-      });
-      // Preserve scroll position: keep the same message under the cursor.
-      requestAnimationFrame(() => {
-        const e2 = scroller.current;
-        if (e2) e2.scrollTop = prevTop + (e2.scrollHeight - prevH);
       });
     } finally {
       paging.current = false;
@@ -368,6 +385,18 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     return o?.id || "";
   }, [shown]);
 
+  // Stable identities for the per-message actions, so memoized messages skip
+  // re-rendering on every poll and scroll state change.
+  const acts = useRef({ react, remove, removeFile, undo, edit });
+  acts.current = { react, remove, removeFile, undo, edit };
+  const stable = useMemo(() => ({
+    react: (...a: Parameters<typeof react>) => acts.current.react(...a),
+    remove: (...a: Parameters<typeof remove>) => acts.current.remove(...a),
+    removeFile: (...a: Parameters<typeof removeFile>) => acts.current.removeFile(...a),
+    undo: (...a: Parameters<typeof undo>) => acts.current.undo(...a),
+    edit: (...a: Parameters<typeof edit>) => acts.current.edit(...a),
+  }), []);
+
   const ready = msgs.loaded && msgs.id === sel;
   return {
     shown,
@@ -377,8 +406,8 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     loading: msgs.id === sel && !msgs.loaded,
     ready,
     failed: ready && !!msgs.failed,
-    scroller, onScroll, stickyDay, atBottom, scrollToBottom,
+    scroller, content, onScroll, stickyDay, atBottom, scrollToBottom,
     stickToBottom: () => { stick.current = true; },
-    loadOlder, noMore, refetch, react, remove, removeFile, undo, edit,
+    loadOlder, noMore, refetch, ...stable,
   };
 }

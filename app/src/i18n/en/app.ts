@@ -6,10 +6,8 @@ export const app = {
   // The pill in Teams' title bar; one is picked at random each time it shows.
   pill: [
     "Get me out of here",
-    "Too many buttons",
     "Make it stop",
     "Where's my chat?",
-    "Fewer pixels, please",
     "Escape",
     "I've seen enough",
     "Back to sanity",
@@ -17,7 +15,8 @@ export const app = {
   pillTitle: "Back to the calm view (⌥⌘T)",
 
   // Chat actions (toasts)
-  sentFailedAfterOpen: (reason: string) => `Opened the chat, but the message wasn't sent (${reason})`,
+  sentFailedAfterOpen: (reason: string) =>
+    `Opened the chat, but the message wasn't sent (${reason})`,
   noEmail: (name: string) => `No email on file for ${name}.`,
   thisPerson: "this person",
   chatOpenedSoon: "Chat opened in Teams. It shows up here shortly.",

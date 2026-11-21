@@ -161,7 +161,7 @@
   border-bottom: 1px solid var(--tc-line); padding: 0 18px; }
 #tc-root .tc-main-head .tc-name { font-size: 15px; }
 /* Message column + composer centre at ~820px on wide windows (line length). */
-#tc-root .tc-msgs { @apply flex-1 overflow-y-auto; padding: 16px max(18px, calc((100% - 820px) / 2)) 14px; }
+#tc-root .tc-msgs { @apply flex-1 overflow-y-auto; overflow-anchor: none; padding: 16px max(18px, calc((100% - 820px) / 2)) 14px; }
 /* Vertical rhythm: continuations sit tight (3px); a new sender group gets a
    little air above it, so conversations read as turns. */
 #tc-root .tc-msg { @apply flex gap-2.5 relative; padding: 3px 0; }
