@@ -134,6 +134,16 @@ instead the host page runs the overlay inside `with (childWindow) { … }`, so
   local-only tweak. On a managed/work device, check your IT policy first.
 - macOS only.
 
+## Roadmap
+
+- [ ] **Windows support.** The new Teams there is an MSIX package under
+      `C:\Program Files\WindowsApps`, owned by TrustedInstaller, so the macOS
+      patch approach does not carry over. Candidates: WebView2 debug-port
+      injection or a browser extension for the Teams web app.
+- [ ] **Linux support.** There is no native new Teams client; the likely route
+      is a browser extension for `teams.microsoft.com`.
+- [ ] Cross-platform launcher (Node instead of bash) once the above lands.
+
 ## License
 
 [MIT](LICENSE)
