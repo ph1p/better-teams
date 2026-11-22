@@ -6,6 +6,8 @@ import { EmojiPicker } from "../shared/EmojiPicker";
 import { Avatar } from "../shared/Avatar";
 import { avatarUri, chatTitle } from "../lib/format";
 import { useDismiss } from "../lib/dismiss";
+import { useLatest } from "../lib/latest";
+import { useChanged } from "../lib/changed";
 import { codeBlock, handleFormatKey } from "../lib/editKeys";
 import { fileKind, KindIcon } from "../lib/files";
 import { extOf } from "../../data/raw";
@@ -18,6 +20,7 @@ import { t } from "../../i18n";
 const fmtSize = (n: number): string =>
   n < 1024 ? n + " B" : n < 1048576 ? Math.round(n / 1024) + " KB" : (n / 1048576).toFixed(1) + " MB";
 
+const NO_PICKS: MentionPick[] = [];
 const hasFiles = (e: DragEvent): boolean => !!e.dataTransfer && [...e.dataTransfer.types].includes("Files");
 
 interface ComposerProps {
@@ -33,12 +36,14 @@ interface ComposerProps {
 // markdown-lite formatting (see src/markdown.ts, ui/lib/editKeys.ts), and
 // files staged to send (attach button, paste, or drop on the composer).
 export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps): JSX.Element {
-  const { composer, draft, setDraft, quote, setQuote, threadTo, setThreadTo } = cs;
+  const { composer: composerRef, draft, setDraft, quote, setQuote, threadTo, setThreadTo } = cs;
   // @-autocomplete popup: open flag + current filter query (text after the @).
   const [atOpen, setAtOpen] = useState(false);
   const [atQuery, setAtQuery] = useState("");
   // Org-directory @mention hits (debounced searchPeople), merged after local members.
-  const [atOrg, setAtOrg] = useState<MentionPick[]>([]);
+  // Kept with the query they answer; shown only while that query is current.
+  const [org, setOrg] = useState<{ q: string; hits: MentionPick[] }>({ q: "", hits: NO_PICKS });
+  const atOrg = atOpen && org.q === atQuery.trim() ? org.hits : NO_PICKS;
   const [emojiOpen, setEmojiOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const [dropping, setDropping] = useState(false);
@@ -46,8 +51,7 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
   // the capture phase so Teams' own drop handlers (which would upload into the
   // hidden native composer) never see it, and a drop elsewhere on the overlay
   // doesn't make the browser open the file.
-  const addFiles = useRef(cs.addFiles);
-  addFiles.current = cs.addFiles;
+  const addFiles = useLatest(cs.addFiles);
   useEffect(() => {
     let clear = 0;
     const where = (e: DragEvent): "pane" | "overlay" | null => {
@@ -74,7 +78,7 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
       setDropping(false);
       if (w !== "pane" || !e.dataTransfer!.files.length) return;
       addFiles.current(e.dataTransfer!.files);
-      composer.current?.focus();
+      composerRef.current?.focus();
     };
     window.addEventListener("dragenter", onOver, true);
     window.addEventListener("dragover", onOver, true);
@@ -85,11 +89,11 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
       window.removeEventListener("dragover", onOver, true);
       window.removeEventListener("drop", onDrop, true);
     };
-  }, []);
+  }, [addFiles, composerRef]);
 
   // Insert text at the composer's caret (or append), keeping focus and caret.
   const insertAtCaret = (ins: string): void => {
-    const el = composer.current;
+    const el = composerRef.current;
     if (!el) {
       setDraft(draft + ins);
       return;
@@ -140,7 +144,7 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
     setDraft(v);
     // Teams signals typing on every non-empty editor change (throttled per chat).
     if (v.trim()) typing.notifyTyping({ convId: chat.id, isChannel: chat.isChannel, members: chat.members });
-    const el = composer.current;
+    const el = composerRef.current;
     const caret = el?.selectionStart ?? v.length;
     // Match "@" preceded by start/space, up to the caret, name chars only.
     const upto = v.slice(0, caret);
@@ -157,7 +161,7 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
   // Replace the half-typed "@query" at the caret with "@Display Name " and record
   // the pick so the send path can emit a real mention span.
   const pickMention = (pick: MentionPick): void => {
-    const el = composer.current;
+    const el = composerRef.current;
     const caret = el?.selectionStart ?? draft.length;
     const upto = draft.slice(0, caret);
     const m = /(?:^|\s)@([^\s@]{0,40})$/.exec(upto);
@@ -168,7 +172,6 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
     cs.addPick(pick);
     setAtOpen(false);
     setAtQuery("");
-    setAtOrg([]);
     requestAnimationFrame(() => {
       el?.focus();
       const pos = start + insert.length;
@@ -181,34 +184,24 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
   };
 
   // Close the @-picker and the emoji picker when the open chat changes.
-  useEffect(() => {
+  if (useChanged(chat.id)) {
     setAtOpen(false);
     setAtQuery("");
-    setAtOrg([]);
-  }, [chat.id]);
-  useEffect(() => {
     setEmojiOpen(false);
-  }, [chat.id]);
+  }
 
   // Debounced org-directory search while the @-picker is open. Local chat members
   // show instantly; org hits stream in ~250ms after typing stops. Stale responses
   // are dropped via the `live` guard so an older query can't overwrite a newer one.
   useEffect(() => {
-    if (!atOpen) {
-      setAtOrg([]);
-      return;
-    }
     const q = atQuery.trim();
-    if (q.length < 2) {
-      setAtOrg([]);
-      return;
-    }
+    if (!atOpen || q.length < 2) return;
     let live = true;
     const h = setTimeout(() => {
       searchPeople(q, 8)
         .then((hits) => {
           if (!live) return;
-          setAtOrg(hits.map((p) => ({ mri: p.mri, name: p.displayName, mentionType: "person" })));
+          setOrg({ q, hits: hits.map((p) => ({ mri: p.mri, name: p.displayName, mentionType: "person" })) });
         })
         .catch(() => {
           /* keep local-only candidates */
@@ -222,7 +215,7 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
 
   // Auto-grow the composer.
   useLayoutEffect(() => {
-    const el = composer.current;
+    const el = composerRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 180) + "px";
@@ -342,7 +335,7 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
           onChange={(e) => {
             if (e.target.files) cs.addFiles(e.target.files);
             e.target.value = "";
-            composer.current?.focus();
+            composerRef.current?.focus();
           }}
         />
         <button
@@ -359,7 +352,7 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
           className="tc-emoji-btn"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
-            if (composer.current) codeBlock(composer.current);
+            if (composerRef.current) codeBlock(composerRef.current);
           }}
           title={t().composer.codeBlockTitle}
           aria-label={t().composer.insertCodeBlock}
@@ -367,7 +360,7 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom }: ComposerProps
           <SquareCode size={18} />
         </button>
         <textarea
-          ref={composer}
+          ref={composerRef}
           rows={1}
           placeholder={
             threadTo && chat.isChannel

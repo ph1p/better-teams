@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { Row } from "./Row";
 import { RECENT_MS, SECTION_CAP, SECTION_MIN } from "../lib/constants";
 import { usePref } from "../lib/prefs";
+import { useNow } from "../lib/now";
 import type { Chat } from "../../types";
 import { t } from "../../i18n";
 
@@ -49,7 +50,7 @@ export function Section({
   const [all, setAll] = useState(false);
   const unread = rows.filter((r) => r.unread).length;
   const open = !collapsed || !title;
-  const cutoff = Date.now() - RECENT_MS;
+  const cutoff = useNow(60_000) - RECENT_MS;
   const shown = !open
     ? rows.filter((r) => r.unread || r.id === sel)
     : all || !capped

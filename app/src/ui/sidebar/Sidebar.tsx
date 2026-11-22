@@ -35,7 +35,28 @@ interface SidebarProps {
 // Left column: header buttons, search + Unread filter, chat sections, the Notes
 // slot and the "me" bar.
 export function Sidebar(p: SidebarProps): JSX.Element {
-  const { sections, selfSlot, sel, error, compact, query, unreadOnly, unreadCount } = p;
+  const {
+    sections,
+    selfSlot,
+    sel,
+    error,
+    compact,
+    query,
+    unreadOnly,
+    unreadCount,
+    searchRef,
+    onToggleCompact,
+    onNewChat,
+    onQuery,
+    onSearchEnter,
+    onUnreadFilter,
+    onPick,
+    onOpenProfile,
+    onMenu,
+    onAddChannel,
+    onHide,
+    onError,
+  } = p;
   const s = t().sidebar;
   return (
     <aside className="tc-side">
@@ -43,13 +64,13 @@ export function Sidebar(p: SidebarProps): JSX.Element {
         <div className="tc-side-spacer" />
         <button
           className="tc-side-btn"
-          onClick={p.onToggleCompact}
+          onClick={onToggleCompact}
           title={compact ? s.showPreviews : s.compactList}
           aria-label={compact ? s.showPreviews : s.compactList}
         >
           {compact ? <Rows2 size={16} /> : <Rows3 size={16} />}
         </button>
-        <button className="tc-side-btn" onClick={p.onNewChat} title={s.newChat} aria-label={s.newChat}>
+        <button className="tc-side-btn" onClick={onNewChat} title={s.newChat} aria-label={s.newChat}>
           <SquarePen size={16} />
         </button>
       </div>
@@ -57,16 +78,16 @@ export function Sidebar(p: SidebarProps): JSX.Element {
         <div className="tc-search">
           <Search size={15} className="tc-search-icon" />
           <input
-            ref={p.searchRef}
+            ref={searchRef}
             placeholder={s.search}
             value={query}
-            onChange={(e) => p.onQuery(e.target.value)}
+            onChange={(e) => onQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Escape") {
-                p.onQuery("");
+                onQuery("");
                 e.currentTarget.blur();
               } else if (e.key === "Enter") {
-                p.onSearchEnter();
+                onSearchEnter();
               }
             }}
           />
@@ -74,7 +95,7 @@ export function Sidebar(p: SidebarProps): JSX.Element {
         <button
           className={"tc-unread-pill" + (unreadOnly ? " on" : "")}
           aria-pressed={unreadOnly}
-          onClick={() => p.onUnreadFilter(!unreadOnly)}
+          onClick={() => onUnreadFilter(!unreadOnly)}
           title={s.unreadFilterTitle}
         >
           {s.unread}
@@ -100,10 +121,10 @@ export function Sidebar(p: SidebarProps): JSX.Element {
             capped={sec.capped}
             groupByTeam={sec.groupByTeam}
             defaultCollapsed={sec.defaultCollapsed}
-            onPick={p.onPick}
-            onOpenProfile={p.onOpenProfile}
-            onMenu={p.onMenu}
-            onAddChannel={p.onAddChannel}
+            onPick={onPick}
+            onOpenProfile={onOpenProfile}
+            onMenu={onMenu}
+            onAddChannel={onAddChannel}
           />
         ))}
         {!error && !sections.length ? (
@@ -115,7 +136,7 @@ export function Sidebar(p: SidebarProps): JSX.Element {
                 <CheckCheck size={28} className="tc-caught-up-icon" />
                 <strong>{s.caughtUp}</strong>
                 <span>{s.noUnread}</span>
-                <button className="tc-more" onClick={() => p.onUnreadFilter(false)}>
+                <button className="tc-more" onClick={() => onUnreadFilter(false)}>
                   {s.showAll}
                 </button>
               </div>
@@ -131,13 +152,13 @@ export function Sidebar(p: SidebarProps): JSX.Element {
             chat={selfSlot}
             compact
             selected={selfSlot.id === sel}
-            onClick={() => p.onPick(selfSlot.id)}
-            onOpenProfile={p.onOpenProfile}
-            onMenu={p.onMenu}
+            onClick={() => onPick(selfSlot.id)}
+            onOpenProfile={onOpenProfile}
+            onMenu={onMenu}
           />
         </div>
       ) : null}
-      <MeBar onSwitchToTeams={p.onHide} onError={p.onError} />
+      <MeBar onSwitchToTeams={onHide} onError={onError} />
     </aside>
   );
 }

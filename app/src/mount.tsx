@@ -123,7 +123,8 @@ function mount(): NonNullable<Window["__teamsCalmApp"]> {
   window.addEventListener("resize", placePill);
   const toggle = (): void => {
     if (suppressed) return;
-    visible ? hide() : show();
+    if (visible) hide();
+    else show();
   };
 
   const root = createRoot(el);
@@ -156,7 +157,8 @@ function mount(): NonNullable<Window["__teamsCalmApp"]> {
       pill.style.display = "none";
     } else {
       suppressed = false;
-      wasVisible ? show() : hide();
+      if (wasVisible) show();
+      else hide();
     }
   };
   applyGuard();

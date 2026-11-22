@@ -3,7 +3,7 @@
 // acts on the second, like removing a file (lib/arm.ts).
 
 import { t } from "../../i18n";
-import { useRef, useState, type JSX } from "react";
+import { useState, type JSX } from "react";
 import { Bell, BellOff, LogOut, MoreHorizontal, Pencil, Users } from "lucide-react";
 import { ChannelLeaveItem, ChannelPresets } from "./ChannelItems";
 import { useDismiss } from "../lib/dismiss";
@@ -30,17 +30,17 @@ export function ChatOptions({
   onLeave,
   onNewChannel,
 }: ChatOptionsProps): JSX.Element | null {
-  const [open, setOpen] = useState(false);
+  // Button rect while the menu is open (null = closed); anchors the menu.
+  const [r, setR] = useState<DOMRect | null>(null);
+  const open = !!r;
   const { armed, tryArm, disarm } = useArm<"leave">();
-  const btn = useRef<HTMLButtonElement>(null);
   const close = (): void => {
-    setOpen(false);
+    setR(null);
     disarm();
   };
   useDismiss(open, "#tc-root .tc-opts-menu, #tc-root .tc-opts-btn", close);
 
   if (chat.kind === "notes" || chat.app) return null;
-  const r = open ? btn.current?.getBoundingClientRect() : undefined;
   const act = (fn: () => void) => (): void => {
     close();
     fn();
@@ -51,9 +51,8 @@ export function ChatOptions({
   return (
     <>
       <button
-        ref={btn}
         className={"tc-ghost tc-icon-only tc-opts-btn" + (open ? " on" : "")}
-        onClick={() => (open ? close() : setOpen(true))}
+        onClick={(e) => (open ? close() : setR(e.currentTarget.getBoundingClientRect()))}
         title={t().chat.options}
         aria-label={t().chat.options}
         aria-haspopup="menu"
@@ -61,7 +60,7 @@ export function ChatOptions({
       >
         <MoreHorizontal size={15} />
       </button>
-      {open && r ? (
+      {r ? (
         <div
           className="tc-menu tc-opts-menu"
           role="menu"

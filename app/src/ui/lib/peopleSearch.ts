@@ -8,30 +8,32 @@ import { searchPeople, type PeopleHit } from "../../teamsData";
 const MIN_CHARS = 2;
 const LOCAL_MAX = 8;
 const DEBOUNCE_MS = 250;
+const NONE: PeopleHit[] = [];
 
 /** `known` should be stable (e.g. computed once per mount); it is a dependency. */
 export function usePeopleSearch(q: string, known: PeopleHit[], cap: number): PeopleHit[] {
-  const [hits, setHits] = useState<PeopleHit[]>([]);
+  const term = q.trim().toLowerCase();
   // Lowercased once per `known`, not on every keystroke.
   const index = useMemo(() => known.map((p) => [p, (p.displayName + "\n" + p.email).toLowerCase()] as const), [known]);
+  const local = useMemo(
+    () =>
+      term.length < MIN_CHARS
+        ? NONE
+        : index
+            .filter(([, key]) => key.includes(term))
+            .slice(0, LOCAL_MAX)
+            .map(([p]) => p),
+    [term, index],
+  );
+  // Directory hits, kept with the term they answer; ignored once it changes.
+  const [remote, setRemote] = useState<{ term: string; hits: PeopleHit[] }>({ term: "", hits: NONE });
   useEffect(() => {
-    const term = q.trim().toLowerCase();
-    if (term.length < MIN_CHARS) {
-      setHits([]);
-      return;
-    }
-    const local = index
-      .filter(([, key]) => key.includes(term))
-      .slice(0, LOCAL_MAX)
-      .map(([p]) => p);
-    setHits(local);
+    if (term.length < MIN_CHARS) return;
     let live = true;
     const h = setTimeout(() => {
       searchPeople(term, LOCAL_MAX)
         .then((r) => {
-          if (!live || !r.length) return;
-          const seen = new Set(local.map((p) => p.mri));
-          setHits([...local, ...r.filter((p) => !seen.has(p.mri))].slice(0, cap));
+          if (live && r.length) setRemote({ term, hits: r });
         })
         .catch(() => {
           /* keep local hits */
@@ -41,6 +43,10 @@ export function usePeopleSearch(q: string, known: PeopleHit[], cap: number): Peo
       live = false;
       clearTimeout(h);
     };
-  }, [q, index, cap]);
-  return hits;
+  }, [term]);
+  return useMemo(() => {
+    if (remote.term !== term) return local;
+    const seen = new Set(local.map((p) => p.mri));
+    return [...local, ...remote.hits.filter((p) => !seen.has(p.mri))].slice(0, cap);
+  }, [local, remote, term, cap]);
 }

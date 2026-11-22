@@ -141,7 +141,7 @@ function remember(authHeader: string, url: string): void {
   if (prev && prev.tok !== tok && prev.exp > exp && prev.exp - Date.now() > 60_000) return;
   v.tokens.set(kind, { tok, exp, at: Date.now(), aud });
   noteRegion(url);
-  for (const w of [...v.waiters]) {
+  for (const w of Array.from(v.waiters)) {
     // A waiter from a window that has since closed must not stop the others.
     try {
       w();

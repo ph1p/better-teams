@@ -91,7 +91,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
     for (const c of chatsRef.current) {
       if (c.kind !== "chat") continue;
       for (const mri of c.members) {
-        if (mri === me || seen.has(mri) || !/^8:orgid:/.test(mri)) continue;
+        if (mri === me || seen.has(mri) || !mri.startsWith("8:orgid:")) continue;
         seen.add(mri);
         const p = profile(mri);
         if (p.displayName)

@@ -45,7 +45,7 @@ export function claimMentions(text: string, picks: readonly MentionPick[]): Ment
   // Longest display name first; keep original order as tiebreak for stable itemids.
   const ordered = picks.map((p, i) => ({ p, i })).sort((a, b) => b.p.name.length - a.p.name.length || a.i - b.i);
   const spans: MentionSpan[] = [];
-  const taken: boolean[] = new Array(text.length).fill(false);
+  const taken: boolean[] = Array.from({ length: text.length }, () => false);
   for (const { p } of ordered) {
     const token = "@" + p.name;
     let from = 0;

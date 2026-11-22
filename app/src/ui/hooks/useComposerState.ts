@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useRef, useState, type RefObject } from "react";
+import { useChanged } from "../lib/changed";
 import { sendRemote } from "../../teamsData";
 import { sendFiles, sendMessage } from "../../send";
 import { splitQuote } from "../../quote";
@@ -60,11 +61,11 @@ export function useComposerState(
   // Files staged per chat, like drafts.
   const [staged, setStaged] = useState<Record<string, File[]>>({});
 
-  useEffect(() => {
-    if (!sel) return;
+  const switched = useChanged(sel + "|" + !!selChat?.isChannel);
+  if (switched && sel) {
     setQuote(null);
     setThreadTo(null);
-  }, [sel, !!selChat?.isChannel]); // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
   const draft = (sel && drafts[sel]) || "";
   const setDraft = (v: string): void => setDrafts((d) => ({ ...d, [sel!]: v }));

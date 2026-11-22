@@ -1,5 +1,5 @@
 import { t } from "../../i18n";
-import type { JSX, RefObject } from "react";
+import { useLayoutEffect, type JSX, type RefObject } from "react";
 import { ChevronsUpDown, ExternalLink, MessageSquareReply, RotateCw, Video } from "lucide-react";
 import { Message } from "./Message";
 import { Avatar } from "../shared/Avatar";
@@ -9,6 +9,7 @@ import { fmtClock, fmtDay, messageText } from "../lib/format";
 import { GROUP_GAP_MS, LIVE_CALL_MS, THREAD_TAIL } from "../lib/constants";
 import { fileKind, KindIcon } from "../lib/files";
 import { extOf } from "../../data/raw";
+import { useNow } from "../lib/now";
 import type { Pending } from "../hooks/useMessages";
 import type { Chat, Message as Msg } from "../../types";
 
@@ -28,8 +29,8 @@ interface TimelineProps {
   onToggleThread: (rootId: string) => void;
   /** Root id of the thread the composer answers in, if any. */
   replyingTo?: string;
-  /** Filled during render: message id -> thread root id (channels). */
-  msgRoot: RefObject<Map<string, string>>;
+  /** Filled after render: message id -> thread root id (channels). */
+  msgRootRef: RefObject<Map<string, string>>;
   // Empty / loading state.
   loading: boolean;
   /** The open chat's messages arrived (possibly empty). */
@@ -92,7 +93,11 @@ const renderPending = (p: Pending): JSX.Element => (
 // The open conversation's messages: day dividers and sender groups; channels
 // as one card per thread. Ends with loose pending sends and the empty states.
 export function Timeline(p: TimelineProps): JSX.Element {
-  const { visible, cid, chat, channel, pending: myPending, mq, openThreads } = p;
+  const { visible, cid, chat, channel, pending: myPending, mq, openThreads, msgRootRef } = p;
+  const now = useNow(30_000);
+  useLayoutEffect(() => {
+    if (channel) msgRootRef.current = new Map(visible.map((m) => [m.id, m.rootId]));
+  }, [channel, visible, msgRootRef]);
   const body: JSX.Element[] = [];
   const renderMsg = (m: Msg, first: boolean): JSX.Element => (
     <Message
@@ -141,7 +146,6 @@ export function Timeline(p: TimelineProps): JSX.Element {
       return { root, msgs: ms, at: head.isReply ? Math.min(...ms.map((m) => m.rootTime || m.time)) : head.time };
     });
     threads.sort((a, b) => a.at - b.at);
-    p.msgRoot.current = new Map(visible.map((m) => [m.id, m.rootId]));
     let lastDay = "";
     for (const th of threads) {
       const head = th.msgs[0];
@@ -168,9 +172,7 @@ export function Timeline(p: TimelineProps): JSX.Element {
       // a start without an end marker, younger than LIVE_CALL_MS.
       const live = chat
         ? chat.liveCall === th.root
-        : rootMsg?.call === "start" &&
-          !th.msgs.some((m) => m.call === "end") &&
-          Date.now() - rootMsg.time < LIVE_CALL_MS;
+        : rootMsg?.call === "start" && !th.msgs.some((m) => m.call === "end") && now - rootMsg.time < LIVE_CALL_MS;
       body.push(
         <div
           key={"t" + th.root}

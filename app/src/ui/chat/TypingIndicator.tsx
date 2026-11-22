@@ -1,5 +1,6 @@
 import { t } from "../../i18n";
 import { useEffect, useState, type JSX } from "react";
+import { useChanged } from "../lib/changed";
 import { typing } from "../../services";
 import type { TypingUser } from "../../services/typing";
 import { profile } from "../../teamsData";
@@ -33,23 +34,24 @@ function label(users: TypingUser[]): string {
 // and Teams' label. Floats above the composer so it never shifts the layout.
 export function TypingIndicator({ chatId }: { chatId: string }): JSX.Element | null {
   const [users, setUsers] = useState<TypingUser[]>([]);
-  const [shown, setShown] = useState<TypingUser[]>([]);
-
-  useEffect(() => {
+  // Last non-empty typers, kept on screen while the pill fades out.
+  const [last, setLast] = useState<TypingUser[]>([]);
+  if (useChanged(chatId)) {
     setUsers([]);
-    setShown([]);
-    return typing.watchTyping(chatId, setUsers);
-  }, [chatId]);
+    setLast([]);
+  } else if (users.length && users !== last) {
+    setLast(users);
+  }
 
-  // Keep the last typers on screen while the pill fades out.
+  useEffect(() => typing.watchTyping(chatId, setUsers), [chatId]);
+
   useEffect(() => {
-    if (users.length) {
-      setShown(users);
-      return;
-    }
-    const h = setTimeout(() => setShown([]), LINGER_MS);
+    if (users.length) return;
+    const h = setTimeout(() => setLast([]), LINGER_MS);
     return () => clearTimeout(h);
   }, [users]);
+
+  const shown = users.length ? users : last;
 
   if (!shown.length) return null;
   const text = label(shown);

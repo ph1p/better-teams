@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type MouseEvent } from "react";
+import { useChanged } from "./lib/changed";
 import { markRead } from "../teamsData";
 import { openNativeChat } from "../send";
 import { Sidebar } from "./sidebar/Sidebar";
@@ -57,16 +58,18 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
 
   const selChat = chats.find((c) => c.id === sel);
   const selIsChannel = !!selChat?.isChannel;
-  const m = useMessages(sel, selChat, flash);
-  const cs = useComposerState(sel, selChat, m, flash);
+  const messages = useMessages(sel, selChat, flash);
+  const cs = useComposerState(sel, selChat, messages, flash);
+  // Refs pulled out, so reading the rest during render is plainly not a ref read.
+  const { scroller, content, noMore, loadOlder, ...m } = messages;
 
   // A new conversation starts with search closed and threads collapsed.
-  useEffect(() => {
-    if (!sel) return;
+  const switched = useChanged(sel + "|" + selIsChannel);
+  if (switched && sel) {
     setMsgSearch("");
     setMsgSearchOpen(false);
     setOpenThreads(new Set());
-  }, [sel, selIsChannel]);
+  }
 
   const sections = useMemo(() => buildSections(chats, query, unreadOnly, keep), [chats, query, unreadOnly, keep]);
   const selfChat = useMemo(() => chats.find((c) => c.kind === "notes"), [chats]);
@@ -175,7 +178,6 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
 
   // Jump to a quoted message: scroll it into view and flash a highlight. If it's
   // not in the DOM (scrolled out / not paged in yet), page older until found.
-  const { scroller, noMore, loadOlder } = m;
   const onJumpTo = useCallback(
     (mid: string): void => {
       const target = String(mid);
@@ -305,14 +307,14 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
               ) : null}
               <div
                 className="tc-msgs"
-                ref={m.scroller}
+                ref={scroller}
                 onScroll={m.onScroll}
                 // At scrollTop 0 the wheel fires no scroll event: retry paging on it.
                 onWheel={(e) => {
-                  if (e.deltaY < 0 && e.currentTarget.scrollTop < 60) void m.loadOlder();
+                  if (e.deltaY < 0 && e.currentTarget.scrollTop < 60) void loadOlder();
                 }}
               >
-                <div className="tc-msgs-inner" ref={m.content}>
+                <div className="tc-msgs-inner" ref={content}>
                   <Timeline
                     visible={visible}
                     cid={selChat.id}
@@ -324,7 +326,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                     openThreads={openThreads}
                     onToggleThread={toggleThread}
                     replyingTo={cs.threadTo?.rootId}
-                    msgRoot={msgRoot}
+                    msgRootRef={msgRoot}
                     loading={m.loading}
                     ready={m.ready}
                     failed={m.failed}

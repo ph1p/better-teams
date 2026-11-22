@@ -39,7 +39,7 @@ function collectPeople(root: unknown, out: PeopleHit[], seen: Set<string>): void
   const o = root as Record<string, unknown>;
   const mri = pick(o, "MRI", "Mri", "mri", "ImAddress");
   const name = pick(o, "DisplayName", "displayName");
-  if (mri && name && /^8:/.test(mri) && !seen.has(mri)) {
+  if (mri && name && mri.startsWith("8:") && !seen.has(mri)) {
     seen.add(mri);
     out.push({
       mri,

@@ -111,13 +111,14 @@ async function setConsumptionHorizon(conversationId: string, ms: number): Promis
 
 export async function flushPendingHorizons(): Promise<void> {
   if (!pendingHorizon.size || !token("ic3")) return;
-  for (const [id, v] of [...pendingHorizon]) {
+  // Snapshot: the loop may re-queue an id it just took out.
+  for (const [id, v] of Array.from(pendingHorizon)) {
     pendingHorizon.delete(id);
     const res = await writeHorizon(id, v);
     // Re-queue only transient failures (network, token gone, 5xx); a 4xx would
     // fail forever. Skip if a newer write for this chat was queued meanwhile.
     const transient =
-      !res.ok && (res.reason === "fetch-failed" || res.reason === "no-token" || /^http-5/.test(res.reason));
+      !res.ok && (res.reason === "fetch-failed" || res.reason === "no-token" || res.reason.startsWith("http-5"));
     if (transient && !pendingHorizon.has(id)) pendingHorizon.set(id, v);
     else if (!res.ok) horizonOverride.delete(id);
   }

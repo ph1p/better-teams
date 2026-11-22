@@ -147,7 +147,7 @@ export function parse(html: string): ElNode {
     }
     const attrs = parseAttrs(m[2] || "");
     const node: ElNode = { tag: name, attrs, children: [] };
-    const selfClose = VOID.has(name) || /\/>$/.test(m[0]);
+    const selfClose = VOID.has(name) || m[0].endsWith("/>");
     if (DROP.test(name)) {
       // Skip the element and, for non-void, its contents until the close tag.
       if (!selfClose) {
@@ -267,11 +267,11 @@ function CodeBlock({ code, lang }: { code: string; lang: string }): JSX.Element 
   );
 }
 
-let keySeq = 0;
-function toReact(node: Node): ReactNode {
+// Keys come from a per-render counter (`seq`), so siblings stay unique.
+function toReact(node: Node, seq: { n: number }): ReactNode {
   if (typeof node === "string") return node;
   const [tag, cls] = mapTag(node.tag, node.attrs);
-  const key = "n" + keySeq++;
+  const key = "n" + seq.n++;
 
   if (node.tag === "pre") {
     // Teams opens code blocks with a <br> and pads with NBSPs; grammars expect
@@ -282,7 +282,7 @@ function toReact(node: Node): ReactNode {
     return <CodeBlock key={key} code={code} lang={langHint(node)} />;
   }
 
-  const kids = node.children.map(toReact).filter((k) => k !== null && k !== "");
+  const kids = node.children.map((c) => toReact(c, seq)).filter((k) => k !== null && k !== "");
 
   if (node.tag === "img") {
     const alt = node.attrs.alt || "";
@@ -327,8 +327,8 @@ function toReact(node: Node): ReactNode {
 // Render a Teams HTML content string as safe React nodes.
 export function RichHtml({ html }: { html: string }): JSX.Element | null {
   if (!html) return null;
-  keySeq = 0;
   const tree = prune(parse(String(html)));
   if (!tree || typeof tree === "string") return null;
-  return <>{tree.children.map(toReact)}</>;
+  const seq = { n: 0 };
+  return <>{tree.children.map((c) => toReact(c, seq))}</>;
 }

@@ -47,11 +47,10 @@ export function MeBar({ onSwitchToTeams, onError }: MeBarProps): JSX.Element {
   const own = self();
   const status: Status = own !== "Unknown" ? own : statusOf(mri);
 
+  // The note editor closes with the menu.
+  if (!open && noteOpen) setNoteOpen(false);
   useEffect(() => {
-    if (!open) {
-      setNoteOpen(false);
-      return;
-    }
+    if (!open) return;
     const close = (e: Event): void => {
       if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
     };

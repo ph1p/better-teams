@@ -13,6 +13,8 @@ import {
 import { openNativeChat } from "../../send";
 import { chat as chatSvc } from "../../services";
 import { htmlToText } from "../lib/format";
+import { useLatest } from "../lib/latest";
+import { useChanged } from "../lib/changed";
 import { formatMessage } from "../../markdown";
 import { isIdle, onTeamsChange } from "../lib/live";
 import { INITIAL_REMOTE, POLL_MS } from "../lib/constants";
@@ -91,6 +93,32 @@ export interface Messages {
   edit: (cid: string, messageId: string, text: string, quoteHtml?: string) => Promise<void>;
 }
 
+// Drop optimistic messages once Teams has synced the real one. The draft is
+// markdown and the synced copy HTML, so both go through the same renderer
+// and compare as plain text without whitespace or "@"; a suffix match
+// allows for the quote Teams puts in front of a reply.
+function prunePending(pending: Pending[], chatId: string, list: Msg[], now: number): Pending[] {
+  if (!pending.length) return pending;
+  const mine = list.filter((m) => m.mine);
+  const texts = mine.map((m) => bare(htmlToText(m.content)));
+  const kept = pending.filter((x) => {
+    if (x.chatId !== chatId) return true;
+    const s = bare(htmlToText(formatMessage(x.text).html));
+    if (s && texts.some((t) => t.endsWith(s))) return false;
+    // A file-only send has no text: match a newer message of mine with the same files.
+    const names = x.files || [];
+    if (
+      !s &&
+      names.length &&
+      mine.some((m) => m.time >= x.time - CLOCK_SKEW_MS && names.every((n) => m.files.some((f) => f.name === n)))
+    )
+      return false;
+    // Unmatched (rewritten by Teams?): give up once a newer message of mine has synced.
+    return !(now - x.time > STALE_PENDING_MS && mine.some((m) => m.time >= x.time - CLOCK_SKEW_MS));
+  });
+  return kept.length === pending.length ? pending : kept;
+}
+
 // Messages of the selected chat: polled, plus live events for chats; backward
 // paging, scroll pinning and optimistic writes.
 export function useMessages(sel: string | null, selChat: Chat | undefined, flash: Flash): Messages {
@@ -113,6 +141,12 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
   const nullTicks = useRef(0); // consecutive unreachable ticks for the open chat
   const hydrated = useRef(false); // tried native-open to populate IDB for this chat
 
+  // A new chat starts with empty buckets, before its first paint.
+  if (useChanged(sel + "|" + selIsChannel) && sel) {
+    setMsgs({ id: sel, list: [], loaded: false });
+    setOlder({ id: sel, list: [] });
+  }
+
   // Messages for the selected chat: polled, plus live events for chats.
   useEffect(() => {
     if (!sel) return;
@@ -124,8 +158,6 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     paging.current = false;
     noMore.current = false;
     resetPaging(sel);
-    setMsgs({ id: sel, list: [], loaded: false });
-    setOlder({ id: sel, list: [] });
     // Capture a backward-paging cursor so scroll-up works even for chats whose
     // recent messages come from the local cache. Merge any remote-only messages.
     (async () => {
@@ -164,6 +196,9 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
         if (s !== lastMsgSig.current || force) {
           lastMsgSig.current = s;
           setMsgs({ id: sel, list, loaded: true });
+          // Same batch as the list, so a synced copy and its pending bubble
+          // never paint together.
+          setPending((p) => prunePending(p, sel, list, Date.now()));
         }
       } catch {
         if (alive) setMsgs({ id: sel, list: [], loaded: true });
@@ -192,35 +227,6 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
       offEvents();
     };
   }, [sel, selIsChannel]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Drop optimistic messages once Teams has synced the real one. The draft is
-  // markdown and the synced copy HTML, so both go through the same renderer
-  // and compare as plain text without whitespace or "@"; a suffix match
-  // allows for the quote Teams puts in front of a reply.
-  // Layout effect: the synced copy and its pending bubble never paint together.
-  useLayoutEffect(() => {
-    if (!pending.length) return;
-    const mine = msgs.list.filter((m) => m.mine);
-    const texts = mine.map((m) => bare(htmlToText(m.content)));
-    const now = Date.now();
-    setPending((p) =>
-      p.filter((x) => {
-        if (x.chatId !== msgs.id) return true;
-        const s = bare(htmlToText(formatMessage(x.text).html));
-        if (s && texts.some((t) => t.endsWith(s))) return false;
-        // A file-only send has no text: match a newer message of mine with the same files.
-        const names = x.files || [];
-        if (
-          !s &&
-          names.length &&
-          mine.some((m) => m.time >= x.time - CLOCK_SKEW_MS && names.every((n) => m.files.some((f) => f.name === n)))
-        )
-          return false;
-        // Unmatched (rewritten by Teams?): give up once a newer message of mine has synced.
-        return !(now - x.time > STALE_PENDING_MS && mine.some((m) => m.time >= x.time - CLOCK_SKEW_MS));
-      }),
-    );
-  }, [msgs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep the view pinned to the bottom only if the user was already there;
   // after a paged-in older page, keep the same message under the cursor.
@@ -439,19 +445,18 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     );
     return all;
   }, [msgs, older, sel, selIsChannel]);
-  shownIds.current = useMemo(() => new Set(shown.map((m) => m.id)), [shown]);
-  // Oldest message on screen by time (channels sort by thread, not time):
-  // where the next older page starts.
-  oldestId.current = useMemo(() => {
+  // Ids on screen, and the oldest message on screen by time (channels sort by
+  // thread, not time): where the next older page starts. Read by loadOlder.
+  useLayoutEffect(() => {
+    shownIds.current = new Set(shown.map((m) => m.id));
     let o: Msg | undefined;
     for (const m of shown) if (!o || m.time < o.time) o = m;
-    return o?.id || "";
+    oldestId.current = o?.id || "";
   }, [shown]);
 
   // Stable identities for the per-message actions, so memoized messages skip
   // re-rendering on every poll and scroll state change.
-  const acts = useRef({ react, remove, removeFile, undo, edit });
-  acts.current = { react, remove, removeFile, undo, edit };
+  const acts = useLatest({ react, remove, removeFile, undo, edit });
   const stable = useMemo(
     () => ({
       react: (...a: Parameters<typeof react>) => acts.current.react(...a),
@@ -460,7 +465,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
       undo: (...a: Parameters<typeof undo>) => acts.current.undo(...a),
       edit: (...a: Parameters<typeof edit>) => acts.current.edit(...a),
     }),
-    [],
+    [acts],
   );
 
   const ready = msgs.loaded && msgs.id === sel;

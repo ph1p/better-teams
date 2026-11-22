@@ -127,7 +127,7 @@ function learn(s: State, w: Worker, msg: unknown): void {
   const first = !s.ctx;
   s.ctx = { worker: w, rendererId: m.rendererId, windowId: m.windowId, authenticationUser: au };
   listen(s, w);
-  if (first) for (const f of [...s.waiters]) f();
+  if (first) for (const f of Array.from(s.waiters)) f(); // snapshot: callbacks may unsubscribe
 }
 
 // Our auth requests use this prefix, so the page's answers are told apart

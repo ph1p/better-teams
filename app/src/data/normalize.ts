@@ -59,7 +59,7 @@ export function asCallRoot(n: Message, raw: Record<string, unknown>): Message {
 function sharePointSite(url: string): string {
   try {
     const u = new URL(url);
-    return u.protocol === "https:" && /\.sharepoint\.com$/.test(u.hostname) ? u.href.replace(/\/?$/, "/") : "";
+    return u.protocol === "https:" && u.hostname.endsWith(".sharepoint.com") ? u.href.replace(/\/?$/, "/") : "";
   } catch {
     return "";
   }

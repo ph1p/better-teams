@@ -1,4 +1,5 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, type RefObject } from "react";
+import { useLatest } from "../lib/latest";
 import { isIdle } from "../lib/live";
 import { viewerOpen } from "../lib/files";
 import type { Chat } from "../../types";
@@ -21,12 +22,11 @@ interface Shortcuts {
 // unread chat, ⌥U Unread filter, ⌥N notes drawer, Esc leaves search.
 export function useShortcuts(opts: Shortcuts): void {
   // Latest options, so the window listener is attached once.
-  const o = useRef(opts);
-  o.current = opts;
+  const o = useLatest(opts);
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (isIdle() || viewerOpen()) return;
-      const { flat, sel, pick, searchRef } = o.current;
+      const { flat, sel, pick, searchRef, msgSearchOpen, unreadOnly } = o.current;
       if (e.metaKey && !e.altKey && e.key.toLowerCase() === "k") {
         e.preventDefault();
         e.stopPropagation();
@@ -37,7 +37,7 @@ export function useShortcuts(opts: Shortcuts): void {
         e.preventDefault();
         e.stopPropagation();
         if (sel) o.current.openMsgSearch();
-      } else if (e.key === "Escape" && o.current.msgSearchOpen) {
+      } else if (e.key === "Escape" && msgSearchOpen) {
         o.current.closeMsgSearch();
       } else if (e.altKey && !e.metaKey && !e.shiftKey && e.code === "KeyN") {
         e.preventDefault();
@@ -46,7 +46,7 @@ export function useShortcuts(opts: Shortcuts): void {
       } else if (e.altKey && !e.metaKey && e.code === "KeyU") {
         e.preventDefault();
         e.stopPropagation();
-        o.current.setUnreadFilter(!o.current.unreadOnly);
+        o.current.setUnreadFilter(!unreadOnly);
       } else if (e.altKey && !e.metaKey && e.shiftKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
         e.preventDefault();
         e.stopPropagation();
@@ -71,5 +71,5 @@ export function useShortcuts(opts: Shortcuts): void {
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, []);
+  }, [o]);
 }
