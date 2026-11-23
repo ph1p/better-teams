@@ -17,7 +17,8 @@ import { STATUS_COLOR, statusLabel, usePresence } from "../lib/presence";
 import type { CSSProperties } from "react";
 import type { Chat } from "../../types";
 import { t } from "../../i18n";
-import { personName, useNameFormat } from "../../names";
+import { formatName } from "../../names";
+import { isAppMri } from "../../apps";
 
 interface ProfilePanelProps {
   mri: string;
@@ -35,14 +36,14 @@ type IconComp = ComponentType<{ size?: number }>;
 // chat the current user shares with them. Details come from the loaded profile
 // row; fields Teams didn't cache simply don't render.
 export function ProfilePanel({ mri, chats, sel, onPick, onClose, onMessage, onCall }: ProfilePanelProps): JSX.Element {
-  useNameFormat();
   const { statusOf } = usePresence();
   const status = statusOf(mri);
   const ring = status !== "Unknown";
   const p = profile(mri);
-  // Avatar initials and colour keep Teams' own name; only the shown name is formatted.
+  // Avatar initials and colour keep Teams' own name. The profile always shows
+  // the full "First Last" name, whatever the name format setting says.
   const rawName = p.displayName || t().common.unknown;
-  const name = personName(p, "", mri) || t().common.unknown;
+  const name = (isAppMri(mri) ? rawName : formatName(p, "first-last")) || t().common.unknown;
   const rows: Array<[IconComp, string]> = (
     [
       [MailIcon, p.email],
