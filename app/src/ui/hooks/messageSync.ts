@@ -28,13 +28,21 @@ function hash(s: string): number {
 }
 
 // Cheap change signature so polling doesn't re-render (and jump) when idle.
-export const msgSig = (list: Msg[]): string =>
-  list
-    .map(
-      (m) =>
-        `${m.id}:${m.time}:${m.edited}:${m.deleted}:${hash(m.content)}:${m.files.map((f) => f.name).join("/")}:${m.reactions.map((r) => r.key + r.count + (r.mine ? "*" : "")).join()}`,
-    )
-    .join("|");
+const itemSig = (m: Msg): string =>
+  `${m.id}:${m.time}:${m.edited}:${m.deleted}:${hash(m.content)}:${m.files.map((f) => f.name).join("/")}:${m.reactions.map((r) => r.key + r.count + (r.mine ? "*" : "")).join()}`;
+
+export const msgSig = (list: Msg[]): string => list.map(itemSig).join("|");
+
+// Keep the previous object for messages whose signature is unchanged, so
+// memo(Message) can skip them. Returns `next` items otherwise. Any field
+// Message renders must be part of itemSig, or its row would go stale.
+export function reuseUnchanged(prev: Msg[], next: Msg[]): Msg[] {
+  const old = new Map(prev.map((m) => [m.id, m]));
+  return next.map((m) => {
+    const p = old.get(m.id);
+    return p && itemSig(p) === itemSig(m) ? p : m;
+  });
+}
 
 // The HTML an edit stores: the same as data/writes.ts editMessage sends.
 export const editedContent = (text: string, quoteHtml = ""): string =>
