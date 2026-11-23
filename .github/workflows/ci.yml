@@ -1,9 +1,12 @@
 name: ci
 
+# Also called by release.yml, so a release only happens after this full gate.
+# Pushes to main are covered by that call; the rest run here.
 on:
-  push:
-    branches: [main]
   pull_request:
+  push:
+    branches-ignore: [main]
+  workflow_call:
 
 jobs:
   build:
@@ -25,7 +28,8 @@ jobs:
       - run: pnpm run typecheck
       - run: pnpm run lint
       - run: pnpm run fmt:check
+      - run: pnpm run --if-present test
       - run: pnpm run build
       - run: node ../scripts/build-host-patch.ts dist/better-teams-app.js dist/better-teams-host.js
       - name: shell scripts parse
-        run: for f in ../better-teams ../install.sh ../uninstall.sh; do bash -n "$f"; done
+        run: for f in ../better-teams ../install.sh ../uninstall.sh ../scripts/package-release.sh; do bash -n "$f"; done
