@@ -1,19 +1,27 @@
 name: release
 
-# Push a tag like v0.2.0 (matching app/package.json) to publish a release with
-# the prebuilt overlay that install.sh downloads.
+# semantic-release: every push to main is analyzed; feat/fix/perf commits (or a
+# BREAKING CHANGE) publish a new version with the prebuilt overlay that
+# install.sh downloads. The version bump is committed back to app/package.json.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           package_json_file: app/package.json
@@ -22,23 +30,16 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: app/pnpm-lock.yaml
-      - name: tag matches package version
-        run: |
-          v="$(node -p 'require("./app/package.json").version')"
-          [ "v$v" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME != app/package.json v$v"; exit 1; }
       - run: pnpm install --frozen-lockfile
         working-directory: app
       - run: pnpm run typecheck && pnpm run build
         working-directory: app
-      - name: package
-        run: |
-          mkdir pkg
-          node scripts/build-host-patch.ts app/dist/better-teams-app.js pkg/better-teams-host.js
-          cp better-teams LICENSE pkg/
-          chmod +x pkg/better-teams
-          echo "${GITHUB_REF_NAME#v}" > pkg/VERSION
-          tar -czf better-teams.tar.gz -C pkg .
-      - name: publish
+      - name: semantic-release
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" better-teams.tar.gz install.sh --title "$GITHUB_REF_NAME" --generate-notes
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          npx --yes
+          -p semantic-release@24.2.3
+          -p @semantic-release/exec@6.0.3
+          -p @semantic-release/git@10.0.1
+          semantic-release

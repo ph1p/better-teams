@@ -73,9 +73,12 @@ bake your changes into the patch.
 
 Type-check with `cd app && pnpm run typecheck`.
 
-**Release:** bump `version` in `app/package.json`, commit, then push a tag
-`vX.Y.Z`. `.github/workflows/release.yml` builds `better-teams.tar.gz` and
-publishes it with `install.sh`.
+**Release:** automatic via semantic-release (`.releaserc.json`,
+`.github/workflows/release.yml`). Each push to `main` is analyzed with
+conventional commits: `fix:` makes a patch release, `feat:` a minor one, and
+`BREAKING CHANGE:` a major one. It builds `better-teams.tar.gz`
+(`scripts/package-release.sh`), commits the version to `app/package.json`, tags
+`vX.Y.Z` and publishes a GitHub release with the tarball and `install.sh`.
 
 ### Mock mode (no Teams)
 

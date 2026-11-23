@@ -1,0 +1,27 @@
+{
+  "branches": ["main"],
+  "tagFormat": "v${version}",
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    ["@semantic-release/exec", { "prepareCmd": "scripts/package-release.sh ${nextRelease.version}" }],
+    [
+      "@semantic-release/git",
+      {
+        "assets": ["app/package.json"],
+        "message": "chore(release): ${nextRelease.version} [skip ci]"
+      }
+    ],
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          { "path": "release/better-teams.tar.gz", "label": "better-teams.tar.gz" },
+          { "path": "install.sh", "label": "install.sh" }
+        ],
+        "successComment": false,
+        "failComment": false
+      }
+    ]
+  ]
+}
