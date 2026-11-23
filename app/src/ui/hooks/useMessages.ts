@@ -135,6 +135,10 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
   // against, applied in a layout effect so the shifted frame is never painted.
   const anchor = useRef<{ h: number; top: number } | null>(null);
   const stick = useRef(true);
+  // scrollTop at the last scroll event: only a move up unpins the view.
+  const lastTop = useRef(0);
+  // The open chat, for async work that must not land in a chat opened since.
+  const openId = useRef(sel);
   const paging = useRef(false);
   const noMore = useRef(false);
   const lastMsgSig = useRef("");
@@ -228,6 +232,15 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     };
   }, [sel, selIsChannel]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A newly opened chat starts pinned. A layout effect declared before the
+  // pinning one, so the chat's first paint already lands at the bottom.
+  useLayoutEffect(() => {
+    openId.current = sel;
+    stick.current = true;
+    lastTop.current = 0;
+    anchor.current = null;
+  }, [sel, selIsChannel]);
+
   // Keep the view pinned to the bottom only if the user was already there;
   // after a paged-in older page, keep the same message under the cursor.
   useLayoutEffect(() => {
@@ -239,6 +252,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
       el.scrollTop = a.top + (el.scrollHeight - a.h);
     } else if (stick.current) el.scrollTop = el.scrollHeight;
   }, [msgs, older, pending]);
+  const hasView = !!selChat;
   // Content that grows after render (images, link previews, avatars, fonts)
   // would otherwise push the newest message out of view.
   useEffect(() => {
@@ -250,7 +264,8 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     });
     ro.observe(box);
     return () => ro.disconnect();
-  }, [sel]);
+    // hasView: the list mounts only once the chat is known, maybe after `sel`.
+  }, [sel, hasView]);
   const loadOlder = useCallback(async (): Promise<void> => {
     if (paging.current || noMore.current) return;
     const el = scroller.current;
@@ -265,7 +280,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
       let hops = 0;
       do {
         page = await fetchOlderRemote(cid!, selIsChannel, oldestId.current || undefined);
-        if (cid !== sel) return; // switched chat mid-fetch
+        if (cid !== openId.current) return; // switched chat mid-fetch
         if (!page) {
           noMore.current = true;
           return;
@@ -317,8 +332,12 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     const el = scroller.current;
     if (!el) return;
     const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    stick.current = near;
-    setAtBottom(near);
+    // Content growing below (images, previews, a newly loaded list) also lands
+    // here, before the ResizeObserver repins: that must not unpin the view.
+    if (near) stick.current = true;
+    else if (el.scrollTop < lastTop.current) stick.current = false;
+    lastTop.current = el.scrollTop;
+    setAtBottom(stick.current);
     updateStickyDay(el);
     if (el.scrollTop < 60) loadOlder();
   };
