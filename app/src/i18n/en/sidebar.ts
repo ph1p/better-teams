@@ -16,6 +16,8 @@ export const sidebar = {
   showPreviews: "Show message previews",
   compactList: "Compact list",
   newChat: "New chat",
+  madeBy: (site: string) => `by ${site}`,
+  sourceOnGitHub: "Source code on GitHub",
   search: "Search  ⌘K",
   unread: "Unread",
   unreadFilterTitle: "Only unread conversations  ⌥U · next unread ⌥⇧↓",

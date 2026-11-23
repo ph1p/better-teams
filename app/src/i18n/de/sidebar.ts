@@ -16,6 +16,8 @@ export const sidebar: Messages["sidebar"] = {
 
   showPreviews: "Nachrichtenvorschau anzeigen",
   compactList: "Kompakte Liste",
+  madeBy: (site) => `by ${site}`,
+  sourceOnGitHub: "Quellcode auf GitHub",
   newChat: "Neuer Chat",
   search: "Suchen  ⌘K",
   unread: "Ungelesen",

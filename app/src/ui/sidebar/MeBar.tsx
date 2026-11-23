@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type JSX, type CSSProperties } from "react";
-import { ArrowLeftRight, Check, RotateCcw, ChevronUp, Languages, MessageSquare } from "lucide-react";
+import { ArrowLeftRight, Check, RotateCcw, ChevronUp, Github, Languages, MessageSquare } from "lucide-react";
 import { myMri, profile } from "../../teamsData";
 import { myNote, setMyNote, setMyStatus, type NoteExpiry, type SettableStatus } from "../../status";
 import { Avatar } from "../shared/Avatar";
@@ -86,8 +86,27 @@ export function MeBar({ onSwitchToTeams, onError }: MeBarProps): JSX.Element {
     rerender((n) => n + 1);
   };
 
+  const row = (inCard: boolean) => (
+    <button
+      className={"tc-me-btn" + (open ? " on" : "")}
+      onClick={() => setOpen((o) => !o)}
+      aria-haspopup="menu"
+      aria-expanded={open}
+      title={s.statusAndView}
+      tabIndex={open && !inCard ? -1 : undefined}
+      autoFocus={inCard}
+    >
+      <Avatar name={name} uri={mri ? avatarUri(mri) : undefined} status={status} />
+      <span className="tc-me-text">
+        <span className="tc-me-name">{name}</span>
+        <span className="tc-me-status">{note ? statusLabel(status) + " · " + note.text : statusLabel(status)}</span>
+      </span>
+      <ChevronUp size={15} className="tc-me-chev" />
+    </button>
+  );
+
   return (
-    <div className="tc-me" ref={box}>
+    <div className={"tc-me" + (open ? " open" : "")} ref={box}>
       {open ? (
         <div className="tc-me-menu" role="menu">
           <div className="tc-menu-label">{s.statusHeading}</div>
@@ -200,22 +219,29 @@ export function MeBar({ onSwitchToTeams, onError }: MeBarProps): JSX.Element {
             <span className="tc-me-menu-label">{s.switchToTeams}</span>
             <span className="tc-me-kb">⌥⌘T</span>
           </button>
+          <div className="tc-menu-sep" />
+          <div className="tc-me-about">
+            <span className="tc-me-about-ver">
+              Better Teams {__VERSION__}
+              <a
+                href="https://github.com/ph1p/better-teams"
+                target="_blank"
+                rel="noreferrer noopener"
+                title={s.sourceOnGitHub}
+                aria-label={s.sourceOnGitHub}
+                onClick={() => setOpen(false)}
+              >
+                <Github size={13} />
+              </a>
+            </span>
+            <a href="https://ph1p.dev" target="_blank" rel="noreferrer noopener" onClick={() => setOpen(false)}>
+              {s.madeBy("ph1p.dev")}
+            </a>
+          </div>
+          {row(true)}
         </div>
       ) : null}
-      <button
-        className={"tc-me-btn" + (open ? " on" : "")}
-        onClick={() => setOpen((o) => !o)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        title={s.statusAndView}
-      >
-        <Avatar name={name} uri={mri ? avatarUri(mri) : undefined} status={status} />
-        <span className="tc-me-text">
-          <span className="tc-me-name">{name}</span>
-          <span className="tc-me-status">{note ? statusLabel(status) + " · " + note.text : statusLabel(status)}</span>
-        </span>
-        <ChevronUp size={15} className="tc-me-chev" />
-      </button>
+      {row(false)}
     </div>
   );
 }

@@ -112,7 +112,6 @@ app/src/
   i18n/                    en/de strings; follows Teams' language
   ui/                      React components
   mock/                    browser-only stand-ins for mock mode
-docs/                      notes on the Teams APIs used
 ```
 
 ## How it works

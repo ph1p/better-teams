@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
@@ -6,6 +7,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 const SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), "src");
 const MOCK = path.join(SRC, "mock");
+const VERSION = JSON.stringify(JSON.parse(readFileSync(path.join(SRC, "../package.json"), "utf8")).version);
 
 // Builds the whole app (React included) into ONE self-contained IIFE file with
 // no external imports, so it can be injected as a single string over CDP into
@@ -43,12 +45,16 @@ export default defineConfig(({ mode }) =>
   mode === "mock"
     ? {
         plugins: [mockTeams(), tailwindcss(), react()],
-        define: { __BUILD__: JSON.stringify("mock") },
+        define: { __BUILD__: JSON.stringify("mock"), __VERSION__: VERSION },
         server: { port: 5199, open: true },
       }
     : {
         plugins: [tailwindcss(), react(), buildId()],
-        define: { "process.env.NODE_ENV": '"production"', __BUILD__: JSON.stringify(BUILD_PLACEHOLDER) },
+        define: {
+          "process.env.NODE_ENV": '"production"',
+          __BUILD__: JSON.stringify(BUILD_PLACEHOLDER),
+          __VERSION__: VERSION,
+        },
         build: {
           outDir: "dist",
           cssCodeSplit: false,

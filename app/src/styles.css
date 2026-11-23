@@ -2489,9 +2489,11 @@
   padding: 6px 8px;
   border-radius: 8px;
 }
-#tc-root .tc-me-btn:hover,
-#tc-root .tc-me-btn.on {
+#tc-root .tc-me-btn:hover {
   background: var(--tc-hover);
+}
+#tc-root .tc-me.open > .tc-me-btn {
+  visibility: hidden;
 }
 #tc-root .tc-me-text {
   @apply flex flex-col min-w-0 flex-1;
@@ -2510,12 +2512,16 @@
 #tc-root .tc-me-chev {
   color: var(--tc-fg2);
   flex: 0 0 auto;
+  transition: transform 0.15s;
+}
+#tc-root .tc-me-menu .tc-me-chev {
+  transform: rotate(180deg);
 }
 #tc-root .tc-me-menu {
   @apply absolute;
-  left: 8px;
-  right: 8px;
-  bottom: calc(100% - 2px);
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
   z-index: 20;
   padding: 4px;
   background: var(--tc-bg);
@@ -2525,6 +2531,26 @@
 }
 #tc-root .tc-me-menu-label {
   @apply flex-1 min-w-0 truncate;
+}
+#tc-root .tc-me-about {
+  @apply flex items-center justify-between gap-2;
+  padding: 4px 10px 6px;
+  font-size: 11.5px;
+  color: var(--tc-fg2);
+}
+#tc-root .tc-me-about-ver {
+  @apply flex items-center gap-1.5;
+}
+#tc-root .tc-me-about-ver a {
+  @apply inline-flex;
+}
+#tc-root .tc-me-about a {
+  color: var(--tc-fg2);
+  text-decoration: none;
+}
+#tc-root .tc-me-about a:hover {
+  color: var(--tc-accent);
+  text-decoration: underline;
 }
 #tc-root .tc-me-kb {
   font-size: 12px;
