@@ -17,7 +17,7 @@ import { inOpenFence } from "../../markdown";
 const INDENT = "  ";
 
 /** Replace [start,end) of the textarea's value with `text`; caret/selection after. */
-function replace(
+export function replaceText(
   el: HTMLTextAreaElement,
   start: number,
   end: number,
@@ -50,7 +50,7 @@ export function wrapSelection(el: HTMLTextAreaElement, mark: string): void {
   const sel = v.slice(s, e);
   // Already wrapped: unwrap.
   if (v.slice(s - mark.length, s) === mark && v.slice(e, e + mark.length) === mark) {
-    replace(el, s - mark.length, e + mark.length, sel, 0, sel.length);
+    replaceText(el, s - mark.length, e + mark.length, sel, 0, sel.length);
     return;
   }
   if (sel.includes("\n")) {
@@ -59,10 +59,10 @@ export function wrapSelection(el: HTMLTextAreaElement, mark: string): void {
       .split("\n")
       .map((l) => (l.trim() && !/^\s*```/.test(l) ? mark + l + mark : l))
       .join("\n");
-    replace(el, s, e, out, 0, out.length);
+    replaceText(el, s, e, out, 0, out.length);
     return;
   }
-  replace(el, s, e, mark + sel + mark, mark.length, mark.length + sel.length);
+  replaceText(el, s, e, mark + sel + mark, mark.length, mark.length + sel.length);
 }
 
 /** Put the selection (or an empty line) in a fenced code block. */
@@ -73,7 +73,7 @@ export function codeBlock(el: HTMLTextAreaElement): void {
   const post = e < v.length && v[e] !== "\n" ? "\n" : "";
   const block = pre + "```\n" + sel + "\n```" + post;
   const caret = pre.length + 4;
-  replace(el, s, e, block, caret, caret + sel.length);
+  replaceText(el, s, e, block, caret, caret + sel.length);
 }
 
 /**
@@ -114,10 +114,10 @@ export function handleFormatKey(e: KeyboardEvent<HTMLTextAreaElement>): boolean 
     const line = v.slice(ls, s);
     // Just typed the opening fence and nothing closes it yet: add the closer.
     if (/^\s*```[\w#+.-]*\s*$/.test(line) && !/^\s*```\s*$/m.test(v.slice(s))) {
-      replace(el, s, end, "\n\n```", 1);
+      replaceText(el, s, end, "\n\n```", 1);
       return true;
     }
-    replace(el, s, end, "\n" + (/^[ \t]*/.exec(line)?.[0] ?? ""));
+    replaceText(el, s, end, "\n" + (/^[ \t]*/.exec(line)?.[0] ?? ""));
     return true;
   }
   if (e.key === "Tab" && fenced && !mod && !e.altKey) {
@@ -126,13 +126,13 @@ export function handleFormatKey(e: KeyboardEvent<HTMLTextAreaElement>): boolean 
     if (e.shiftKey) {
       const n = /^ {1,2}|^\t/.exec(v.slice(ls, ls + INDENT.length))?.[0].length ?? 0;
       if (n) {
-        replace(el, ls, ls + n, "");
+        replaceText(el, ls, ls + n, "");
         el.setSelectionRange(Math.max(ls, s - n), Math.max(ls, end - n));
       }
     } else if (s === end) {
-      replace(el, s, s, INDENT);
+      replaceText(el, s, s, INDENT);
     } else {
-      replace(el, ls, ls, INDENT);
+      replaceText(el, ls, ls, INDENT);
       el.setSelectionRange(s + INDENT.length, end + INDENT.length);
     }
     return true;
@@ -143,11 +143,11 @@ export function handleFormatKey(e: KeyboardEvent<HTMLTextAreaElement>): boolean 
     if (!m) return false;
     e.preventDefault();
     if (!m[3].trim()) {
-      replace(el, ls, s, ""); // empty item: end the list
+      replaceText(el, ls, s, ""); // empty item: end the list
       return true;
     }
     const n = /\d/.test(m[2]) ? `${parseInt(m[2], 10) + 1}${m[2].slice(-1)}` : m[2];
-    replace(el, s, s, `\n${m[1]}${n} `);
+    replaceText(el, s, s, `\n${m[1]}${n} `);
     return true;
   }
   return false;

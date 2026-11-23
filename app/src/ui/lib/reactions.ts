@@ -359,3 +359,110 @@ export const PICKER: ReadonlyArray<readonly [key: string, glyph: string]> = [
   ["sad", "😢"],
   ["angry", "😠"],
 ];
+
+// Slack-style shortcode names on top of the Teams keys above, for `:name`
+// autocomplete in the composer. Underscored names match Slack's.
+const SHORTCODE_EXTRA: Record<string, string> = {
+  smile: "😄",
+  smiley: "😃",
+  grin: "😁",
+  grinning: "😀",
+  joy: "😂",
+  rofl: "🤣",
+  sweat_smile: "😅",
+  slightly_smiling_face: "🙂",
+  upside_down_face: "🙃",
+  blush: "😊",
+  heart_eyes: "😍",
+  kissing_heart: "😘",
+  sunglasses: "😎",
+  thinking_face: "🤔",
+  thinking: "🤔",
+  neutral_face: "😐",
+  expressionless: "😑",
+  sleeping: "😴",
+  sob: "😭",
+  rage: "😡",
+  scream: "😱",
+  open_mouth: "😮",
+  exploding_head: "🤯",
+  partying_face: "🥳",
+  shrug: "🤷",
+  facepalm: "🤦",
+  "+1": "👍",
+  "-1": "👎",
+  raised_hands: "🙌",
+  white_check_mark: "✅",
+  heavy_check_mark: "✔️",
+  x: "❌",
+  warning: "⚠️",
+  bulb: "💡",
+  zap: "⚡",
+  sparkles: "✨",
+  bug: "🐛",
+  dart: "🎯",
+  poop: "💩",
+  coffee: "☕",
+  beer: "🍺",
+  pizza: "🍕",
+  cake: "🎂",
+  gift: "🎁",
+  calendar: "📅",
+  memo: "📝",
+  pushpin: "📌",
+  link: "🔗",
+  lock: "🔒",
+  key: "🔑",
+  hourglass: "⏳",
+  alarm_clock: "⏰",
+  bell: "🔔",
+  question: "❓",
+  exclamation: "❗",
+  hammer: "🔨",
+  wrench: "🔧",
+  gear: "⚙️",
+  computer: "💻",
+  chart_with_upwards_trend: "📈",
+  moneybag: "💰",
+  sun: "☀️",
+  rainbow: "🌈",
+  see_no_evil: "🙈",
+  wave: "👋",
+  ok_hand: "👌",
+  point_right: "👉",
+  point_up: "☝️",
+  muscle: "💪",
+  eyes: "👀",
+  rocket: "🚀",
+  tada: "🎉",
+  fire: "🔥",
+  "100": "💯",
+};
+
+const SHORTCODES: Record<string, string> = { ...REACTION, ...SHORTCODE_EXTRA };
+const SORTED = Object.entries(SHORTCODES).sort(([a], [b]) => (a < b ? -1 : 1));
+
+/** Glyph of an exact shortcode (`smile` → 😄), or undefined. */
+export function shortcodeGlyph(name: string): string | undefined {
+  return SHORTCODES[name.toLowerCase()];
+}
+
+/**
+ * Shortcodes for a half-typed `:query`: names starting with it first, then
+ * names containing it; one row per glyph, so aliases don't crowd the list.
+ */
+export function searchShortcodes(query: string, limit = 8): Array<{ name: string; glyph: string }> {
+  const q = query.toLowerCase();
+  if (!q) return [];
+  const out: Array<{ name: string; glyph: string }> = [];
+  const seen = new Set<string>();
+  for (const prefix of [true, false]) {
+    for (const [name, glyph] of SORTED) {
+      if (out.length >= limit) return out;
+      if (seen.has(glyph) || (prefix ? !name.startsWith(q) : name.startsWith(q) || !name.includes(q))) continue;
+      seen.add(glyph);
+      out.push({ name, glyph });
+    }
+  }
+  return out;
+}

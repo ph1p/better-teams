@@ -846,20 +846,82 @@
   border-color: var(--tc-accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--tc-accent) 22%, transparent);
 }
+/* The draft field: a styled copy of the text (.tc-composer-hl) sits behind a
+   textarea whose own glyphs are transparent, so markdown shows live while
+   typing. Highlight styles must not change glyph widths (no font, weight or
+   padding changes), or the caret drifts from the text. */
+#tc-root .tc-composer-field {
+  @apply relative flex flex-1 self-center;
+  min-width: 0;
+}
+#tc-root .tc-composer textarea,
+#tc-root .tc-composer-hl {
+  font-family: var(--tc-font);
+  font-size: 14px;
+  padding: 4px 0;
+  line-height: 1.45;
+  letter-spacing: normal;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
 #tc-root .tc-composer textarea {
-  @apply flex-1 resize-none self-center;
+  @apply relative flex-1 resize-none;
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--tc-fg);
-  font-family: var(--tc-font);
-  font-size: 14px;
+  color: transparent;
+  caret-color: var(--tc-fg);
   max-height: 180px;
-  padding: 4px 0;
-  line-height: 1.45;
+  scrollbar-width: none;
+}
+#tc-root .tc-composer textarea::-webkit-scrollbar {
+  display: none;
+}
+#tc-root .tc-composer textarea::selection {
+  background: color-mix(in srgb, var(--tc-accent) 30%, transparent);
+  color: transparent;
 }
 #tc-root .tc-composer textarea::placeholder {
   color: var(--tc-fg2);
+}
+#tc-root .tc-composer-hl {
+  @apply absolute inset-0 overflow-hidden pointer-events-none;
+  color: var(--tc-fg);
+}
+#tc-root .tc-hl-code {
+  background: var(--tc-bg3);
+  box-shadow: 0 0 0 1px var(--tc-bg3);
+  border-radius: 3px;
+  color: var(--tc-code-fg, #c0392b);
+}
+#tc-root .tc-hl-mark {
+  color: var(--tc-fg2);
+}
+#tc-root .tc-hl-code .tc-hl-mark {
+  color: inherit;
+  opacity: 0.55;
+}
+#tc-root .tc-hl-b {
+  -webkit-text-stroke: 0.4px currentColor;
+}
+#tc-root .tc-hl-i {
+  color: color-mix(in srgb, var(--tc-fg) 80%, var(--tc-accent));
+}
+#tc-root .tc-hl-s {
+  text-decoration: line-through;
+}
+#tc-root .tc-hl-at {
+  color: var(--tc-accent);
+  background: var(--tc-accent-soft);
+  border-radius: 3px;
+}
+#tc-root .tc-hl-fence,
+#tc-root .tc-hl-pre {
+  color: var(--tc-code-fg, #c0392b);
+}
+#tc-root .tc-hl-fence {
+  opacity: 0.6;
 }
 #tc-root .tc-send {
   @apply grid place-items-center cursor-pointer;
@@ -1036,8 +1098,19 @@
   padding: 6px 8px;
   border-radius: 8px;
 }
-#tc-root .tc-at-opt:hover {
+#tc-root .tc-at-opt:hover,
+#tc-root .tc-at-pop .tc-at-opt.on {
   background: var(--tc-hover);
+}
+#tc-root .tc-em-pop {
+  right: auto;
+  width: 300px;
+  max-width: calc(100% - 36px);
+}
+#tc-root .tc-em-glyph {
+  width: 22px;
+  font-size: 17px;
+  text-align: center;
 }
 #tc-root .tc-at-name {
   @apply truncate;
@@ -2871,7 +2944,6 @@
 #tc-root .tc-list,
 #tc-root .tc-msgs,
 #tc-root .tc-profile-chats,
-#tc-root .tc-composer textarea,
 #tc-root .tc-edit-area {
   scrollbar-width: thin;
   scrollbar-color: var(--tc-line) transparent;

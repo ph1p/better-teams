@@ -26,8 +26,8 @@ const M0 = "",
 const MENTION_RE = /(\d+)/g;
 const STASH_RE = /(\d+)/g;
 
-const FENCE_OPEN = /^\s*```\s*([\w#+.-]*)\s*$/;
-const FENCE_CLOSE = /^\s*```\s*$/;
+export const FENCE_OPEN = /^\s*```\s*([\w#+.-]*)\s*$/;
+export const FENCE_CLOSE = /^\s*```\s*$/;
 const HEADING = /^(#{1,3})\s+(.+)$/;
 const BULLET = /^\s*[-*+]\s+(.*)$/;
 const NUMBERED = /^\s*\d{1,3}[.)]\s+(.*)$/;

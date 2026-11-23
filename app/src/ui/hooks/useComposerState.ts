@@ -19,6 +19,8 @@ export interface ThreadTo {
   text: string;
 }
 
+const NO_PICKS: readonly MentionPick[] = [];
+
 export interface ComposerState {
   composer: RefObject<HTMLTextAreaElement | null>;
   /** Draft of the open chat. */
@@ -26,6 +28,8 @@ export interface ComposerState {
   setDraft: (v: string) => void;
   /** Record an inserted @mention for the open chat. */
   addPick: (pick: MentionPick) => void;
+  /** @mentions inserted into the open chat's draft. */
+  picks: readonly MentionPick[];
   /** Files staged for the open chat's next send. */
   files: File[];
   addFiles: (list: FileList | File[]) => void;
@@ -167,6 +171,7 @@ export function useComposerState(
     draft,
     setDraft,
     addPick,
+    picks: (sel && mentionPicks[sel]) || NO_PICKS,
     files,
     addFiles,
     removeFile,
