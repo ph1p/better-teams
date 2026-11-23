@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { t } from "../../i18n";
 import type { PeopleHit } from "../../teamsData";
 import { PeoplePicker } from "../chat/MembersPanel";
+import { useModalExit } from "../lib/modalExit";
 
 interface NewChannelProps {
   /** Team the channel goes into, for the title. */
@@ -28,6 +29,7 @@ interface NewChannelProps {
 // posts). A private channel can get its first members right away. Shared
 // channels are left to Teams.
 export function NewChannel({ team, known, onCreate, onClose }: NewChannelProps): JSX.Element {
+  const { closing, close } = useModalExit(onClose);
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [priv, setPriv] = useState(false);
@@ -51,22 +53,22 @@ export function NewChannel({ team, known, onCreate, onClose }: NewChannelProps):
   const onKey = (e: { key: string; shiftKey?: boolean; preventDefault: () => void }): void => {
     if (e.key === "Escape") {
       e.preventDefault();
-      onClose();
+      close();
     }
   };
 
   const c = t().chat;
   return (
     <div
-      className="tc-scrim"
+      className={"tc-scrim" + (closing ? " out" : "")}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) close();
       }}
     >
       <div className="tc-newchat" role="dialog" aria-label={c.newChannelIn(team)} onKeyDown={onKey}>
         <div className="tc-newchat-head">
           <span>{c.newChannelIn(team)}</span>
-          <button className="tc-profile-close" onClick={onClose} title={t().common.close} aria-label={t().common.close}>
+          <button className="tc-profile-close" onClick={close} title={t().common.close} aria-label={t().common.close}>
             <X size={16} />
           </button>
         </div>

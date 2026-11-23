@@ -801,6 +801,38 @@
   place-items: start center;
   padding-top: 12vh;
   background: rgba(0, 0, 0, 0.28);
+  animation: tc-scrim-in 0.16s ease-out;
+}
+#tc-root .tc-scrim.out {
+  animation: tc-scrim-out 0.14s ease-in both;
+  pointer-events: none;
+}
+#tc-root .tc-scrim.out .tc-newchat {
+  animation: tc-modal-out 0.14s ease-in both;
+}
+@keyframes tc-scrim-in {
+  from {
+    background: transparent;
+  }
+}
+@keyframes tc-scrim-out {
+  to {
+    background: transparent;
+  }
+}
+/* Modals grow in place (no side slide); the exit mirrors it. Keep the 0.14s
+   exit in sync with EXIT_MS in ui/lib/modalExit.ts. */
+@keyframes tc-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+@keyframes tc-modal-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
 }
 #tc-root .tc-newchat {
   @apply flex flex-col;
@@ -811,7 +843,7 @@
   border-radius: 14px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
   padding: 10px 14px 14px;
-  animation: tc-slide-in 0.16s ease;
+  animation: tc-modal-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 #tc-root .tc-newchat-head {
   @apply flex items-center justify-between;

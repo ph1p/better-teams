@@ -5,6 +5,7 @@ import { Avatar } from "../shared/Avatar";
 import { avatarUri } from "../lib/format";
 import { usePeopleSearch } from "../lib/peopleSearch";
 import { t } from "../../i18n";
+import { useModalExit } from "../lib/modalExit";
 
 /** Outcome of a start attempt, reported back by App. */
 export type NewChatOutcome =
@@ -29,6 +30,7 @@ interface NewChatProps {
 // Teams' own New message flow with them (send.ts openNativeNewChat), so the
 // result is exactly what the stock UI would create.
 export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewChatProps): JSX.Element {
+  const { closing, close } = useModalExit(onClose);
   const [picked, setPicked] = useState<PeopleHit[]>(initial || []);
   const [q, setQ] = useState("");
   const [hi, setHi] = useState(0);
@@ -97,7 +99,7 @@ export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewC
     } else if (e.key === "Backspace" && !q && picked.length) remove(picked[picked.length - 1].mri);
     else if (e.key === "Escape") {
       e.preventDefault();
-      onClose();
+      close();
     }
   };
 
@@ -106,15 +108,15 @@ export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewC
 
   return (
     <div
-      className="tc-scrim"
+      className={"tc-scrim" + (closing ? " out" : "")}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) close();
       }}
     >
       <div className="tc-newchat" role="dialog" aria-label={s.newChat}>
         <div className="tc-newchat-head">
           <span>{s.newChat}</span>
-          <button className="tc-profile-close" onClick={onClose} title={t().common.close} aria-label={t().common.close}>
+          <button className="tc-profile-close" onClick={close} title={t().common.close} aria-label={t().common.close}>
             <X size={16} />
           </button>
         </div>
@@ -183,7 +185,7 @@ export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewC
               void submit();
             } else if (e.key === "Escape") {
               e.preventDefault();
-              onClose();
+              close();
             }
           }}
         />

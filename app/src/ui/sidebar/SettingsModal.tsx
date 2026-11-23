@@ -3,6 +3,7 @@ import { Contact, Languages, Rows3, X } from "lucide-react";
 import { NAME_FORMATS, nameFormat, setNameFormat, type NameFormat } from "../../names";
 import { Select } from "../shared/Select";
 import { LANGS, autoLang, langPref, setLangPref, t, type LangPref } from "../../i18n";
+import { useModalExit } from "../lib/modalExit";
 
 interface SettingsModalProps {
   compact: boolean;
@@ -13,26 +14,27 @@ interface SettingsModalProps {
 // Small settings dialog (language, name format, chat list density), opened from the status menu so
 // the menu itself stays short.
 export function SettingsModal({ compact, onCompact, onClose }: SettingsModalProps): JSX.Element {
+  const { closing, close } = useModalExit(onClose);
   const c = t().common;
   useEffect(() => {
     const key = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") close();
     };
     document.addEventListener("keydown", key, true);
     return () => document.removeEventListener("keydown", key, true);
-  }, [onClose]);
+  }, [close]);
 
   return (
     <div
-      className="tc-scrim"
+      className={"tc-scrim" + (closing ? " out" : "")}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) close();
       }}
     >
       <div className="tc-newchat tc-settings" role="dialog" aria-label={c.settings}>
         <div className="tc-newchat-head">
           <span>{c.settings}</span>
-          <button className="tc-profile-close" onClick={onClose} title={c.close} aria-label={c.close}>
+          <button className="tc-profile-close" onClick={close} title={c.close} aria-label={c.close}>
             <X size={16} />
           </button>
         </div>
