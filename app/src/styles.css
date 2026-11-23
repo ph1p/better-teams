@@ -3033,13 +3033,21 @@
   opacity: 0.8;
 }
 
-/* Language picker row in the status menu */
-#tc-root .tc-me-lang {
-  cursor: default;
+/* Settings dialog: one row per preference */
+#tc-root .tc-settings {
+  width: min(380px, calc(100vw - 32px));
 }
-#tc-root .tc-me-lang select {
+#tc-root .tc-settings-row {
+  @apply flex items-center gap-2.5;
+  padding: 8px 2px;
+  font-size: 13px;
+}
+#tc-root .tc-settings-row + .tc-settings-row {
+  border-top: 1px solid var(--tc-line);
+}
+#tc-root .tc-settings-row select {
   margin-left: auto;
-  max-width: 150px;
+  max-width: 190px;
   border: 1px solid var(--tc-line);
   border-radius: 7px;
   background: var(--tc-bg);

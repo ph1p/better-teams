@@ -30,6 +30,7 @@ export const common: Messages["common"] = {
   language: "Sprache",
   languageAuto: (name: string) => `Automatisch (${name})`,
   nameFormat: "Namen",
+  settings: "Einstellungen",
   nameFormats: {
     teams: "Wie in Teams",
     first: "Vorname",

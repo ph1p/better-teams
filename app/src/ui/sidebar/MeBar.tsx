@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState, type JSX, type CSSProperties } from "react";
-import { ArrowLeftRight, Check, Contact, RotateCcw, ChevronUp, Github, Languages, MessageSquare } from "lucide-react";
-import { NAME_FORMATS, nameFormat, setNameFormat, type NameFormat } from "../../names";
+import { useCallback, useEffect, useRef, useState, type JSX, type CSSProperties } from "react";
+import { ArrowLeftRight, Check, RotateCcw, ChevronUp, Github, MessageSquare, Settings } from "lucide-react";
 import { myMri, profile } from "../../teamsData";
 import { myNote, setMyNote, setMyStatus, type NoteExpiry, type SettableStatus } from "../../status";
 import { Avatar } from "../shared/Avatar";
 import { avatarUri } from "../lib/format";
-import { LANGS, autoLang, langPref, setLangPref, t, type LangPref } from "../../i18n";
+import { t } from "../../i18n";
+import { SettingsModal } from "./SettingsModal";
 import { STATUS_COLOR, statusLabel, setSelfPresence, usePresence, type Status } from "../lib/presence";
 
 const CHOICES: Exclude<SettableStatus, "Reset">[] = [
@@ -38,6 +38,8 @@ export function MeBar({ onSwitchToTeams, onError }: MeBarProps): JSX.Element {
   const [draft, setDraft] = useState("");
   const [expiry, setExpiry] = useState<NoteExpiry>("today");
   const [pinned, setPinned] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const [, rerender] = useState(0);
   const note = myNote();
   const box = useRef<HTMLDivElement>(null);
@@ -192,37 +194,17 @@ export function MeBar({ onSwitchToTeams, onError }: MeBarProps): JSX.Element {
               <span className="tc-me-menu-label">{note ? s.editStatusMessage : s.setStatusMessage}</span>
             </button>
           )}
-          <label className="tc-menu-item tc-me-lang">
-            <Languages size={14} />
-            <span className="tc-me-menu-label">{t().common.language}</span>
-            <select
-              value={langPref()}
-              onChange={(e) => setLangPref(e.target.value as LangPref)}
-              aria-label={t().common.language}
-            >
-              <option value="auto">{t().common.languageAuto(LANGS.find((l) => l.id === autoLang())!.name)}</option>
-              {LANGS.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="tc-menu-item tc-me-lang">
-            <Contact size={14} />
-            <span className="tc-me-menu-label">{t().common.nameFormat}</span>
-            <select
-              value={nameFormat()}
-              onChange={(e) => setNameFormat(e.target.value as NameFormat)}
-              aria-label={t().common.nameFormat}
-            >
-              {NAME_FORMATS.map((f) => (
-                <option key={f} value={f}>
-                  {t().common.nameFormats[f]}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="tc-menu-sep" />
+          <button
+            className="tc-menu-item"
+            onClick={() => {
+              setOpen(false);
+              setSettingsOpen(true);
+            }}
+          >
+            <Settings size={14} />
+            <span className="tc-me-menu-label">{t().common.settings}…</span>
+          </button>
           <div className="tc-menu-sep" />
           <button
             className="tc-menu-item"
@@ -258,6 +240,7 @@ export function MeBar({ onSwitchToTeams, onError }: MeBarProps): JSX.Element {
         </div>
       ) : null}
       {row(false)}
+      {settingsOpen ? <SettingsModal onClose={closeSettings} /> : null}
     </div>
   );
 }
