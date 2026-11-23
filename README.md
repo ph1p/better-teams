@@ -13,6 +13,16 @@ calls, meetings and files still work natively. Toggle with **Option+Cmd+T**.
 
 Screenshots show the built-in mock data (`pnpm run mock` in `app/`).
 
+> [!WARNING]
+> **Use at your own risk.** Better Teams patches the installed Teams app and
+> breaks its code signature. It talks to Teams' own backend through internal,
+> undocumented APIs, which Microsoft can change at any time. Modifying the
+> client is not sanctioned by Microsoft's terms and may break your employer's
+> IT policy, so check before using it on a work or managed device. The software
+> is provided "as is", without warranty of any kind (see [LICENSE](LICENSE)).
+> You alone are responsible for any consequences, including lost messages,
+> account or compliance issues, or a broken Teams install.
+>
 > Better Teams is an independent project. It is not affiliated with, endorsed by
 > or supported by Microsoft. "Microsoft Teams" is a trademark of Microsoft.
 
