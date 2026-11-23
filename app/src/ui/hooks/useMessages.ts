@@ -58,6 +58,8 @@ export interface Messages {
   scrollToBottom: () => void;
   /** Pin the view to the bottom on the next render (after a send). */
   stickToBottom: () => void;
+  /** Stop pinning to the bottom (before a programmatic jump up the list). */
+  unstick: () => void;
   loadOlder: () => Promise<boolean>;
   /** True once the server has no older page. */
   noMore: RefObject<boolean>;
@@ -473,6 +475,9 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
       removeFile: (...a: Parameters<typeof removeFile>) => acts.current.removeFile(...a),
       undo: (...a: Parameters<typeof undo>) => acts.current.undo(...a),
       edit: (...a: Parameters<typeof edit>) => acts.current.edit(...a),
+      unstick: () => {
+        stick.current = false;
+      },
     }),
     [acts],
   );

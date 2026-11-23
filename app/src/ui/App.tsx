@@ -65,7 +65,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   const messages = useMessages(sel, selChat, flash);
   const cs = useComposerState(sel, selChat, messages, flash);
   // Refs pulled out, so reading the rest during render is plainly not a ref read.
-  const { scroller, content, noMore, loadOlder, ...m } = messages;
+  const { scroller, content, noMore, loadOlder, unstick, ...m } = messages;
 
   // A new conversation starts with search closed and threads collapsed.
   const switched = useChanged(sel + "|" + selIsChannel);
@@ -188,6 +188,8 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
       const tryScroll = (): boolean => {
         const el = scroller.current?.querySelector(`.tc-msg[data-mid="${CSS.escape(target)}"]`);
         if (!el) return false;
+        // Else a late resize (paged-in content) re-pins the bottom mid-scroll.
+        unstick();
         el.scrollIntoView({ block: "center", behavior: "smooth" });
         el.classList.add("tc-flash");
         setTimeout(() => el.classList.remove("tc-flash"), 1400);
@@ -220,7 +222,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
       };
       void pump();
     },
-    [loadOlder, scroller, noMore, selRef],
+    [loadOlder, scroller, noMore, selRef, unstick],
   );
 
   // Open the right-click menu for a chat row.
