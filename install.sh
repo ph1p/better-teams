@@ -13,7 +13,9 @@
 #   --uninstall   restore Teams and delete ~/.better-teams
 #
 # Environment: BETTER_TEAMS_VERSION=v0.2.0 installs that release instead of
-# the latest; BETTER_TEAMS_HOME changes the install folder.
+# the latest; BETTER_TEAMS_HOME changes the install folder;
+# BETTER_TEAMS_INSECURE=1 installs even when no checksum can be downloaded
+# (releases made before checksums were added).
 
 set -euo pipefail
 
@@ -61,10 +63,27 @@ if [ -n "${BETTER_TEAMS_URL:-}" ]; then url="$BETTER_TEAMS_URL" # testing: a loc
 elif [ -n "$VERSION_TAG" ]; then url="https://github.com/$REPO/releases/download/$VERSION_TAG/better-teams.tar.gz"
 else url="https://github.com/$REPO/releases/latest/download/better-teams.tar.gz"; fi
 
+case "$url" in
+  https://* | file://*) ;;
+  *) die "BETTER_TEAMS_URL must start with https:// or file:// (got: $url)" ;;
+esac
+
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 say "Downloading Better Teams${VERSION_TAG:+ $VERSION_TAG}..."
-curl -fsSL "$url" -o "$tmp/better-teams.tar.gz" || die "download failed: $url"
+curl --proto '=https,file' -fsSL "$url" -o "$tmp/better-teams.tar.gz" || die "download failed: $url"
+
+# Verify the tarball against the checksum published next to it before extracting.
+if curl --proto '=https,file' -fsSL "$url.sha256" -o "$tmp/better-teams.tar.gz.sha256"; then
+  want="$(awk '{print $1; exit}' "$tmp/better-teams.tar.gz.sha256")"
+  have="$(shasum -a 256 "$tmp/better-teams.tar.gz" | awk '{print $1}')"
+  [ -n "$want" ] && [ "$want" = "$have" ] || die "checksum mismatch for $url; not installing."
+elif [ "${BETTER_TEAMS_INSECURE:-}" = 1 ]; then
+  printf 'warning: could not download the checksum (%s.sha256); installing without verification.\n' "$url" >&2
+else
+  die "could not download the checksum ($url.sha256). Releases before checksums were added cannot be verified; set BETTER_TEAMS_INSECURE=1 to install anyway."
+fi
+
 mkdir "$tmp/pkg"
 tar -xzf "$tmp/better-teams.tar.gz" -C "$tmp/pkg"
 for f in better-teams better-teams-host.js VERSION; do

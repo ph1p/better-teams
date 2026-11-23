@@ -17,6 +17,7 @@
       {
         "assets": [
           { "path": "release/better-teams.tar.gz", "label": "better-teams.tar.gz" },
+          { "path": "release/better-teams.tar.gz.sha256", "label": "better-teams.tar.gz.sha256" },
           { "path": "install.sh", "label": "install.sh" }
         ],
         "successComment": false,

@@ -293,7 +293,9 @@ case "$cmd" in
     ;;
   update)
     [ "$PREBUILT" = 1 ] || die "this is a source checkout: git pull, then run ./better-teams"
-    curl -fsSL "$INSTALL_URL" | bash
+    f="$(mktemp)"; trap 'rm -f "$f"' EXIT
+    curl --proto '=https' -fsSL "$INSTALL_URL" -o "$f" || die "could not download $INSTALL_URL"
+    bash "$f"
     ;;
   dev)
     [ "$PREBUILT" = 0 ] || die "dev mode needs a source checkout (git clone https://github.com/ph1p/better-teams)"

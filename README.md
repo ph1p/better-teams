@@ -28,7 +28,10 @@ curl -fsSL https://github.com/ph1p/better-teams/releases/latest/download/install
 
 It downloads the latest release into `~/.better-teams`, patches Teams and
 relaunches it. Toggle the overlay with **Option+Cmd+T**. Nothing else is
-installed and nothing is added to your `PATH`.
+installed and nothing is added to your `PATH`. The installer verifies the
+release's SHA-256 checksum before extracting; to verify build provenance
+yourself, run
+`gh attestation verify better-teams.tar.gz --repo ph1p/better-teams`.
 
 **Update**, or after a **Teams update** removed the patch: run the same line
 again.
@@ -86,7 +89,9 @@ Type-check with `cd app && pnpm run typecheck`.
 conventional commits: `fix:` makes a patch release, `feat:` a minor one, and
 `BREAKING CHANGE:` a major one. It builds `better-teams.tar.gz`
 (`scripts/package-release.sh`), commits the version to `app/package.json`, tags
-`vX.Y.Z` and publishes a GitHub release with the tarball and `install.sh`.
+`vX.Y.Z` and publishes a GitHub release with the tarball, its `.sha256` checksum and
+`install.sh`. A release only runs after the full CI workflow passes, and the
+tarball gets a build provenance attestation.
 
 ### Mock mode (no Teams)
 
