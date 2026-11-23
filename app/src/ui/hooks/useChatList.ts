@@ -4,6 +4,9 @@ import { isIdle, onTeamsChange } from "../lib/live";
 import { POLL_MS } from "../lib/constants";
 import type { Chat } from "../../types";
 
+// Profiles rarely change; a full 10k-row getAll on every tick is waste.
+const PROFILES_TTL_MS = 30_000;
+
 // Cheap change signature so polling doesn't re-render (and jump) when idle.
 const chatSig = (list: Chat[]): string =>
   list
@@ -32,10 +35,16 @@ export function useChatList(): ChatList {
 
   useEffect(() => {
     let alive = true;
-    const tick = async (force?: boolean): Promise<void> => {
+    let profilesAt = 0;
+    let reloadProfiles = true;
+    const run = async (force?: boolean): Promise<void> => {
       if (!force && isIdle()) return;
       try {
-        await loadProfiles();
+        if (reloadProfiles || Date.now() - profilesAt >= PROFILES_TTL_MS) {
+          await loadProfiles();
+          profilesAt = Date.now();
+          reloadProfiles = false;
+        }
         const c = await listChats();
         if (!alive) return;
         setError("");
@@ -43,10 +52,34 @@ export function useChatList(): ChatList {
         if (s !== lastChatSig.current) {
           lastChatSig.current = s;
           setChats(c);
+          // A changed list may name new people: refresh profiles next tick.
+          reloadProfiles = true;
         }
         setSel((cur) => cur || (c[0] && c[0].id) || null);
       } catch (e) {
         if (alive) setError(String((e as Error).message || e));
+      }
+    };
+    // One poll at a time: triggers (interval, DOM changes, chat events) can
+    // fire while a slow read is in flight, and a late stale answer must not
+    // overwrite a newer one. Coalesce into one trailing run instead.
+    let running = false;
+    let again: boolean | null = null;
+    const tick = async (force?: boolean): Promise<void> => {
+      if (running) {
+        again = !!(again || force);
+        return;
+      }
+      running = true;
+      try {
+        await run(force);
+      } finally {
+        running = false;
+      }
+      if (again !== null && alive) {
+        const f = again;
+        again = null;
+        void tick(f);
       }
     };
     tick(true);

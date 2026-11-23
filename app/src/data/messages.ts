@@ -50,10 +50,19 @@ export async function listMessages(
   // Uncached chat: Teams never opened it natively, so no replychain is stored
   // locally. Fetch it from the same backend Teams uses, with Teams' own token.
   if (msgs.length === 0) {
+    // Polls fire faster than Teams' worker needs to answer; reuse a fresh
+    // result (same cache the REST fallback uses; writes invalidate it).
+    const cached = remoteCache.get(conversationId);
+    if (cached && Date.now() - cached.at < REMOTE_TTL && cached.msgs.length) {
+      return cached.msgs.slice(-remoteLimit);
+    }
     // Same query Teams' chat pane sends; the worker may hold the chat in memory.
     // Channels too: the worker answers them as one flat list, replies included.
     const fromWorker = await cdlFirstPage(conversationId, channel);
-    if (fromWorker && fromWorker.length) return fromWorker.slice(-remoteLimit);
+    if (fromWorker && fromWorker.length) {
+      remoteCache.set(conversationId, { at: Date.now(), msgs: fromWorker });
+      return fromWorker.slice(-remoteLimit);
+    }
     const remote = await fetchRemoteMessages(conversationId, remoteLimit, channel);
     if (remote && remote.length) return remote;
     // remote === null means the backend couldn't be reached (no token yet, http
