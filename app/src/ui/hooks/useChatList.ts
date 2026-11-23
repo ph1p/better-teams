@@ -2,7 +2,11 @@ import { useEffect, useRef, useState, type Dispatch, type MutableRefObject, type
 import { listChats, loadProfiles } from "../../teamsData";
 import { isIdle, onTeamsChange } from "../lib/live";
 import { POLL_MS } from "../lib/constants";
+import { read, write } from "../lib/prefs";
 import type { Chat } from "../../types";
+
+// Last opened chat, restored after a reload.
+const LAST_CHAT = "lastChat";
 
 // Profiles rarely change; a full 10k-row getAll on every tick is waste.
 const PROFILES_TTL_MS = 30_000;
@@ -26,7 +30,8 @@ export interface ChatList {
   setSel: Dispatch<SetStateAction<string | null>>;
 }
 
-// Chat list, polled. Selects the newest chat when nothing is selected yet.
+// Chat list, polled. When nothing is selected yet it reopens the chat open
+// before the reload, else the newest one.
 export function useChatList(): ChatList {
   const [chats, setChats] = useState<Chat[]>([]);
   const [error, setError] = useState("");
@@ -55,7 +60,11 @@ export function useChatList(): ChatList {
           // A changed list may name new people: refresh profiles next tick.
           reloadProfiles = true;
         }
-        setSel((cur) => cur || (c[0] && c[0].id) || null);
+        setSel((cur) => {
+          if (cur) return cur;
+          const last = read<string | null>(LAST_CHAT, null);
+          return (last && c.some((x) => x.id === last) ? last : c[0]?.id) ?? null;
+        });
       } catch (e) {
         if (alive) setError(String((e as Error).message || e));
       }
@@ -96,6 +105,10 @@ export function useChatList(): ChatList {
       document.removeEventListener("visibilitychange", onVis);
     };
   }, []);
+
+  useEffect(() => {
+    if (sel) write(LAST_CHAT, sel);
+  }, [sel]);
 
   const chatsRef = useRef<Chat[]>([]);
   useEffect(() => {
