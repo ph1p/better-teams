@@ -1,4 +1,5 @@
 import type { JSX, MouseEvent, RefObject } from "react";
+import { SideResize } from "./SideResize";
 import { ArrowLeft, CheckCheck, Search, SquarePen } from "lucide-react";
 import { Section } from "./Section";
 import { Row } from "./Row";
@@ -160,6 +161,7 @@ export function Sidebar(p: SidebarProps): JSX.Element {
         </div>
       ) : null}
       <MeBar compact={compact} onCompact={onCompact} onSwitchToTeams={onHide} onError={onError} />
+      <SideResize />
     </aside>
   );
 }

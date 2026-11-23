@@ -72,4 +72,5 @@ export const sidebar: Messages["sidebar"] = {
   firstMessage: "Erste Nachricht",
   firstMessageOptional: "Erste Nachricht (optional)",
   groupOf: (n) => `${n} Personen · Gruppenchat`,
+  resize: "Seitenleiste anpassen (Doppelklick setzt zurück)",
 };

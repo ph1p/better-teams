@@ -75,4 +75,5 @@ export const sidebar = {
   firstMessage: "First message",
   firstMessageOptional: "First message (optional)",
   groupOf: (n: number) => `${n} people · group chat`,
+  resize: "Resize sidebar (double-click resets)",
 };

@@ -78,7 +78,7 @@
   inset: 0;
   z-index: 2147483000;
   display: grid;
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: var(--tc-side-w, 300px) 1fr;
   background: var(--tc-bg);
   color: var(--tc-fg);
   font-family: var(--tc-font);
@@ -103,9 +103,40 @@
 
 /* Sidebar */
 #tc-root .tc-side {
-  @apply flex flex-col min-h-0;
+  @apply flex flex-col min-h-0 relative;
   background: var(--tc-bg2);
   border-right: 1px solid var(--tc-line);
+}
+/* Drag handle on the sidebar's right edge; straddles the border. */
+#tc-root .tc-side-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -4px;
+  width: 8px;
+  z-index: 5;
+  cursor: col-resize;
+  touch-action: none;
+}
+#tc-root .tc-side-resize::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: var(--tc-accent);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+#tc-root .tc-side-resize:hover::after,
+#tc-root .tc-side-resize:focus-visible::after,
+#tc-root.tc-resizing .tc-side-resize::after {
+  opacity: 1;
+}
+#tc-root.tc-resizing {
+  cursor: col-resize;
+  user-select: none;
 }
 #tc-root .tc-side-head {
   @apply flex items-center gap-2;
@@ -2206,7 +2237,7 @@
    of running (header actions, composer) underneath. */
 @media (min-width: 960px) {
   #tc-root:has(> .tc-notes) {
-    grid-template-columns: 300px 1fr 320px;
+    grid-template-columns: var(--tc-side-w, 300px) 1fr 320px;
   }
   #tc-root .tc-notes {
     position: static;
