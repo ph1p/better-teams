@@ -20,6 +20,8 @@
 // page handler the same way, as if it were the worker, and takes the answer
 // out of the wrapper before it reaches the real worker (see cdlToken()).
 
+import { untilReady } from "./untilReady";
+
 const KEY = Symbol.for("better-teams.cdl");
 
 interface Ctx {
@@ -351,8 +353,8 @@ export function cdlSubscribe<T = Record<string, unknown>>(
   let stop = (): void => {
     stopped = true;
   };
-  void whenCdl(30_000).then((ok) => {
-    if (!ok || stopped) return;
+  void untilReady(whenCdl, () => stopped).then((ok) => {
+    if (!ok) return;
     const s = state();
     const ctx = s.ctx!;
     const requestId = nextId(s, "s");
