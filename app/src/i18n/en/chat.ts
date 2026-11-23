@@ -125,4 +125,5 @@ export const chat = {
   removeFileConfirm: (name: string) => `Confirm removing ${name}`,
   preview: (name: string) => `Preview ${name}`,
   file: "File",
+  loadImage: (host: string) => `Load image from ${host || "an external site"}`,
 };

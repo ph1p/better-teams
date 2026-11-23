@@ -9,6 +9,8 @@
 // code, code blocks and quoted replies — instead of flattening to plain text.
 import { Fragment, useEffect, useState, type ReactNode, type JSX } from "react";
 import { highlightLines, onHighlighterReady, normLang } from "./highlight";
+import { hostOf, isTrustedImgHost, safeHref, safeImgSrc } from "./safeUrl";
+import { t } from "./i18n";
 
 const ENTITIES: Record<string, string> = {
   amp: "&",
@@ -169,9 +171,9 @@ export function parse(html: string): ElNode {
 }
 
 // Teams' AMS/preview image src already points at de-prod.asyncgw.* /views/imgo,
-// which 200s with the page's cookies, so we keep it as-is.
+// which 200s with the page's cookies, so we keep it as-is — https only.
 function imgSrc(attrs: Attrs): string {
-  return attrs.src || "";
+  return safeImgSrc(attrs.src || "");
 }
 
 const isBr = (n: Node | undefined): n is ElNode => !!n && typeof n === "object" && n.tag === "br";
@@ -267,6 +269,20 @@ function CodeBlock({ code, lang }: { code: string; lang: string }): JSX.Element 
   );
 }
 
+// Images from non-Microsoft hosts can be tracking pixels: show a button and
+// load the image only when the user asks. State is per rendered image, so a
+// re-mount (chat switch, reload) asks again. That is intended.
+function GatedImg({ src, alt }: { src: string; alt: string }): JSX.Element {
+  const [shown, setShown] = useState(false);
+  if (shown) return <img className="tc-inline-img" src={src} alt={alt} loading="lazy" />;
+  return (
+    <button type="button" className="tc-img-gate" title={src} onClick={() => setShown(true)}>
+      {t().chat.loadImage(hostOf(src))}
+      {alt ? <span className="tc-img-gate-alt">{alt}</span> : null}
+    </button>
+  );
+}
+
 // Keys come from a per-render counter (`seq`), so siblings stay unique.
 function toReact(node: Node, seq: { n: number }): ReactNode {
   if (typeof node === "string") return node;
@@ -291,10 +307,11 @@ function toReact(node: Node, seq: { n: number }): ReactNode {
     const emojiish = (node.attrs.itemtype || "").includes("Emoji") || (!src && alt);
     if (emojiish) return alt || null;
     if (!src) return alt || null;
+    if (!isTrustedImgHost(src)) return <GatedImg key={key} src={src} alt={alt} />;
     return <img key={key} className="tc-inline-img" src={src} alt={alt} loading="lazy" />;
   }
   if (node.tag === "a") {
-    const href = decodeEntities(node.attrs.href || "");
+    const href = safeHref(decodeEntities(node.attrs.href || ""));
     if (!href) return <Fragment key={key}>{kids}</Fragment>;
     return (
       <a key={key} href={href} target="_blank" rel="noreferrer noopener">
