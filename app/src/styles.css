@@ -184,17 +184,6 @@
 #tc-root .tc-row.sel {
   background: var(--tc-accent-soft);
 }
-/* Selected row gets a left accent bar so it reads apart from a plain hover. */
-#tc-root .tc-row.sel::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 7px;
-  bottom: 7px;
-  width: 3px;
-  border-radius: 3px;
-  background: var(--tc-accent);
-}
 #tc-root .tc-av {
   @apply grid place-items-center overflow-hidden;
   flex: 0 0 auto;
@@ -2722,10 +2711,6 @@
 }
 #tc-root .tc-row.compact:hover .tc-time {
   opacity: 1;
-}
-#tc-root .tc-row.compact.sel::before {
-  top: 6px;
-  bottom: 6px;
 }
 /* Detailed rows: read rows name in regular weight so unread ones stand out. */
 #tc-root .tc-row:not(.compact):not(.unread) .tc-name {
