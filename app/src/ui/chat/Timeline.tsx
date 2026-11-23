@@ -115,6 +115,7 @@ export function Timeline(p: TimelineProps): JSX.Element {
       onQuote={p.onQuote}
       onJumpTo={p.onJumpTo}
       onThreadReply={channel ? p.onThreadReply : undefined}
+      onOpenInTeams={p.onOpenInTeams}
     />
   );
   // A meeting's end marker renders as one quiet line, not a message.

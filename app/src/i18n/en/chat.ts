@@ -96,6 +96,8 @@ export const chat = {
   loadFailedSub: "Teams' backend didn't answer. It may need a moment after Teams starts.",
   retry: "Retry",
   openInTeams: "Open in Teams",
+  cardActionInTeams: "Opens the chat in Teams: card actions are answered there",
+  cardMoreActions: "More actions",
   empty: "No messages in this chat yet.",
 
   // Typing

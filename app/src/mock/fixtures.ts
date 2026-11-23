@@ -137,17 +137,81 @@ const quote = (who: Person, text: string): string =>
   `<p itemprop="preview">${text}</p></blockquote>`;
 
 // A bot card as Teams stores it: Swift JSON, base64 in a URIObject.
-const card = (title: string, text: string): string =>
+const card = (content: Record<string, unknown>): string =>
   `<URIObject type="SWIFT.1"><Swift b64="${btoa(
     String.fromCharCode(
       ...new TextEncoder().encode(
         JSON.stringify({
           type: "message/card",
-          attachments: [{ contentType: "application/vnd.microsoft.card.adaptive", content: { title, text } }],
+          attachments: [{ contentType: "application/vnd.microsoft.card.adaptive", content }],
         }),
       ),
     ),
   )}"/></URIObject>`;
+
+// An issue-tracker notification shaped like the Adaptive Cards such bots send:
+// who changed what, a link to the issue, old -> new value, actions, a footer.
+const trackerCard = (key: string, title: string, field: string, from: string, to: string): string =>
+  card({
+    type: "AdaptiveCard",
+    version: "1.5",
+    body: [
+      {
+        type: "ColumnSet",
+        columns: [
+          {
+            width: "auto",
+            items: [{ type: "Image", url: "https://tracker.example.com/bot.png", style: "Person", size: "Small" }],
+          },
+          {
+            width: "stretch",
+            verticalContentAlignment: "Center",
+            items: [{ type: "TextBlock", text: `Tracker Bot updated the **${field}** on this issue:`, wrap: true }],
+          },
+        ],
+      },
+      {
+        type: "TextBlock",
+        text: `[${key} ${title}](https://tracker.example.com/browse/${key})`,
+        wrap: true,
+        weight: "Bolder",
+      },
+      { type: "TextBlock", text: `From **${from}** to **${to}**`, wrap: true },
+      {
+        type: "ActionSet",
+        actions: [
+          { type: "Action.Submit", title: "Do I need to do anything?", style: "positive" },
+          {
+            type: "Action.ShowCard",
+            title: "Details",
+            card: {
+              type: "AdaptiveCard",
+              body: [
+                {
+                  type: "FactSet",
+                  facts: [
+                    { title: "Status", value: "In Progress" },
+                    { title: "Priority", value: "High" },
+                    { title: "Assignee", value: "You" },
+                  ],
+                },
+              ],
+            },
+          },
+          { type: "Action.OpenUrl", title: "Open issue", url: `https://tracker.example.com/browse/${key}` },
+          { type: "Action.Submit", title: "Mute this issue", mode: "secondary" },
+        ],
+      },
+      {
+        type: "TextBlock",
+        text: "_You received this message because you are assignee of this issue._",
+        isSubtle: true,
+        size: "Small",
+        wrap: true,
+        spacing: "Medium",
+      },
+    ],
+  });
 const CARD = "RichText/Media_Card";
 
 // A long scroll-back for the release group, so paging older history works.
@@ -371,9 +435,20 @@ export const CHATS: SeedChat[] = [
         from: tracker.mri,
         ago: 4 * H,
         type: CARD,
-        html: card("WEB-412 assigned to you", "Retry uploads with backoff · Priority: High"),
+        html: trackerCard("WEB-412", "Retry uploads with backoff", "Assignee", "Unassigned", "You"),
       },
-      { from: tracker.mri, ago: 70, type: CARD, html: card("WEB-398 moved to Done", "Fix timezone in nightly tests") },
+      {
+        from: tracker.mri,
+        ago: 70,
+        type: CARD,
+        html: trackerCard(
+          "WEB-398",
+          "Fix timezone in nightly tests",
+          "Implementation started",
+          "NONE",
+          "{{DATE(2026-11-23T15:58:00Z, SHORT)}} {{TIME(2026-11-23T15:58:00Z)}}",
+        ),
+      },
     ],
   },
   {

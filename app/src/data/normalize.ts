@@ -6,6 +6,7 @@ import { allowedUrl } from "../services/http";
 import { safeHref } from "../safeUrl";
 import { arr, extOf, get, mriOf, obj, str, toMs, type Dict } from "./raw";
 import { deletedHere, rememberRef } from "./state";
+import { parseCards, type Card } from "../cards";
 
 const SKIP_TYPES = /ThreadActivity|Control|Event\//i;
 
@@ -131,6 +132,12 @@ function reactionsOf(m: Dict): Reaction[] {
 // undo state for it, or it was deleted from this overlay (see deletedHere).
 export const hiddenDeleted = (m: Dict, n: Message): boolean => n.deleted && !m.deletionInfo && !deletedHere.has(n.id);
 
+// Bot cards ride in the Swift content or a cards list; only set when present.
+function withCards(content: string, raw: unknown): { cards?: Card[] } {
+  const cards = parseCards(content, raw);
+  return cards.length ? { cards } : {};
+}
+
 // A minimal reply-chain context: a cached replychain row, or a synthesized one
 // for a remote channel message (built from its rootMessageId).
 export interface ChainCtx {
@@ -170,6 +177,7 @@ export function normMessage(raw: unknown, rc: ChainCtx | null): Message {
     importance: asImportance(props.importance),
     reactions: reactionsOf(m),
     files: parseFiles(props.files),
+    ...withCards(str(m.content), props.cards),
     time,
   };
 }
@@ -260,6 +268,7 @@ export function normCdlMessage(raw: unknown, channel = false): Message | null {
       importance: asImportance(str(m.importance).toLowerCase()),
       reactions,
       files: parseFiles(m.files),
+      ...withCards(str(m.content), m.cards),
       time,
     },
     m,

@@ -6,6 +6,7 @@
 import type { Chat, FileRef, Message, Profile, Reaction } from "../types";
 import { APPS, CHATS, CHATTER, ME, PEOPLE, PRESENCE, REPLIES, type SeedChat } from "./fixtures";
 import { isAppMri } from "../apps";
+import { parseCards } from "../cards";
 import { shortName } from "../names";
 import { extOf } from "../data/raw";
 import { isOneToOneId } from "../data/state";
@@ -109,6 +110,7 @@ for (const seed of CHATS) {
       importance: s.importance || "normal",
       files: (s.files || []).map(mockFile),
       ...(s.type ? { messageType: s.type } : {}),
+      ...(/Media_Card/.test(s.type || "") ? { cards: parseCards(s.html) } : {}),
       ...(s.call ? { call: s.call } : {}),
       ...(root ? { rootId: root.id, rootTime: root.rootTime, isReply: true } : {}),
     });

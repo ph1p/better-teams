@@ -1,3 +1,4 @@
+import type { Card } from "./cards";
 // Shared domain types for the overlay. These describe the NORMALIZED shapes the
 // data layer (teamsData) emits after narrowing Teams' untyped IndexedDB rows and
 // chatsvc REST payloads. UI code consumes only these, never raw Teams data.
@@ -95,6 +96,8 @@ export interface Message {
   importance: Importance;
   reactions: Reaction[];
   files: FileRef[];
+  /** Bot / connector cards (Adaptive, hero, O365 connector), see cards.ts. */
+  cards?: Card[];
   /** Message time, ms since epoch. */
   time: number;
   /** Channel meeting event: the thread root ("start") or its end marker. */

@@ -7,6 +7,7 @@ import { splitQuote } from "../../quote";
 import { RichHtml } from "../../richText";
 import { Avatar } from "../shared/Avatar";
 import { Attachments } from "./Attachments";
+import { Cards } from "./Cards";
 import { isAppMri } from "../../apps";
 import { Linkified } from "../shared/Linkified";
 import { avatarUri, fmtClock, fmtFull, htmlToText, isHtmlMsg, messageText, oneLine } from "../lib/format";
@@ -33,6 +34,8 @@ interface MessageProps {
   onJumpTo?: (mid: string) => void;
   /** Channels only: answer in this message's thread. */
   onThreadReply?: (m: Msg) => void;
+  /** Card buttons that post back to a bot hand off to Teams. */
+  onOpenInTeams?: () => void;
 }
 
 // One rendered message: avatar + meta on the first of a group, content (rich
@@ -52,6 +55,7 @@ export const Message = memo(function Message({
   onQuote,
   onJumpTo,
   onThreadReply,
+  onOpenInTeams,
 }: MessageProps): JSX.Element {
   useNameFormat();
   const { statusOf } = usePresence();
@@ -75,6 +79,9 @@ export const Message = memo(function Message({
   }, [pick]);
   const html = !m.deleted && isHtmlMsg(m);
   const text = m.deleted ? "" : messageText(m);
+  const cards = !m.deleted && m.cards?.length ? m.cards : null;
+  // A card message's text is only the card's summary: the card shows it already.
+  const cardOnly = !!cards && /Media_Card/i.test(m.messageType);
   // Split any leading Skype Reply blockquote off the content so the textarea
   // holds just the reply body; the quote shows as a removable chip.
   const { quoteHtml: origQuote, body: bodyHtml } = splitQuote(m.content);
@@ -203,10 +210,11 @@ export const Message = memo(function Message({
               }
             }}
           >
-            {html ? <RichHtml html={m.content} /> : <Linkified text={text} />}
+            {cardOnly ? null : html ? <RichHtml html={m.content} /> : <Linkified text={text} />}
             {m.edited ? <span className="tc-edited">{t().chat.edited}</span> : null}
           </div>
         )}
+        {cards ? <Cards cards={cards} openInTeams={onOpenInTeams} /> : null}
         {m.files.length ? (
           <Attachments
             files={m.files}

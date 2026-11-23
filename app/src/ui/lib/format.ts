@@ -10,6 +10,7 @@ import { profile, profilePhotoUrl } from "../../teamsData";
 import type { Chat, Message } from "../../types";
 import { locale, t } from "../../i18n";
 import { nameFormat, personName, shortName } from "../../names";
+import { cardSummary } from "../../cards";
 
 /** A chat's display name. The data layer keeps "Notes" untranslated; the UI shows it in the current language. */
 export function chatTitle(c: Chat): string {
@@ -133,32 +134,11 @@ export function htmlToText(html: string): string {
 
 export const oneLine = (html: string): string => htmlToText(html).replace(/\s+/g, " ").trim();
 
-// Connector / bot cards: <URIObject …><Swift b64="…">. Show their title+summary.
-function cardText(content: string): string {
-  const m = /b64="([^"]+)"/.exec(content || "");
-  if (!m) return "";
-  try {
-    const bytes = Uint8Array.from(atob(m[1]), (c) => c.charCodeAt(0));
-    const parsed: unknown = JSON.parse(new TextDecoder().decode(bytes));
-    const j = (typeof parsed === "object" && parsed !== null ? parsed : {}) as Record<string, unknown>;
-    const atts = Array.isArray(j.attachments) ? j.attachments : [];
-    const c = (atts[0] && typeof atts[0] === "object" ? (atts[0] as Record<string, unknown>).content : {}) as Record<
-      string,
-      unknown
-    >;
-    return [c.title, c.summary || j.summary, c.text]
-      .filter((v): v is string => typeof v === "string" && !!v)
-      .map(htmlToText)
-      .join("\n");
-  } catch {
-    return "";
-  }
-}
-
 export function messageText(m: Message): string {
-  if (/Media_Card/i.test(m.messageType)) return cardText(m.content) || "[Card]";
+  const cards = m.cards?.length ? cardSummary(m.cards) : "";
+  if (/Media_Card/i.test(m.messageType)) return cards || t().sidebar.card;
   if (/^RichText\/Media_/i.test(m.messageType)) return "[" + m.messageType.split("_").pop() + "]";
-  return htmlToText(m.content);
+  return htmlToText(m.content) || cards;
 }
 
 // Prefer a cached imageUri from the profile row; fall back to the live Teams

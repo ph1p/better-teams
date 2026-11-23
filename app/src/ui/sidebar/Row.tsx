@@ -5,6 +5,7 @@ import { avatarUri, chatTitle, fmtTime, oneLine } from "../lib/format";
 import { usePresence } from "../lib/presence";
 import type { Chat } from "../../types";
 import { t } from "../../i18n";
+import { cardSummary, parseCards } from "../../cards";
 
 interface RowProps {
   chat: Chat;
@@ -19,7 +20,9 @@ interface RowProps {
 }
 
 const preview = (chat: Chat): string => {
-  const text = /Media_Card/i.test(chat.last.type) ? t().sidebar.card : oneLine(chat.last.content);
+  const text = /Media_Card/i.test(chat.last.type)
+    ? cardSummary(parseCards(chat.last.content)) || t().sidebar.card
+    : oneLine(chat.last.content);
   return (chat.last.from ? chat.last.from + ": " : "") + (text.slice(0, 120) || "…");
 };
 

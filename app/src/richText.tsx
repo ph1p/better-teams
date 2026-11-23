@@ -278,7 +278,7 @@ function CodeBlock({ code, lang }: { code: string; lang: string }): JSX.Element 
 // Images from non-Microsoft hosts can be tracking pixels: show a button and
 // load the image only when the user asks. State is per rendered image, so a
 // re-mount (chat switch, reload) asks again. That is intended.
-function GatedImg({ src, alt }: { src: string; alt: string }): JSX.Element {
+export function GatedImg({ src, alt }: { src: string; alt: string }): JSX.Element {
   const [shown, setShown] = useState(false);
   if (shown) return <img className="tc-inline-img" src={src} alt={alt} loading="lazy" />;
   return (
