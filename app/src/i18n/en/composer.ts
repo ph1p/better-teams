@@ -30,5 +30,9 @@ export const composer = {
     "no-file-input": "Teams' attach menu wasn't found. Not sent.",
     "upload-timeout": "Teams didn't finish uploading in time. Not sent.",
     "no-send-button": "Teams' send button wasn't ready. Not sent.",
+    "fallback-quote": "Teams isn't ready for quote replies yet. Retry in a moment, or remove the quote.",
+    "fallback-mentions": "Teams isn't ready for @mentions yet. Retry in a moment. Not sent.",
+    "native-draft": "Teams' own message box already holds text. Send or clear it in Teams first. Not sent.",
+    "not-confirmed": "Teams didn't confirm the send. Check the chat before retrying.",
   },
 };

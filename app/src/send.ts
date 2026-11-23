@@ -471,6 +471,8 @@ export async function sendMessage(conversationId: string, title: string, text: s
 
   const composer = await waitFor(findComposer);
   if (!composer) return { ok: false, reason: "no-composer" };
+  // setComposerText selects all: never replace what the user typed in Teams.
+  if (composer.textContent?.trim()) return { ok: false, reason: "native-draft" };
   setComposerText(composer, text);
 
   const btn = await waitFor(() => {
@@ -479,12 +481,17 @@ export async function sendMessage(conversationId: string, title: string, text: s
   }, 1500);
   // Re-check right before sending: the user may have clicked elsewhere.
   if (nativeThreadId() !== conversationId) return { ok: false, reason: "wrong-chat" };
+  // Teams empties its composer once the message is handed off; anything else
+  // means we cannot tell whether it was sent.
+  const cleared = (): boolean => !composer.isConnected || !composer.textContent?.trim();
   if (btn) {
     btn.click();
+    if (!(await waitFor(() => cleared() || null, 3000))) return { ok: false, reason: "not-confirmed" };
     return { ok: true, via: "button" };
   }
   const opts = { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true };
   composer.dispatchEvent(new KeyboardEvent("keydown", opts));
   composer.dispatchEvent(new KeyboardEvent("keyup", opts));
+  if (!(await waitFor(() => cleared() || null, 3000))) return { ok: false, reason: "not-confirmed" };
   return { ok: true, via: "enter" };
 }

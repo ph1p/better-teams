@@ -5,6 +5,7 @@ import { sendFiles, sendMessage } from "../../send";
 import { splitQuote } from "../../quote";
 import { typing } from "../../services";
 import { oneLine } from "../lib/format";
+import { nativeFallbackBlocker } from "../lib/sendFallback";
 import { t } from "../../i18n";
 import type { Flash } from "../lib/toast";
 import type { Messages } from "./useMessages";
@@ -144,13 +145,17 @@ export function useComposerState(
     let r = sending.length
       ? await sendFiles(chat.id, chat.title, text, sending)
       : await sendRemote(chat.id, text, q, picks, thread?.rootId);
-    if (!r.ok && r.reason === "no-token") r = await sendMessage(chat.id, chat.title, text);
+    if (!r.ok && r.reason === "no-token") {
+      const blocked = nativeFallbackBlocker(q, picks);
+      r = blocked ? { ok: false, reason: blocked } : await sendMessage(chat.id, chat.title, text);
+    }
     if (!r.ok) {
       m.dropPending(key);
       setDrafts((d) => ({ ...d, [chat.id]: d[chat.id] || text }));
       setMentionPicks((mp) => ({ ...mp, [chat.id]: picks }));
       setStaged((st) => ({ ...st, [chat.id]: [...sending, ...(st[chat.id] || [])] }));
       if (thread) setThreadTo((t) => t || thread);
+      if (q) setQuote((cur) => cur || q);
       // Why a send failed, in words; unknown reasons show as-is.
       const known = t().composer.sendErrors;
       flash(r.reason in known ? known[r.reason as keyof typeof known] : t().composer.sendFailed(r.reason), 5000);

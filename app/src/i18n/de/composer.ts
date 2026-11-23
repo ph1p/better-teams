@@ -35,5 +35,11 @@ export const composer: Messages["composer"] = {
     "no-file-input": "Das Anfügen-Menü von Teams wurde nicht gefunden. Nicht gesendet.",
     "upload-timeout": "Teams hat den Upload nicht rechtzeitig abgeschlossen. Nicht gesendet.",
     "no-send-button": "Die Senden-Schaltfläche von Teams war nicht bereit. Nicht gesendet.",
+    "fallback-quote":
+      "Teams ist noch nicht bereit für Zitat-Antworten. Versuch es gleich noch einmal oder entferne das Zitat.",
+    "fallback-mentions": "Teams ist noch nicht bereit für @Erwähnungen. Versuch es gleich noch einmal. Nicht gesendet.",
+    "native-draft":
+      "Das Nachrichtenfeld von Teams enthält bereits Text. Sende oder leere es zuerst in Teams. Nicht gesendet.",
+    "not-confirmed": "Teams hat das Senden nicht bestätigt. Prüfe den Chat, bevor du es erneut versuchst.",
   },
 };
