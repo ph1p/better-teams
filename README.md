@@ -43,12 +43,24 @@ release's SHA-256 checksum before extracting; to verify build provenance
 yourself, run
 `gh attestation verify better-teams.tar.gz --repo ph1p/better-teams`.
 
-**Update**, or after a **Teams update** removed the patch: run the same line
-again.
+## Update
 
-The overlay follows Teams' language (English or German); the status menu
-under your avatar can pin one. Clicking a macOS notification opens that chat
-in the overlay too, not only in Teams underneath.
+```sh
+~/.better-teams/better-teams update           # install the latest release if newer
+~/.better-teams/better-teams update --check   # only compare versions
+~/.better-teams/better-teams update --force   # reinstall the latest release
+```
+
+The overlay checks for a new release once a day and shows it in the status
+menu; Settings → Update check → **Check now** asks right away. A **Teams
+update** removes the patch: run `~/.better-teams/better-teams` to patch again.
+
+## Using it
+
+- **Option+Cmd+T** toggles the overlay; Teams keeps running underneath.
+- Language follows Teams (English or German); Settings can pin one.
+- Drag the sidebar's right edge to resize it; double-click resets.
+- Clicking a macOS notification opens that chat in the overlay.
 
 ## Uninstall
 
@@ -62,9 +74,9 @@ Teams if it was running and deletes `~/.better-teams`.
 ## More commands
 
 ```sh
+~/.better-teams/better-teams            # patch again and relaunch Teams
 ~/.better-teams/better-teams status     # Teams version, patch state
 ~/.better-teams/better-teams off        # restore original Teams, keep the install
-~/.better-teams/better-teams            # patch again and relaunch Teams
 ~/.better-teams/better-teams doctor     # check requirements
 ~/.better-teams/better-teams help       # all commands
 ```
@@ -73,7 +85,7 @@ Teams if it was running and deletes `~/.better-teams`.
 
 | Symptom                             | Fix                                                                        |
 | ----------------------------------- | -------------------------------------------------------------------------- |
-| Overlay gone after a Teams update   | Run the install line again.                                                |
+| Overlay gone after a Teams update   | `~/.better-teams/better-teams` (patches again).                            |
 | Teams misbehaves or won't start     | `~/.better-teams/better-teams off`, then report the version from `status`. |
 | `client-bindings/bundle.js missing` | This Teams build loads differently and is not supported.                   |
 | Teams did not quit                  | Quit it from the menu bar, then run the command again.                     |
@@ -92,7 +104,9 @@ the overlay into every Teams window on each save (~1s, UI state resets).
 Ctrl-C relaunches Teams without the port. Run `./better-teams` afterwards to
 bake your changes into the patch.
 
-Type-check with `cd app && pnpm run typecheck`.
+Checks (in `app/`, all run in CI): `pnpm run typecheck`, `pnpm run test`,
+`pnpm run lint`, `pnpm run fmt:check`. In a checkout, `./better-teams update`
+pulls `main` and restarts.
 
 **Release:** automatic via semantic-release (`.releaserc.json`,
 `.github/workflows/release.yml`). Each push to `main` is analyzed with
