@@ -1,4 +1,4 @@
-import type { ComponentType, JSX } from "react";
+import { type ComponentType, type JSX } from "react";
 import {
   X,
   Mail as MailIcon,
@@ -10,7 +10,11 @@ import {
   Phone,
   Video,
   Hash,
+  Copy,
+  Check,
 } from "lucide-react";
+import { useCopied } from "../lib/clipboard";
+import { useDismiss } from "../lib/dismiss";
 import { profile } from "../../teamsData";
 import { avatarUri, hue, initials } from "../lib/format";
 import { STATUS_COLOR, statusLabel, usePresence } from "../lib/presence";
@@ -31,11 +35,31 @@ interface ProfilePanelProps {
 
 type IconComp = ComponentType<{ size?: number }>;
 
+// One detail line; a copy button shows on hover.
+function DetailRow({ icon: Icon, value }: { icon: IconComp; value: string }): JSX.Element {
+  const [copied, copy] = useCopied();
+  return (
+    <div className="tc-profile-detail">
+      <Icon size={15} /> <span title={value}>{value}</span>
+      <button
+        className={"tc-profile-copy" + (copied ? " on" : "")}
+        onClick={() => copy(value)}
+        title={copied ? t().chat.copied : t().app.copy}
+        aria-label={t().app.copy}
+      >
+        {copied ? <Check size={13} /> : <Copy size={13} />}
+      </button>
+    </div>
+  );
+}
+
 // Right-hand profile drawer (Slack-style). Shows the person's details and every
 // chat the current user shares with them. Details come from the loaded profile
 // row; fields Teams didn't cache simply don't render.
 export function ProfilePanel({ mri, chats, sel, onPick, onClose, onMessage, onCall }: ProfilePanelProps): JSX.Element {
   const { statusOf } = usePresence();
+  // Clicking anywhere outside the drawer (or Escape) closes it.
+  useDismiss(true, "#tc-root .tc-profile", onClose);
   const status = statusOf(mri);
   const ring = status !== "Unknown";
   const p = profile(mri);
@@ -74,9 +98,7 @@ export function ProfilePanel({ mri, chats, sel, onPick, onClose, onMessage, onCa
       {rows.length ? (
         <div className="tc-profile-details">
           {rows.map(([Icon, v], i) => (
-            <div key={i} className="tc-profile-detail">
-              <Icon size={15} /> <span>{v}</span>
-            </div>
+            <DetailRow key={i} icon={Icon} value={v} />
           ))}
         </div>
       ) : null}

@@ -90,6 +90,7 @@ export const app: Messages["app"] = {
   noLink: "Teams hat keinen Link zu dieser Datei geteilt. Öffne sie in Teams.",
   download: "Herunterladen",
   saveImage: "Bild speichern",
+  copy: "Kopieren",
   copyLink: "Link kopieren",
   closeEsc: "Schließen (Esc)",
   previous: "Zurück (←)",

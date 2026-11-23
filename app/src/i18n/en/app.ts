@@ -80,6 +80,7 @@ export const app = {
   noLink: "Teams shared no link for this file. Open it in Teams.",
   download: "Download",
   saveImage: "Save image",
+  copy: "Copy",
   copyLink: "Copy link",
   closeEsc: "Close (Esc)",
   previous: "Previous (←)",

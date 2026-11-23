@@ -2569,9 +2569,32 @@
   flex: 0 0 auto;
 }
 #tc-root .tc-profile-detail span {
-  @apply overflow-hidden whitespace-nowrap;
+  @apply overflow-hidden whitespace-nowrap flex-1;
   min-width: 0;
   text-overflow: ellipsis;
+}
+#tc-root .tc-profile-copy {
+  @apply grid place-items-center cursor-pointer;
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: var(--tc-fg2);
+  padding: 3px;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+#tc-root .tc-profile-detail:hover .tc-profile-copy,
+#tc-root .tc-profile-copy:focus-visible,
+#tc-root .tc-profile-copy.on {
+  opacity: 1;
+}
+#tc-root .tc-profile-copy:hover {
+  background: var(--tc-hover);
+  color: var(--tc-fg);
+}
+#tc-root .tc-profile-copy.on {
+  color: var(--tc-accent);
 }
 #tc-root .tc-profile-sec {
   @apply flex items-center gap-1.5;

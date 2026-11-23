@@ -74,6 +74,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     setMsgSearch("");
     setMsgSearchOpen(false);
     setOpenThreads(new Set());
+    setProfileMri(null);
   }
 
   const sections = useMemo(() => buildSections(chats, query, unreadOnly, keep), [chats, query, unreadOnly, keep]);
