@@ -23,7 +23,6 @@ export const sidebar: Messages["sidebar"] = {
   newChat: "Neuer Chat",
   search: "Suchen  ⌘K",
   unread: "Ungelesen",
-  allChats: "Alle Chats",
   allChatsTitle: "Zurück zu allen Unterhaltungen  ⌥U",
   unreadFilterTitle: "Nur ungelesene Unterhaltungen  ⌥U · nächste ungelesene ⌥⇧↓",
   cantRead: "Die lokalen Teams-Daten sind in diesem Fenster nicht lesbar.",
@@ -32,6 +31,17 @@ export const sidebar: Messages["sidebar"] = {
   noUnread: "Keine ungelesenen Unterhaltungen.",
   showAll: "Alle Unterhaltungen anzeigen",
   noChats: "Noch keine Unterhaltungen.",
+
+  activity: "Aktivität",
+  activityTitle: "Erwähnungen, Reaktionen und Antworten an dich",
+  activityEmpty: "Noch keine Aktivität.",
+  activityMention: "hat dich erwähnt",
+  activityReply: "hat dir geantwortet",
+  activityReaction: (glyph, n) =>
+    n > 1 ? `und ${n - 1} weitere reagierten mit ${glyph}` : `hat mit ${glyph} reagiert`,
+  activityOther: (type) => type.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase(),
+  activityIn: (chat) => `in ${chat}`,
+  activitySomeChat: "einem Chat",
 
   card: "[Karte]",
   liveCall: "Anruf läuft",

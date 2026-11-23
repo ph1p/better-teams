@@ -1,6 +1,6 @@
 // Mock of src/teamsData.ts: same exports, backed by the in-memory store instead
 // of Teams' IndexedDB and chatsvc. parity.ts keeps the signatures in sync.
-import type { Chat, FileRef, Message, Profile, Quote, WriteResult } from "../types";
+import type { Activity, Chat, FileRef, Message, Profile, Quote, WriteResult } from "../types";
 import type { MentionPick } from "../mentions";
 import { formatMessage } from "../markdown";
 import { buildQuoteHtml } from "../quote";
@@ -108,6 +108,15 @@ export async function setChatHidden(conversationId: string, hidden: boolean): Pr
 
 export async function markRead(conversationId: string, _lastMessageMs?: number): Promise<WriteResult> {
   return store.setRead(conversationId, true) ? ok : fail("unknown chat");
+}
+
+export async function listActivity(): Promise<Activity[]> {
+  return store.activity();
+}
+
+export async function markActivityRead(newest: number): Promise<WriteResult> {
+  store.setFeedRead(newest + 1);
+  return ok;
 }
 
 export async function markUnread(conversationId: string, _lastMessageMs?: number): Promise<WriteResult> {

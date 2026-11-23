@@ -2294,6 +2294,134 @@
   background: var(--tc-accent);
   color: #fff;
 }
+/* Bell (sidebar head): count badge pinned to its top-right corner. */
+#tc-root .tc-bell {
+  @apply relative;
+}
+#tc-root .tc-bell.on {
+  background: var(--tc-accent-soft);
+  color: var(--tc-accent);
+}
+#tc-root .tc-bell .tc-unread-n {
+  @apply absolute;
+  top: -3px;
+  right: -5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  font-size: 9.5px;
+  box-shadow: 0 0 0 2px var(--tc-bg2);
+}
+
+/* Inbox tabs (bell on): Unread | Activity, a two-part segmented control. */
+#tc-root .tc-inbox-tabs {
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--tc-hover);
+}
+#tc-root .tc-inbox-tab {
+  @apply flex-1 inline-flex items-center justify-center cursor-pointer;
+  gap: 5px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--tc-fg2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+#tc-root .tc-inbox-tab:hover {
+  color: var(--tc-fg);
+}
+#tc-root .tc-inbox-tab.on {
+  background: var(--tc-bg);
+  color: var(--tc-fg);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+}
+
+/* Activity feed (sidebar, inbox Activity tab): one button per item, newest first. */
+#tc-root .tc-activity {
+  @apply flex flex-col;
+  padding: 0 6px 12px;
+  gap: 1px;
+}
+#tc-root .tc-act {
+  @apply flex items-start gap-2.5 w-full text-left cursor-pointer;
+  border: 0;
+  border-radius: var(--tc-radius);
+  background: transparent;
+  color: var(--tc-fg);
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 8px;
+}
+#tc-root .tc-act:hover:not(:disabled) {
+  background: var(--tc-hover);
+}
+#tc-root .tc-act:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+#tc-root .tc-act.unread {
+  background: color-mix(in srgb, var(--tc-accent-soft) 45%, transparent);
+}
+#tc-root .tc-act.unread:hover {
+  background: var(--tc-accent-soft);
+}
+#tc-root .tc-act-av {
+  @apply relative;
+  flex: 0 0 auto;
+}
+#tc-root .tc-act-kind {
+  @apply absolute grid place-items-center;
+  right: -3px;
+  bottom: -3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--tc-accent);
+  color: #fff;
+  box-shadow: 0 0 0 2px var(--tc-bg);
+}
+#tc-root .tc-act-kind.reaction {
+  background: #e8912d;
+}
+#tc-root .tc-act-kind.reply {
+  background: #3a9b6b;
+}
+#tc-root .tc-act-body {
+  @apply flex flex-col;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 2px;
+}
+#tc-root .tc-act-top {
+  @apply flex items-baseline gap-2;
+}
+#tc-root .tc-act-line {
+  @apply truncate;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+#tc-root .tc-act.unread .tc-act-line b {
+  font-weight: 700;
+}
+#tc-root .tc-act-line b {
+  font-weight: 600;
+}
+#tc-root .tc-act-prev {
+  @apply truncate;
+  color: var(--tc-fg);
+  opacity: 0.85;
+  font-size: 12.5px;
+}
+#tc-root .tc-act-where {
+  @apply truncate;
+  color: var(--tc-fg2);
+  font-size: 12px;
+}
 #tc-root .tc-profile-close {
   @apply grid place-items-center cursor-pointer;
   border: 0;
@@ -2624,7 +2752,19 @@
 }
 #tc-root .tc-caught-up .tc-more {
   width: auto;
-  margin-top: 8px;
+  max-width: 100%;
+  margin: 10px 0 0;
+  padding: 5px 12px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid var(--tc-line);
+  border-radius: 999px;
+  color: var(--tc-fg);
+}
+#tc-root .tc-caught-up .tc-more:hover {
+  background: var(--tc-hover);
 }
 
 /* Sidebar tools row: search field + "Unread" toggle pill side by side. */
@@ -2636,35 +2776,6 @@
   @apply flex-1;
   margin: 0;
   min-width: 0;
-}
-#tc-root .tc-unread-pill {
-  @apply inline-flex items-center cursor-pointer;
-  flex: 0 0 auto;
-  gap: 5px;
-  border: 1px solid var(--tc-line);
-  border-radius: 8px;
-  padding: 0 8px;
-  height: 32px;
-  background: var(--tc-bg);
-  color: var(--tc-fg2);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-}
-#tc-root .tc-unread-pill:hover {
-  color: var(--tc-fg);
-}
-#tc-root .tc-unread-pill:focus {
-  outline: none;
-}
-#tc-root .tc-unread-pill:focus-visible {
-  outline: 2px solid var(--tc-accent);
-  outline-offset: 1px;
-}
-#tc-root .tc-unread-pill.on {
-  background: var(--tc-accent-soft);
-  border-color: transparent;
-  color: var(--tc-accent);
 }
 #tc-root .tc-unread-n {
   @apply grid place-items-center;

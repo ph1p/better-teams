@@ -30,6 +30,7 @@ export { listMessages, fetchOlderRemote, primeRemote, resetPaging } from "./data
 export { sendRemote, setReaction, deleteMessage, editMessage, undoDelete, removeFiles } from "./data/writes";
 export { searchPeople, type PeopleHit } from "./data/people";
 export { setChatHidden, markRead, markUnread } from "./data/readState";
+export { listActivity, markActivityRead } from "./data/activity";
 export {
   renameChat,
   addChatMembers,

@@ -22,7 +22,6 @@ export const sidebar = {
   updateHint: "Paste into Terminal. Teams restarts.",
   search: "Search  ⌘K",
   unread: "Unread",
-  allChats: "All chats",
   allChatsTitle: "Back to all conversations  ⌥U",
   unreadFilterTitle: "Only unread conversations  ⌥U · next unread ⌥⇧↓",
   cantRead: "Can't read Teams' local data in this window.",
@@ -31,6 +30,17 @@ export const sidebar = {
   noUnread: "No unread conversations.",
   showAll: "Show all conversations",
   noChats: "No conversations yet.",
+
+  // Activity feed
+  activity: "Activity",
+  activityTitle: "Mentions, reactions and replies to you",
+  activityEmpty: "No activity yet.",
+  activityMention: "mentioned you",
+  activityReply: "replied to you",
+  activityReaction: (glyph: string, n: number) => (n > 1 ? `and ${n - 1} more reacted ${glyph}` : `reacted ${glyph}`),
+  activityOther: (type: string) => type.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase(),
+  activityIn: (chat: string) => `in ${chat}`,
+  activitySomeChat: "a chat",
 
   // Rows
   card: "[Card]",

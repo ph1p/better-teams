@@ -130,3 +130,29 @@ export interface Quote {
 
 /** Result of a write operation against Teams' backend. */
 export type WriteResult = { ok: true; via?: string } | { ok: false; reason: string };
+
+/** What an activity-feed item reports: Teams' activityType, narrowed to the kinds the UI labels. */
+export type ActivityKind = "mention" | "reaction" | "reply" | "other";
+
+/** One item of Teams' activity feed (the "48:notifications" stream). */
+export interface Activity {
+  id: string;
+  kind: ActivityKind;
+  /** Teams' raw activityType, kept for "other" items. */
+  type: string;
+  /** Reaction key for reactions ("like", "heart"…), else "". */
+  subtype: string;
+  /** Activity time, ms since epoch. */
+  time: number;
+  /** Conversation the activity happened in. */
+  threadId: string;
+  /** Message the activity points at, "" when none. */
+  messageId: string;
+  actorMri: string;
+  actorName: string;
+  /** Plain-text preview of the source message. */
+  preview: string;
+  /** How many actions this item folds together (e.g. 3 reactions). */
+  count: number;
+  unread: boolean;
+}

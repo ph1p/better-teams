@@ -3,7 +3,7 @@
 // small simulation on top: typing then a canned reply after you write in a chat,
 // occasional background messages and presence drift. Subscribers (chat events,
 // typing, presence) get pushed the same way Teams' worker would push them.
-import type { Chat, FileRef, Message, Profile, Reaction } from "../types";
+import type { Activity, Chat, FileRef, Message, Profile, Reaction } from "../types";
 import { APPS, CHATS, CHATTER, ME, PEOPLE, PRESENCE, REPLIES, type SeedChat } from "./fixtures";
 import { isAppMri } from "../apps";
 import { parseCards } from "../cards";
@@ -512,4 +512,65 @@ export function startSimulation(): void {
     const p = pick(PEOPLE.filter((x) => x.mri !== ME));
     setPresence(p.mri, pick(states));
   }, 20_000);
+}
+
+// --- Activity feed -----------------------------------------------------------
+
+/** Feed read horizon, ms. Starts six hours back so the seed shows an unread item. */
+let feedReadMs = at(6 * 60);
+
+const plain = (html: string): string =>
+  html
+    .replace(/<blockquote[\s\S]*?<\/blockquote>/g, "")
+    .replace(/<\/(p|div)>|<br\s*\/?>/g, " ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** What Teams' activity feed would hold: mentions of me, replies to my posts, reactions on my messages. */
+export function activity(): Activity[] {
+  const me = nameOf(ME);
+  const out: Activity[] = [];
+  const add = (a: Omit<Activity, "id" | "unread" | "count"> & { count?: number }): void => {
+    out.push({ count: 1, ...a, id: `${a.kind}:${a.messageId}:${a.subtype}`, unread: a.time > feedReadMs });
+  };
+  for (const c of chats.values()) {
+    const byId = new Map(c.messages.map((m) => [m.id, m]));
+    for (const m of c.messages) {
+      if (m.deleted) continue;
+      const base = { threadId: c.seed.id, messageId: m.id, subtype: "", preview: plain(m.content) };
+      if (m.fromMri !== ME) {
+        const actor = { actorMri: m.fromMri, actorName: m.from };
+        if (m.content.includes(`schema.skype.com/Mention`) && m.content.includes(`>${me}</span>`)) {
+          add({ ...base, ...actor, kind: "mention", type: "mention", time: m.time });
+        } else if (
+          (m.isReply && byId.get(m.rootId)?.fromMri === ME) ||
+          (m.content.includes("schema.skype.com/Reply") && m.content.includes(`itemid="${ME}"`))
+        ) {
+          add({ ...base, ...actor, kind: "reply", type: "reply", time: m.time });
+        }
+        continue;
+      }
+      for (const [key, users] of reactors.get(m.id) ?? []) {
+        const others = [...users].filter((u) => u !== ME);
+        if (!others.length) continue;
+        const who = others[others.length - 1];
+        add({
+          ...base,
+          kind: "reaction",
+          type: "reactionInChat",
+          subtype: key,
+          actorMri: who,
+          actorName: nameOf(who),
+          count: others.length,
+          time: Math.min(Date.now(), m.time + 90_000),
+        });
+      }
+    }
+  }
+  return out.sort((a, b) => b.time - a.time).slice(0, 50);
+}
+
+export function setFeedRead(ms: number): void {
+  feedReadMs = Math.max(feedReadMs, ms);
 }

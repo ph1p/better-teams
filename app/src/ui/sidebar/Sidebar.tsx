@@ -1,17 +1,24 @@
 import type { JSX, MouseEvent, RefObject } from "react";
 import { SideResize } from "./SideResize";
-import { ArrowLeft, CheckCheck, Search, SquarePen } from "lucide-react";
+import { Bell, CheckCheck, Search, SquarePen } from "lucide-react";
 import { Section } from "./Section";
 import { Row } from "./Row";
 import { MeBar } from "./MeBar";
 import type { SideSection } from "./sections";
-import type { Chat } from "../../types";
+import type { Activity, Chat } from "../../types";
+import { ActivityList } from "../activity/ActivityList";
 import { t } from "../../i18n";
 
 interface SidebarProps {
   sections: SideSection[];
   /** Notes self-chat for the bottom slot (normal view only). */
   selfSlot?: Chat;
+  /** Inbox tab shown while the bell is on: unread chats or the activity feed. */
+  inboxTab: InboxTab;
+  onInboxTab: (tab: InboxTab) => void;
+  /** Bell button: turns the inbox (unread chats + activity) on and off. */
+  onBell: () => void;
+  activity: { items: Activity[]; unread: number; chats: Chat[]; onOpen: (a: Activity) => void };
   sel: string | null;
   error: string;
   compact: boolean;
@@ -33,12 +40,18 @@ interface SidebarProps {
   onError: (msg: string) => void;
 }
 
+export type InboxTab = "unread" | "activity";
+
 // Left column: header buttons, search + Unread filter, chat sections, the Notes
 // slot and the "me" bar.
 export function Sidebar(p: SidebarProps): JSX.Element {
   const {
     sections,
     selfSlot,
+    inboxTab,
+    onInboxTab,
+    onBell,
+    activity,
     sel,
     error,
     compact,
@@ -59,51 +72,66 @@ export function Sidebar(p: SidebarProps): JSX.Element {
     onError,
   } = p;
   const s = t().sidebar;
+  const showActivity = unreadOnly && inboxTab === "activity";
   return (
     <aside className="tc-side">
       <div className="tc-side-head">
         <div className="tc-side-spacer" />
+        <button
+          className={"tc-side-btn tc-bell" + (unreadOnly ? " on" : "")}
+          onClick={onBell}
+          aria-pressed={unreadOnly}
+          title={unreadOnly ? s.allChatsTitle : s.unreadFilterTitle}
+          aria-label={s.unread}
+        >
+          <Bell size={16} />
+          {!unreadOnly && unreadCount + activity.unread ? (
+            <span className="tc-unread-n">{unreadCount + activity.unread}</span>
+          ) : null}
+        </button>
         <button className="tc-side-btn" onClick={onNewChat} title={s.newChat} aria-label={s.newChat}>
           <SquarePen size={16} />
         </button>
       </div>
-      <div className="tc-side-tools">
-        <div className="tc-search">
-          <Search size={15} className="tc-search-icon" />
-          <input
-            ref={searchRef}
-            placeholder={s.search}
-            value={query}
-            onChange={(e) => onQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                onQuery("");
-                e.currentTarget.blur();
-              } else if (e.key === "Enter") {
-                onSearchEnter();
-              }
-            }}
-          />
+      {unreadOnly ? (
+        <div className="tc-side-tools tc-inbox-tabs" role="tablist">
+          {(["unread", "activity"] as const).map((tab) => {
+            const n = tab === "unread" ? unreadCount : activity.unread;
+            return (
+              <button
+                key={tab}
+                role="tab"
+                aria-selected={inboxTab === tab}
+                className={"tc-inbox-tab" + (inboxTab === tab ? " on" : "")}
+                onClick={() => onInboxTab(tab)}
+              >
+                {tab === "unread" ? s.unread : s.activity}
+                {n ? <span className="tc-unread-n">{n}</span> : null}
+              </button>
+            );
+          })}
         </div>
-        <button
-          className={"tc-unread-pill" + (unreadOnly ? " on" : "")}
-          aria-pressed={unreadOnly}
-          onClick={() => onUnreadFilter(!unreadOnly)}
-          title={unreadOnly ? s.allChatsTitle : s.unreadFilterTitle}
-        >
-          {unreadOnly ? (
-            <>
-              <ArrowLeft size={13} aria-hidden />
-              {s.allChats}
-            </>
-          ) : (
-            <>
-              {s.unread}
-              {unreadCount ? <span className="tc-unread-n">{unreadCount}</span> : null}
-            </>
-          )}
-        </button>
-      </div>
+      ) : (
+        <div className="tc-side-tools">
+          <div className="tc-search">
+            <Search size={15} className="tc-search-icon" />
+            <input
+              ref={searchRef}
+              placeholder={s.search}
+              value={query}
+              onChange={(e) => onQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  onQuery("");
+                  e.currentTarget.blur();
+                } else if (e.key === "Enter") {
+                  onSearchEnter();
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
       <div className="tc-list">
         {error ? (
           <div className="tc-note">
@@ -112,7 +140,15 @@ export function Sidebar(p: SidebarProps): JSX.Element {
             <small>{error}</small>
           </div>
         ) : null}
-        {sections.map((sec) => (
+        {showActivity ? (
+          <ActivityList
+            items={activity.items}
+            chats={activity.chats}
+            onOpen={activity.onOpen}
+            onOpenProfile={onOpenProfile}
+          />
+        ) : null}
+        {(showActivity ? [] : sections).map((sec) => (
           <Section
             key={sec.id}
             id={sec.id}
@@ -129,7 +165,7 @@ export function Sidebar(p: SidebarProps): JSX.Element {
             onAddChannel={onAddChannel}
           />
         ))}
-        {!error && !sections.length ? (
+        {!error && !sections.length && !showActivity ? (
           <div className="tc-list-empty">
             {query ? (
               s.noMatch(query)

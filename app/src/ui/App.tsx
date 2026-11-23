@@ -3,7 +3,7 @@ import { useChanged } from "./lib/changed";
 import { useLatest } from "./lib/latest";
 import { markRead } from "../teamsData";
 import { openNativeChat } from "../send";
-import { Sidebar } from "./sidebar/Sidebar";
+import { Sidebar, type InboxTab } from "./sidebar/Sidebar";
 import { ChatMenu, type Menu } from "./sidebar/ChatMenu";
 import { buildSections } from "./sidebar/sections";
 import { NewChat } from "./sidebar/NewChat";
@@ -17,9 +17,10 @@ import { FileViewer } from "./shared/FileViewer";
 import { messageText } from "./lib/format";
 import { usePref } from "./lib/prefs";
 import { useToast } from "./lib/toast";
-import type { Chat } from "../types";
+import type { Activity, Chat } from "../types";
 import { useChatList } from "./hooks/useChatList";
 import { useMessages } from "./hooks/useMessages";
+import { useActivity } from "./hooks/useActivity";
 import { useComposerState } from "./hooks/useComposerState";
 import { useChatActions } from "./hooks/useChatActions";
 import { useShortcuts } from "./hooks/useShortcuts";
@@ -86,6 +87,16 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     [sections, selfSlot],
   );
   const unreadCount = useMemo(() => chats.filter((c) => c.unread && !c.hidden).length, [chats]);
+
+  // Activity feed: polled always (the bell shows its unread count), listed in
+  // the sidebar's Activity tab while the inbox is on.
+  const feed = useActivity();
+  const [inboxTab, setInboxTab] = useState<InboxTab>("unread");
+  const activityShown = unreadOnly && inboxTab === "activity";
+  // A feed item to scroll to once its chat has loaded.
+  const pendingJump = useRef<{ cid: string; mid: string } | null>(null);
+  // Bumped per item click so the jump effect re-runs even when the chat is already open.
+  const [jumpSeq, setJumpSeq] = useState(0);
 
   const pick = useCallback(
     (id: string): void => {
@@ -225,6 +236,36 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     [loadOlder, scroller, noMore, selRef, unstick],
   );
 
+  // Seen while open: new items arriving with the feed on screen are read too.
+  const { unread: feedUnread, markAllRead } = feed;
+  useEffect(() => {
+    if (activityShown && feedUnread) markAllRead();
+  }, [activityShown, feedUnread, markAllRead]);
+
+  // Bell: on opens the inbox (Activity tab when only the feed has news), off
+  // goes back to all chats.
+  const toggleInbox = (): void => {
+    if (unreadOnly) return setUnreadFilter(false);
+    setQuery("");
+    setInboxTab(!unreadCount && feed.unread ? "activity" : "unread");
+    setUnreadFilter(true);
+  };
+
+  const openActivityItem = useCallback(
+    (item: Activity): void => {
+      pendingJump.current = item.messageId ? { cid: item.threadId, mid: item.messageId } : null;
+      setJumpSeq((n) => n + 1);
+      pick(item.threadId);
+    },
+    [pick],
+  );
+  useEffect(() => {
+    const j = pendingJump.current;
+    if (!j || !m.ready || sel !== j.cid) return;
+    pendingJump.current = null;
+    requestAnimationFrame(() => onJumpTo(j.mid));
+  }, [jumpSeq, m.ready, sel, onJumpTo]);
+
   // Open the right-click menu for a chat row.
   const openMenu = useCallback((e: MouseEvent, chat: Chat): void => {
     e.preventDefault();
@@ -253,6 +294,10 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
       <Sidebar
         sections={sections}
         selfSlot={selfSlot}
+        inboxTab={inboxTab}
+        onInboxTab={setInboxTab}
+        onBell={toggleInbox}
+        activity={{ items: feed.items, unread: feed.unread, chats, onOpen: openActivityItem }}
         sel={sel}
         error={error}
         compact={compact}
