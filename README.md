@@ -8,36 +8,22 @@ calls, meetings and files still work natively. Toggle with **Option+Cmd+T**.
 > Better Teams is an independent project. It is not affiliated with, endorsed by
 > or supported by Microsoft. "Microsoft Teams" is a trademark of Microsoft.
 
-## Requirements
-
-- macOS with the **new** Microsoft Teams in `/Applications` (tested on 26289.x)
-- Node.js 20+ and pnpm (`corepack enable pnpm`; `better-teams dev` needs Node 22+)
-- An administrator password: the Teams app bundle is owned by root
-
-Check everything with `./better-teams doctor`.
-
 ## Install
 
-```sh
-git clone <this repo> better-teams && cd better-teams
-./install.sh               # or ./install.sh --no-start
-```
-
-The installer checks the requirements, installs dependencies with `pnpm install`,
-links a `better-teams` launcher into `~/.local/bin`, builds the overlay, patches
-Teams and relaunches it. It is safe to re-run, e.g. after `git pull`.
-
-After a **Teams update** the patch is gone: run `better-teams` again.
-
-## Use
+Needs macOS, the **new** Microsoft Teams in `/Applications` (tested on 26289.x)
+and an administrator password (the Teams app is owned by root). Paste this into
+Terminal:
 
 ```sh
-better-teams            # build, patch if needed, relaunch Teams
-better-teams status     # Teams version, patch state, debug port
-better-teams off        # restore original Teams (relaunch if it was running)
-better-teams doctor     # check requirements
-better-teams help       # all commands
+curl -fsSL https://github.com/ph1p/better-teams/releases/latest/download/install.sh | bash
 ```
+
+It downloads the latest release into `~/.better-teams`, patches Teams and
+relaunches it. Toggle the overlay with **Option+Cmd+T**. Nothing else is
+installed and nothing is added to your `PATH`.
+
+**Update**, or after a **Teams update** removed the patch: run the same line
+again.
 
 The overlay follows Teams' language (English or German); the status menu
 under your avatar can pin one. Clicking a macOS notification opens that chat
@@ -46,36 +32,50 @@ in the overlay too, not only in Teams underneath.
 ## Uninstall
 
 ```sh
-./uninstall.sh             # or: better-teams uninstall
-./uninstall.sh --purge     # also delete node_modules and build output
+~/.better-teams/better-teams uninstall
 ```
 
 Restores Teams' original bytes (the code signature verifies again), relaunches
-Teams if it was running and removes the launcher. The project folder stays;
-delete it to remove everything.
+Teams if it was running and deletes `~/.better-teams`.
+
+## More commands
+
+```sh
+~/.better-teams/better-teams status     # Teams version, patch state
+~/.better-teams/better-teams off        # restore original Teams, keep the install
+~/.better-teams/better-teams            # patch again and relaunch Teams
+~/.better-teams/better-teams doctor     # check requirements
+~/.better-teams/better-teams help       # all commands
+```
 
 ## Troubleshooting
 
-| Symptom                             | Fix                                                                       |
-| ----------------------------------- | ------------------------------------------------------------------------- |
-| Overlay gone after a Teams update   | Run `better-teams`.                                                         |
-| Teams misbehaves or won't start     | `better-teams off`, then report the Teams version from `better-teams status`. |
-| `client-bindings/bundle.js missing` | This Teams build loads differently and is not supported.                  |
-| `better-teams: command not found`     | Add `~/.local/bin` to `PATH` (the installer prints the line).             |
-| Teams did not quit                  | Quit it from the menu bar, then run the command again.                    |
+| Symptom                             | Fix                                                                        |
+| ----------------------------------- | -------------------------------------------------------------------------- |
+| Overlay gone after a Teams update   | Run the install line again.                                                |
+| Teams misbehaves or won't start     | `~/.better-teams/better-teams off`, then report the version from `status`. |
+| `client-bindings/bundle.js missing` | This Teams build loads differently and is not supported.                   |
+| Teams did not quit                  | Quit it from the menu bar, then run the command again.                     |
 
 ## Develop
 
+Needs Node.js 22+ and pnpm (`corepack enable pnpm`).
+
 ```sh
-better-teams dev      # or: cd app && pnpm run dev
+git clone https://github.com/ph1p/better-teams && cd better-teams
+./better-teams dev    # or: cd app && pnpm run dev
 ```
 
 Relaunches Teams with a DevTools port, runs `vite build --watch` and re-injects
 the overlay into every Teams window on each save (~1s, UI state resets).
-Ctrl-C relaunches Teams without the port. Run `better-teams` afterwards to bake
-your changes into the patch.
+Ctrl-C relaunches Teams without the port. Run `./better-teams` afterwards to
+bake your changes into the patch.
 
 Type-check with `cd app && pnpm run typecheck`.
+
+**Release:** bump `version` in `app/package.json`, commit, then push a tag
+`vX.Y.Z`. `.github/workflows/release.yml` builds `better-teams.tar.gz` and
+publishes it with `install.sh`.
 
 ### Mock mode (no Teams)
 
@@ -96,7 +96,8 @@ real module's exports.
 
 ```
 better-teams                 launcher (start, dev, patch, off, status, uninstall…)
-install.sh / uninstall.sh  thin wrappers around the launcher
+install.sh                 release installer (curl | bash); in a checkout runs the launcher
+uninstall.sh               thin wrapper around `better-teams uninstall`
 scripts/
   build-host-patch.ts     wraps the app bundle into the bundle.js payload
   dev.ts                  CDP hot-reload for `better-teams dev`

@@ -6,6 +6,10 @@
 # `patch` appends the overlay to that file (needs sudo, the app is root-owned),
 # so Teams loads it by itself — no debug port, no injection step.
 #
+# Two layouts: a source checkout (app/ next to this script; builds with Node)
+# and a release install (~/.better-teams from install.sh: a prebuilt payload,
+# no Node needed).
+#
 # Patching breaks the app's code signature seal (`codesign --verify` fails);
 # `unpatch` restores the exact original bytes. A Teams update overwrites the
 # patch — run `better-teams` again afterwards.
@@ -29,7 +33,14 @@ done
 DIR="$(cd "$(dirname "$SELF")" && pwd)"
 SELF="$DIR/$(basename "$SELF")"
 
-VERSION="$(sed -n 's/^  "version": "\(.*\)",$/\1/p' "$DIR/app/package.json" 2>/dev/null | head -1)"
+# Release install: prebuilt payload next to this script, no app/ sources.
+PREBUILT=0
+[ -f "$DIR/app/package.json" ] || PREBUILT=1
+if [ "$PREBUILT" = 1 ]; then VERSION="$(cat "$DIR/VERSION" 2>/dev/null || true)"
+else VERSION="$(sed -n 's/^  "version": "\(.*\)",$/\1/p' "$DIR/app/package.json" 2>/dev/null | head -1)"; fi
+# How to call this script in messages (it is not on PATH).
+ME="${SELF/#$HOME/~}"
+INSTALL_URL="https://github.com/ph1p/better-teams/releases/latest/download/install.sh"
 PORT=9222
 APP="Microsoft Teams"
 TEAMS_APP="/Applications/$APP.app"
@@ -37,32 +48,34 @@ TARGET="$TEAMS_APP/Contents/Resources/client-bindings/bundle.js"
 TESTED="26289"                       # Teams build line the patch was verified on
 NODE_MIN=20                          # vite 6 / tailwind 4
 NODE_DEV_MIN=22                      # dev mode uses Node's global WebSocket
-BIN_LINK="$HOME/.local/bin/better-teams"
 BUNDLE="$DIR/app/dist/better-teams-app.js"
 PAYLOAD="$DIR/app/dist/better-teams-host.js"
+[ "$PREBUILT" = 1 ] && PAYLOAD="$DIR/better-teams-host.js"
 DEV_BUNDLE="$DIR/app/dist-dev/better-teams-app.js"
 MARK='/*better-teams:begin*/'
 # Marker of builds from before the rename: still found, so an old patch is
 # replaced instead of a second overlay appended.
 OLD_MARK='/*teams-calm:begin*/'
-OLD_BIN_LINK="$HOME/.local/bin/teams-calm"
+# Launchers earlier versions linked into ~/.local/bin; removed on uninstall.
+OLD_LINKS=("$HOME/.local/bin/teams-calm" "$HOME/.local/bin/better-teams")
 
 usage() {
   cat <<EOF
 better-teams ${VERSION:-} — a calmer client inside the new Microsoft Teams (macOS)
 
-Usage: better-teams [command]
+Usage: $ME [command]
 
   start       Build, patch Teams if needed, restart it (default).
-  dev         Hot-reload dev mode (opens debug port $PORT while running).
+  update      Install the latest release and restart Teams (release install).
+  dev         Hot-reload dev mode (source checkout; debug port $PORT while running).
   build       Build the overlay only; Teams is not touched.
   patch       Build + patch, no restart (takes effect on next Teams launch).
   unpatch     Restore Teams' original files.
   off         Unpatch and restart plain Teams if it is running.
   status      Show Teams version, patch state and debug port.
-  doctor      Check requirements (macOS, Node, Teams, dependencies).
-  uninstall   Unpatch Teams and remove the launcher. --purge also deletes
-              node_modules and build output. The project folder stays.
+  doctor      Check requirements (macOS, Teams; Node for source checkouts).
+  uninstall   Unpatch Teams. A release install deletes itself; a source
+              checkout stays (--purge deletes node_modules and build output).
   help        Show this help.
 
 Toggle the overlay inside Teams with Option+Cmd+T.
@@ -121,7 +134,7 @@ need_node() {
 warn_untested() {
   case "$(teams_version)" in
     "$TESTED".*) ;;
-    *) warn "Teams $(teams_version) is untested (verified on $TESTED.x). If the overlay misbehaves, run 'better-teams off'." ;;
+    *) warn "Teams $(teams_version) is untested (verified on $TESTED.x). If the overlay misbehaves, run '$ME off'." ;;
   esac
 }
 
@@ -152,11 +165,15 @@ doctor() {
   note() { printf '  note  %s\n' "$*"; }
   say "better-teams ${VERSION:-} in $DIR"
   [ "$(uname -s)" = Darwin ] && ok "macOS $(sw_vers -productVersion 2>/dev/null)" || fail "macOS only"
-  if command -v node >/dev/null 2>&1; then
+  if [ "$PREBUILT" = 1 ]; then
+    [ -f "$PAYLOAD" ] && ok "prebuilt overlay ${VERSION:-}" || fail "prebuilt overlay missing (reinstall)"
+  elif command -v node >/dev/null 2>&1; then
     if [ "$(node_major)" -ge "$NODE_MIN" ]; then ok "Node $(node --version)"; else fail "Node $(node --version); need $NODE_MIN+"; fi
     [ "$(node_major)" -ge "$NODE_DEV_MIN" ] || note "dev mode needs Node $NODE_DEV_MIN+"
   else fail "Node.js not found (need $NODE_MIN+)"; fi
-  command -v pnpm >/dev/null 2>&1 && ok "pnpm $(pnpm --version)" || fail "pnpm not found"
+  if [ "$PREBUILT" = 0 ]; then
+    command -v pnpm >/dev/null 2>&1 && ok "pnpm $(pnpm --version)" || fail "pnpm not found"
+  fi
   if [ -d "$TEAMS_APP" ]; then
     case "$(teams_version)" in
       "$TESTED".*) ok "Teams $(teams_version)" ;;
@@ -164,9 +181,9 @@ doctor() {
     esac
     [ -f "$TARGET" ] && ok "client-bindings/bundle.js present" || fail "client-bindings/bundle.js missing: unsupported Teams build"
   else fail "new Microsoft Teams not found at $TEAMS_APP"; fi
-  [ -f "$DIR/app/node_modules/.modules.yaml" ] && ok "dependencies installed" || note "dependencies not installed yet (installed on first run)"
-  if [ -L "$BIN_LINK" ]; then ok "launcher $BIN_LINK"; else note "no launcher in ~/.local/bin (run ./install.sh)"; fi
-  case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) note "~/.local/bin is not on PATH" ;; esac
+  if [ "$PREBUILT" = 0 ]; then
+    [ -f "$DIR/app/node_modules/.modules.yaml" ] && ok "dependencies installed" || note "dependencies not installed yet (installed on first run)"
+  fi
   return $bad
 }
 
@@ -202,6 +219,10 @@ launch_plain() { open -a "$APP"; }
 launch_debug() { WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=$PORT" open -a "$APP"; }
 
 build() {
+  if [ "$PREBUILT" = 1 ]; then
+    [ -f "$PAYLOAD" ] || die "$PAYLOAD is missing; reinstall: curl -fsSL $INSTALL_URL | bash"
+    return 0
+  fi
   need_node
   ensure_deps
   if [ ! -f "$BUNDLE" ] || [ -n "$(find "$DIR/app/src" "$DIR/app/vite.config.ts" -newer "$BUNDLE" 2>/dev/null | head -1)" ]; then
@@ -237,21 +258,21 @@ restart_plain() {
   quit_teams && launch_plain
 }
 
-remove_launcher() {
-  # The pre-rename launcher points at this checkout's old script name.
-  if [ -L "$OLD_BIN_LINK" ] && [ "$(readlink "$OLD_BIN_LINK")" = "$DIR/teams-calm" ]; then
-    rm -f "$OLD_BIN_LINK"; say "Removed old launcher $OLD_BIN_LINK"
-  fi
-  [ -L "$BIN_LINK" ] || return 0
-  local to; to="$(readlink "$BIN_LINK")"
-  if [ "$to" = "$SELF" ] || [ "$to" = "$DIR/better-teams" ]; then rm -f "$BIN_LINK"; say "Removed launcher $BIN_LINK"
-  else say "Left $BIN_LINK alone (points to $to)."; fi
+# Drop launcher links earlier versions put in ~/.local/bin, if they point here.
+remove_old_links() {
+  local l to
+  for l in "${OLD_LINKS[@]}"; do
+    [ -L "$l" ] || continue
+    to="$(readlink "$l")"
+    case "$to" in "$DIR/teams-calm" | "$DIR/better-teams") rm -f "$l"; say "Removed old launcher $l" ;; esac
+  done
 }
 
 cmd="${1:-start}"
 [ $# -gt 0 ] && shift
 case "$cmd" in
   start)
+    remove_old_links
     patch
     if port_open; then say "Teams has the debug port open; restarting without it."; fi
     restart_plain
@@ -270,7 +291,12 @@ case "$cmd" in
     unpatch
     if teams_running; then restart_plain; else say "Teams starts without the overlay next time."; fi
     ;;
+  update)
+    [ "$PREBUILT" = 1 ] || die "this is a source checkout: git pull, then run ./better-teams"
+    curl -fsSL "$INSTALL_URL" | bash
+    ;;
   dev)
+    [ "$PREBUILT" = 0 ] || die "dev mode needs a source checkout (git clone https://github.com/ph1p/better-teams)"
     need_teams; need_node "$NODE_DEV_MIN"; stop_stale_dev; ensure_deps
     say "Relaunching Teams with debug port $PORT (dev only)..."
     quit_teams || exit 1
@@ -296,7 +322,7 @@ case "$cmd" in
     if [ -d "$TEAMS_APP" ]; then say "Teams:      $(teams_version)$(teams_running && echo ', running' || true)"
     else say "Teams:      not installed"; fi
     if is_patched; then
-      if patch_current; then say "patch:      current build"; else say "patch:      older build (run better-teams)"; fi
+      if patch_current; then say "patch:      current build"; else say "patch:      older build (run $ME)"; fi
     else say "patch:      not patched"; fi
     if port_open; then say "debug port: $PORT OPEN"; else say "debug port: closed"; fi
     ;;
@@ -309,12 +335,18 @@ case "$cmd" in
     was_running=0; teams_running && was_running=1
     unpatch
     [ "$was_running" = 1 ] && restart_plain
-    remove_launcher
-    if [ "$purge" = 1 ]; then
-      rm -rf "$DIR/app/node_modules" "$DIR/app/dist" "$DIR/app/dist-dev"
-      say "Removed node_modules and build output."
+    remove_old_links
+    if [ "$PREBUILT" = 1 ]; then
+      # Only a folder this script recognises as its own release install.
+      if [ -f "$DIR/VERSION" ] && [ -f "$DIR/better-teams-host.js" ]; then rm -rf "$DIR"; say "Removed $DIR."; fi
+      say "Better Teams is uninstalled."
+    else
+      if [ "$purge" = 1 ]; then
+        rm -rf "$DIR/app/node_modules" "$DIR/app/dist" "$DIR/app/dist-dev"
+        say "Removed node_modules and build output."
+      fi
+      say "Better Teams is uninstalled. Delete $DIR to remove the source too."
     fi
-    say "Better Teams is uninstalled. Delete $DIR to remove the source too."
     say "(Overlay preferences live in Teams' local storage and are inert without the patch.)"
     ;;
   help|-h|--help)
