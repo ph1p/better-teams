@@ -5,6 +5,8 @@ describe("glyphFor", () => {
   it("maps wider Teams emoticon ids", () => {
     expect(glyphFor("raisedfist")).toBe("✊");
     expect(glyphFor("fistbump")).toBe("👊");
+    expect(glyphFor("smileeyes")).toBe("😊");
+    expect(glyphFor("heartonfire")).toBe("❤️‍🔥");
   });
   it("adds the skin tone to a mapped or hex key", () => {
     expect(glyphFor("raisedfist-tone2")).toBe("✊\u{1F3FC}");
@@ -12,6 +14,7 @@ describe("glyphFor", () => {
   });
   it("decodes hex-codepoint keys, else shows the key", () => {
     expect(glyphFor("1f52d_telescope")).toBe("🔭");
+    expect(glyphFor("2639_frowningface")).toBe("☹️");
     expect(glyphFor("nosuchemoticon")).toBe("nosuchemoticon");
     expect(glyphFor("nosuch-tone2")).toBe("nosuch-tone2");
   });
