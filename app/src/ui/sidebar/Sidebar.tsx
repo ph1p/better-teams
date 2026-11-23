@@ -1,6 +1,6 @@
 import type { JSX, MouseEvent, RefObject } from "react";
 import { SideResize } from "./SideResize";
-import { Bell, CheckCheck, Search, SquarePen } from "lucide-react";
+import { Bell, CheckCheck, Search, SquarePen, X } from "lucide-react";
 import { Section } from "./Section";
 import { Row } from "./Row";
 import { MeBar } from "./MeBar";
@@ -129,6 +129,19 @@ export function Sidebar(p: SidebarProps): JSX.Element {
                 }
               }}
             />
+            {query ? (
+              <button
+                className="tc-search-clear"
+                onClick={() => {
+                  onQuery("");
+                  searchRef.current?.focus();
+                }}
+                title={s.clearSearch}
+                aria-label={s.clearSearch}
+              >
+                <X size={14} />
+              </button>
+            ) : null}
           </div>
         </div>
       )}

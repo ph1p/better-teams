@@ -1,5 +1,6 @@
 import { profile } from "../../teamsData";
 import type { Chat } from "../../types";
+import { isDirect } from "../lib/format";
 import type { Messages } from "../../i18n";
 
 /** A headed section; its title comes from t().sidebar.sections at render time. */
@@ -25,13 +26,17 @@ export function buildSections(
 ): SideSection[] {
   const q = query.toLowerCase().trim();
   if (q) {
-    // Search: one flat result list, best matches first (title before team /
-    // member names). Hidden chats are found too.
+    // Search: one flat result list. 1:1 chats first, then title matches before
+    // team / member-name matches, newest first within each. Hidden chats are
+    // found too.
     const hay = (c: Chat): string =>
       (c.team + " " + c.members.map((m) => profile(m).displayName).join(" ")).toLowerCase();
-    const byTitle = chats.filter((c) => c.title.toLowerCase().includes(q));
-    const byOther = chats.filter((c) => !c.title.toLowerCase().includes(q) && hay(c).includes(q));
-    const list = [...byTitle, ...byOther];
+    const hits: Array<{ c: Chat; r: number }> = [];
+    for (const c of chats) {
+      const inTitle = c.title.toLowerCase().includes(q);
+      if (inTitle || hay(c).includes(q)) hits.push({ c, r: (isDirect(c) ? 0 : 2) + (inTitle ? 0 : 1) });
+    }
+    const list = hits.sort((x, y) => x.r - y.r || y.c.time - x.c.time).map((h) => h.c);
     return list.length ? [{ id: "search", rows: list, capped: false }] : [];
   }
   // Hidden chats leave the list, as in Teams; search still finds them.
@@ -56,7 +61,7 @@ export function buildSections(
   return (
     [
       { id: "fav", rows: list.filter(pinned) },
-      { id: "dms", rows: rest.filter((c) => c.kind === "chat" && !c.app && !c.group) },
+      { id: "dms", rows: rest.filter(isDirect) },
       { id: "groups", rows: rest.filter((c) => c.kind === "chat" && c.group) },
       { id: "channels", rows: channels, groupByTeam: true },
       { id: "apps", rows: rest.filter((c) => c.app) },

@@ -155,11 +155,26 @@
   background: var(--tc-bg);
   color: var(--tc-fg);
   border-radius: 8px;
-  padding: 7px 10px 7px 32px;
+  padding: 7px 28px 7px 32px;
   font-size: 13px;
 }
 #tc-root .tc-search input:focus {
   border-color: var(--tc-accent);
+}
+#tc-root .tc-search-clear {
+  @apply absolute grid place-items-center cursor-pointer;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--tc-fg2);
+  padding: 3px;
+  border-radius: 6px;
+}
+#tc-root .tc-search-clear:hover {
+  background: var(--tc-hover);
+  color: var(--tc-fg);
 }
 #tc-root .tc-search .tc-search-icon {
   @apply absolute pointer-events-none;
@@ -314,7 +329,7 @@
   min-width: 0;
 }
 #tc-root .tc-row-top {
-  @apply flex justify-between gap-2;
+  @apply flex items-center justify-between gap-2;
 }
 #tc-root .tc-name {
   @apply overflow-hidden whitespace-nowrap;
@@ -2799,11 +2814,11 @@
   flex: 0 0 auto;
 }
 
-/* Keep the sidebar head clear of the macOS traffic-light buttons (top-left). */
+/* Keep the sidebar head clear of the macOS traffic-light buttons (top-left):
+   icons centered on the lights' row, right edge flush with the tools row. */
 #tc-root .tc-side-head {
-  height: 40px;
-  padding: 0 16px 0 94px;
-  margin-bottom: 6px;
+  height: 46px;
+  padding: 0 12px 0 94px;
 }
 
 /* Frameless window: the sidebar title bar and the chat header move the window.

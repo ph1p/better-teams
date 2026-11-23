@@ -12,6 +12,9 @@ import { locale, t } from "../../i18n";
 import { nameFormat, personName, shortName } from "../../names";
 import { cardSummary } from "../../cards";
 
+/** A 1:1 chat with one person (not a group, app, channel or meeting). */
+export const isDirect = (c: Chat): boolean => c.kind === "chat" && !c.group && !c.app;
+
 /** A chat's display name. The data layer keeps "Notes" untranslated; the UI shows it in the current language. */
 export function chatTitle(c: Chat): string {
   if (c.kind === "notes") return t().common.notes;

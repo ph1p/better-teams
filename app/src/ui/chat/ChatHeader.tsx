@@ -4,7 +4,7 @@ import { BellOff, Blocks, Hash, MessageSquareText, Phone, Search, StickyNote, Vi
 import { profile, type PeopleHit } from "../../teamsData";
 import { isAppMri } from "../../apps";
 import { Avatar, GroupAvatar } from "../shared/Avatar";
-import { avatarUri, chatTitle } from "../lib/format";
+import { avatarUri, chatTitle, isDirect } from "../lib/format";
 import { statusLabel, usePresence } from "../lib/presence";
 import { MAX_CALL } from "../lib/constants";
 import type { Flash } from "../lib/toast";
@@ -92,7 +92,7 @@ export function ChatHeader({
   onNewChannel,
 }: ChatHeaderProps): JSX.Element {
   const { statusOf, noteOf } = usePresence();
-  const note = chat.kind === "chat" && !chat.group && !chat.app && chat.avatarMri ? noteOf(chat.avatarMri) : "";
+  const note = isDirect(chat) && chat.avatarMri ? noteOf(chat.avatarMri) : "";
   const [renaming, setRenaming] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   // Calls: 1:1 and group chats ring their members (Teams rings at most 20 in a

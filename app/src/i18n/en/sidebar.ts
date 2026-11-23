@@ -21,6 +21,7 @@ export const sidebar = {
   updateCopy: "Copy command",
   updateHint: "Paste into Terminal. Teams restarts.",
   search: "Search  ⌘K",
+  clearSearch: "Clear search",
   unread: "Unread",
   allChatsTitle: "Back to all conversations  ⌥U",
   unreadFilterTitle: "Only unread conversations  ⌥U · next unread ⌥⇧↓",

@@ -22,6 +22,7 @@ export const sidebar: Messages["sidebar"] = {
   updateHint: "Im Terminal einfügen. Teams startet neu.",
   newChat: "Neuer Chat",
   search: "Suchen  ⌘K",
+  clearSearch: "Suche leeren",
   unread: "Ungelesen",
   allChatsTitle: "Zurück zu allen Unterhaltungen  ⌥U",
   unreadFilterTitle: "Nur ungelesene Unterhaltungen  ⌥U · nächste ungelesene ⌥⇧↓",
