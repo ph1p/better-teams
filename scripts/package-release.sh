@@ -24,4 +24,5 @@ cp better-teams LICENSE release/pkg/
 chmod +x release/pkg/better-teams
 printf '%s\n' "$VERSION" > release/pkg/VERSION
 tar -czf release/better-teams.tar.gz -C release/pkg .
-echo "packaged release/better-teams.tar.gz ($VERSION)"
+(cd release && shasum -a 256 better-teams.tar.gz > better-teams.tar.gz.sha256)
+echo "packaged release/better-teams.tar.gz + .sha256 ($VERSION)"
