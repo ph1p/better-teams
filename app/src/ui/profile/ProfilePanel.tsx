@@ -17,8 +17,7 @@ import { STATUS_COLOR, statusLabel, usePresence } from "../lib/presence";
 import type { CSSProperties } from "react";
 import type { Chat } from "../../types";
 import { t } from "../../i18n";
-import { formatName } from "../../names";
-import { isAppMri } from "../../apps";
+import { fullName } from "../../names";
 
 interface ProfilePanelProps {
   mri: string;
@@ -43,7 +42,7 @@ export function ProfilePanel({ mri, chats, sel, onPick, onClose, onMessage, onCa
   // Avatar initials and colour keep Teams' own name. The profile always shows
   // the full "First Last" name, whatever the name format setting says.
   const rawName = p.displayName || t().common.unknown;
-  const name = (isAppMri(mri) ? rawName : formatName(p, "first-last")) || t().common.unknown;
+  const name = fullName(p, mri) || rawName;
   const rows: Array<[IconComp, string]> = (
     [
       [MailIcon, p.email],

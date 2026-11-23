@@ -222,7 +222,7 @@ export const Message = memo(function Message({
                 title={r.mine ? t().chat.removeReaction(r.key) : t().chat.react(r.key)}
                 onClick={() => onReact(cid, m.id, r.key, !r.mine)}
               >
-                {glyphFor(r)} {r.count}
+                {glyphFor(r.key)} {r.count}
               </button>
             ))}
           </div>

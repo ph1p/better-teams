@@ -1,6 +1,5 @@
 // Reaction emoji: Teams sends a reaction key (`like`, `heart`, …) or a raw
 // hex-codepoint key; map the named ones to a glyph, and offer a quick picker.
-import type { Reaction } from "../../types";
 
 const REACTION: Record<string, string> = {
   like: "👍",
@@ -56,7 +55,6 @@ const REACTION: Record<string, string> = {
   muscle: "💪",
   flex: "💪",
   rock: "🤘",
-  poke: "👉",
   pointup: "☝️",
   pointupindex: "☝️",
   stop: "✋",
@@ -68,8 +66,6 @@ const REACTION: Record<string, string> = {
   bow: "🙇",
   facepalm: "🤦",
   shrug: "🤷",
-  nod: "🙂",
-  shake: "😐",
   heartsign: "🫶",
   hearthands: "🫶",
   praying: "🙏",
@@ -117,7 +113,6 @@ const REACTION: Record<string, string> = {
   whew: "😮‍💨",
   relieved: "😌",
   hug: "🤗",
-  bear: "🧸",
   mmm: "😋",
   yum: "😋",
   drool: "🤤",
@@ -239,18 +234,27 @@ const REACTION: Record<string, string> = {
   greencheck: "✅",
 };
 
-// Glyph for a reaction: the named map first, else the key's own decoded glyph
-// (reactionsOf already turns a hex-codepoint key into its emoji), else the key.
-// Skin-tone variants arrive as `<key>-tone1..5` (e.g. `yes-tone2`): base glyph
-// plus the matching Fitzpatrick modifier (U+1F3FB..U+1F3FF).
-export const glyphFor = (r: Reaction): string => {
-  if (REACTION[r.key]) return REACTION[r.key];
-  const tone = /^(.+)-tone([1-5])$/.exec(r.key);
-  if (tone && REACTION[tone[1]]) {
-    return REACTION[tone[1]].replace(/\uFE0F$/, "") + String.fromCodePoint(0x1f3fa + Number(tone[2]));
+// Glyph for a reaction key, the one place keys are resolved: the named map
+// first; then skin-tone variants `<key>-tone1..5` (e.g. `yes-tone2`) as the
+// base glyph plus the Fitzpatrick modifier (U+1F3FB..U+1F3FF); then custom keys
+// that lead with a hex codepoint ("1f52d_telescope", "1f44d"); else the key.
+export function glyphFor(key: string): string {
+  if (REACTION[key]) return REACTION[key];
+  const tone = /^(.+)-tone([1-5])$/.exec(key);
+  if (tone) {
+    const base = glyphFor(tone[1]);
+    if (base !== tone[1]) return base.replace(/\uFE0F$/, "") + String.fromCodePoint(0x1f3fa + Number(tone[2]));
   }
-  return r.glyph || r.key;
-};
+  const hex = /^([0-9a-f]{4,6})(?:_|$)/i.exec(key);
+  if (hex) {
+    try {
+      return String.fromCodePoint(parseInt(hex[1], 16));
+    } catch {
+      /* not a codepoint: show the key */
+    }
+  }
+  return key;
+}
 
 // The quick picker shown behind the "＋". Teams' own default emotion set.
 export const PICKER: ReadonlyArray<readonly [key: string, glyph: string]> = [

@@ -103,25 +103,10 @@ function parseFiles(raw: unknown): FileRef[] {
   }
 }
 
-// Teams custom reaction keys encode the emoji as a leading codepoint, e.g.
-// "1f52d_telescope" or "1f44d". Decode that to the actual glyph; leave the six
-// classic keys (like/heart/…) alone for the UI's own map.
-function reactionGlyph(key: string): string {
-  const m = /^([0-9a-f]{4,6})(?:_|$)/i.exec(key);
-  if (m) {
-    try {
-      return String.fromCodePoint(parseInt(m[1], 16));
-    } catch {
-      /* fall through */
-    }
-  }
-  return key;
-}
-
 function reactionsOf(m: Dict): Reaction[] {
   // Counts live in annotationsSummary.emotions ({key:count}); the per-user list
   // (needed to know if *I* reacted) lives in properties.emotions
-  // ([{key, users:[{mri,...}]}]). Merge both into {key, glyph, count, mine}.
+  // ([{key, users:[{mri,...}]}]). Merge both into {key, count, mine}.
   const em = obj(get(m.annotationsSummary, "emotions"));
   let detail: unknown = get(m.properties, "emotions");
   if (typeof detail === "string") {
@@ -138,7 +123,7 @@ function reactionsOf(m: Dict): Reaction[] {
     return users.some((u) => (str(get(u, "mri")) || str(get(u, "id")) || u) === me);
   };
   return Object.entries(em)
-    .map(([k, v]): Reaction => ({ key: k, glyph: reactionGlyph(k), count: Number(v) || 0, mine: mineOf(k) }))
+    .map(([k, v]): Reaction => ({ key: k, count: Number(v) || 0, mine: mineOf(k) }))
     .filter((r) => r.count > 0);
 }
 
@@ -253,7 +238,6 @@ export function normCdlMessage(raw: unknown, channel = false): Message | null {
       const users = arr(get(e, "users"));
       return {
         key,
-        glyph: reactionGlyph(key),
         count: users.length || counts.get(key) || 0,
         mine: users.some((u) => (str(get(u, "userId")) || str(get(u, "id"))) === me),
       };

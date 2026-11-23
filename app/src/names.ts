@@ -87,8 +87,11 @@ export function shortName(p: NameParts): string {
 }
 
 /** A person's name in the chosen format. Apps and bots are never reformatted. */
-export function personName(p: Profile | undefined, raw: string, mri: string): string {
-  if (isAppMri(mri) || current === "teams") return raw || p?.displayName || "";
-  if (p?.displayName) return formatName(p, current);
-  return formatName({ displayName: raw }, current);
+export function personName(p: Profile | undefined, raw: string, mri: string, fmt: NameFormat = current): string {
+  if (isAppMri(mri) || fmt === "teams") return raw || p?.displayName || "";
+  if (p?.displayName) return formatName(p, fmt);
+  return formatName({ displayName: raw }, fmt);
 }
+
+/** Full "First Last" name regardless of the name format setting (apps keep theirs). */
+export const fullName = (p: Profile | undefined, mri: string): string => personName(p, "", mri, "first-last");

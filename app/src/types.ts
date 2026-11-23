@@ -10,10 +10,8 @@ export type Importance = "normal" | "high" | "urgent";
 
 /** One reaction bucket on a message (all users who used the same emotion). */
 export interface Reaction {
-  /** Emotion key, e.g. "like" / "heart", or a decoded glyph for custom ones. */
+  /** Emotion key, e.g. "like" / "heart" / "1f52d_telescope"; see glyphFor. */
   key: string;
-  /** Resolved emoji glyph for display (may equal `key`). */
-  glyph: string;
   /** How many people reacted with this emotion. */
   count: number;
   /** True when the current user is among them. */

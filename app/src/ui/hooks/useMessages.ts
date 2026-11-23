@@ -362,7 +362,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
             hit.count += 1;
             hit.mine = true;
           }
-        } else rs.push({ key, glyph: key, count: 1, mine: true });
+        } else rs.push({ key, count: 1, mine: true });
       } else {
         const hit = rs.find((r) => r.key === key);
         if (hit) {

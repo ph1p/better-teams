@@ -45,15 +45,6 @@ export const profiles: Record<string, Profile> = {};
 for (const { mri, ...p } of [...PEOPLE, ...APPS]) profiles[mri] = p;
 export const nameOf = (mri: string): string => profiles[mri]?.displayName || "Unknown";
 
-const REACTION_GLYPH: Record<string, string> = {
-  like: "👍",
-  heart: "❤️",
-  laugh: "😆",
-  surprised: "😮",
-  sad: "😢",
-  angry: "😠",
-};
-
 /** Who reacted with what, per message id; Message.reactions is derived from it. */
 const reactors = new Map<string, Map<string, Set<string>>>();
 
@@ -62,7 +53,7 @@ function reactionsOf(id: string): Reaction[] {
   if (!byKey) return [];
   const out: Reaction[] = [];
   for (const [key, users] of byKey) {
-    if (users.size) out.push({ key, glyph: REACTION_GLYPH[key] || key, count: users.size, mine: users.has(ME) });
+    if (users.size) out.push({ key, count: users.size, mine: users.has(ME) });
   }
   return out;
 }
