@@ -10,6 +10,7 @@
     "mock": "vite --mode mock",
     "build": "vite build",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json",
+    "test": "vitest run",
     "lint": "cd .. && oxlint",
     "fmt": "cd .. && oxfmt",
     "fmt:check": "cd .. && oxfmt --check"
@@ -30,7 +31,8 @@
     "oxlint": "^1.94.0",
     "tailwindcss": "^4.3.5",
     "typescript": "^7.0.2",
-    "vite": "^6.0.7"
+    "vite": "^6.0.7",
+    "vitest": "^5.1.1"
   },
   "engines": {
     "node": ">=22.18"
