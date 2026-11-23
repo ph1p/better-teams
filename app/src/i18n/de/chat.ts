@@ -127,4 +127,5 @@ export const chat: Messages["chat"] = {
   removeFileConfirm: (name) => `Entfernen von ${name} bestätigen`,
   preview: (name) => `Vorschau: ${name}`,
   file: "Datei",
+  loadImage: (host) => `Bild von ${host || "externer Seite"} laden`,
 };

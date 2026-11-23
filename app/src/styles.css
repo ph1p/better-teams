@@ -1745,6 +1745,25 @@
   margin: 4px 0;
   border: 1px solid var(--tc-line);
 }
+#tc-root .tc-img-gate {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border: 1px dashed var(--tc-line);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+#tc-root .tc-img-gate:hover {
+  background: var(--tc-hover);
+}
+#tc-root .tc-img-gate-alt {
+  opacity: 0.7;
+}
 #tc-root .tc-mention {
   color: var(--tc-accent);
   font-weight: 600;

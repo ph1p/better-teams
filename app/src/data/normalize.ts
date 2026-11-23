@@ -3,6 +3,7 @@ import type { FileRef, Message, Reaction } from "../types";
 import { myMri } from "./idb";
 import { profile } from "./profiles";
 import { allowedUrl } from "../services/http";
+import { safeHref } from "../safeUrl";
 import { arr, extOf, get, mriOf, obj, str, toMs, type Dict } from "./raw";
 import { deletedHere, rememberRef } from "./state";
 
@@ -78,7 +79,7 @@ function parseFiles(raw: unknown): FileRef[] {
         const ext = (str(get(f, "fileType")) || str(get(f, "type"))).toLowerCase() || extOf(name);
         const ref: FileRef = {
           name,
-          url: str(info.shareUrl) || str(info.fileUrl) || str(get(f, "objectUrl")) || str(get(f, "openUrl")),
+          url: safeHref(str(info.shareUrl) || str(info.fileUrl) || str(get(f, "objectUrl")) || str(get(f, "openUrl"))),
           ext,
           raw: f,
         };
