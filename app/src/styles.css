@@ -436,6 +436,54 @@
 #tc-root .tc-day + .tc-msg.first {
   margin-top: 0;
 }
+/* Picked with the arrow keys: soft tint + faint ring; key hint sits on the
+   top edge where the hover toolbar goes (and yields to it on hover). */
+#tc-root .tc-msgs-inner:focus {
+  outline: none;
+}
+/* Tint drawn on a pseudo layer so it can reach past the row's padding
+   without shifting layout; the avatar ring sits flush with the row top, so
+   sender rows get extra room above to balance the text's bottom leading. */
+#tc-root .tc-msg.kbd-sel {
+  isolation: isolate;
+}
+#tc-root .tc-msg.kbd-sel,
+#tc-root .tc-msg.kbd-sel:hover {
+  background: transparent;
+}
+#tc-root .tc-msg.kbd-sel::before {
+  content: "";
+  position: absolute;
+  inset: -3px -8px;
+  z-index: -1;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--tc-accent) 9%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tc-accent) 28%, transparent);
+  pointer-events: none;
+}
+#tc-root .tc-msg.kbd-sel.first::before {
+  top: -6px;
+}
+#tc-root .tc-msg.kbd-sel::after {
+  content: attr(data-hint);
+  position: absolute;
+  top: -13px;
+  right: 6px;
+  z-index: 5;
+  padding: 0 8px;
+  font-size: 10.5px;
+  line-height: 20px;
+  border-radius: 6px;
+  color: var(--tc-fg2);
+  background: var(--tc-bg2);
+  border: 1px solid var(--tc-line);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.18);
+  pointer-events: none;
+  white-space: nowrap;
+}
+#tc-root .tc-msg.kbd-sel:hover::after {
+  opacity: 0;
+}
 #tc-root .tc-msg.tc-flash {
   animation: tc-flash 1.4s ease;
 }
@@ -857,6 +905,17 @@
     border-color 0.15s,
     box-shadow 0.15s;
 }
+#tc-root .tc-composer-box.tall {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+#tc-root .tc-composer-box.tall .tc-composer-field {
+  order: -1;
+  flex-basis: 100%;
+}
+#tc-root .tc-composer-box.tall .tc-composer-field + * {
+  margin-left: auto;
+}
 #tc-root .tc-composer-box:focus-within {
   border-color: var(--tc-accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--tc-accent) 22%, transparent);
@@ -869,7 +928,7 @@
   @apply relative flex flex-1 self-center;
   min-width: 0;
 }
-#tc-root .tc-composer textarea,
+#tc-root .tc-editor textarea,
 #tc-root .tc-composer-hl {
   font-family: var(--tc-font);
   font-size: 14px;
@@ -880,7 +939,10 @@
   overflow-wrap: break-word;
   word-break: normal;
 }
-#tc-root .tc-composer textarea {
+#tc-root .tc-editor {
+  @apply relative;
+}
+#tc-root .tc-editor textarea {
   @apply relative flex-1 resize-none;
   border: 0;
   outline: 0;
@@ -890,14 +952,14 @@
   max-height: 180px;
   scrollbar-width: none;
 }
-#tc-root .tc-composer textarea::-webkit-scrollbar {
+#tc-root .tc-editor textarea::-webkit-scrollbar {
   display: none;
 }
-#tc-root .tc-composer textarea::selection {
+#tc-root .tc-editor textarea::selection {
   background: color-mix(in srgb, var(--tc-accent) 30%, transparent);
   color: transparent;
 }
-#tc-root .tc-composer textarea::placeholder {
+#tc-root .tc-editor textarea::placeholder {
   color: var(--tc-fg2);
 }
 #tc-root .tc-composer-hl {
@@ -931,12 +993,16 @@
   background: var(--tc-accent-soft);
   border-radius: 3px;
 }
-#tc-root .tc-hl-fence,
-#tc-root .tc-hl-pre {
-  color: var(--tc-code-fg, #c0392b);
+/* A ``` block: one full-width box. No padding or margin (the caret would
+   drift), so the box shadow pads it visually. */
+#tc-root .tc-hl-block {
+  display: block;
+  background: var(--tc-bg3);
+  box-shadow: 0 0 0 3px var(--tc-bg3);
+  border-radius: 2px;
 }
 #tc-root .tc-hl-fence {
-  opacity: 0.6;
+  color: var(--tc-fg2);
 }
 #tc-root .tc-send {
   @apply grid place-items-center cursor-pointer;
@@ -1066,7 +1132,7 @@
 
 /* Emoji toggle button in the composer */
 #tc-root .tc-emoji-btn {
-  @apply grid place-items-center cursor-pointer self-center;
+  @apply grid place-items-center cursor-pointer self-end;
   flex: 0 0 auto;
   border: 0;
   background: transparent;
@@ -1090,8 +1156,8 @@
 /* @mention autocomplete popover, anchored above the composer box */
 #tc-root .tc-at-pop {
   @apply absolute flex flex-col;
-  left: 18px;
-  right: 18px;
+  left: 0;
+  right: 0;
   bottom: 100%;
   margin-bottom: 6px;
   z-index: 12;
@@ -1120,7 +1186,7 @@
 #tc-root .tc-em-pop {
   right: auto;
   width: 300px;
-  max-width: calc(100% - 36px);
+  max-width: 100%;
 }
 #tc-root .tc-em-glyph {
   width: 22px;
@@ -1332,7 +1398,7 @@
 /* Emoji picker popover, anchored above the composer box */
 #tc-root .tc-emoji-pop {
   @apply absolute;
-  left: 18px;
+  left: 0;
   bottom: 100%;
   margin-bottom: 6px;
   z-index: 12;
@@ -2064,36 +2130,78 @@
 #tc-root .tc-edit {
   margin-top: 2px;
 }
-#tc-root .tc-edit-area {
-  @apply w-full;
-  box-sizing: border-box;
-  min-height: 48px;
-  resize: vertical;
-  font: inherit;
-  color: var(--tc-fg);
-  background: var(--tc-bg2);
-  border: 1px solid var(--tc-accent);
-  border-radius: 8px;
-  padding: 6px 8px;
+/* The shared editor, compact inside a message; taller before it scrolls. */
+#tc-root .tc-edit .tc-composer-box {
+  padding: 4px 6px 4px 10px;
+  border-color: var(--tc-accent);
+}
+#tc-root .tc-edit .tc-editor textarea {
+  max-height: 320px;
+}
+#tc-root .tc-edit .tc-emoji-btn svg {
+  width: 16px;
+  height: 16px;
 }
 #tc-root .tc-edit-actions {
-  @apply flex gap-1.5;
+  @apply flex items-center gap-1.5;
   margin-top: 4px;
 }
-#tc-root .tc-edit-save,
-#tc-root .tc-edit-cancel {
-  @apply cursor-pointer;
+#tc-root .tc-edit-hint {
+  @apply flex-1 truncate;
+  font-size: 11px;
+  color: var(--tc-fg2);
+}
+#tc-root .tc-edit-btn {
+  @apply inline-flex items-center gap-1.5 cursor-pointer;
+  height: 26px;
+  line-height: 1;
+  padding: 0 5px 0 10px;
   font-size: 12px;
-  border-radius: 6px;
-  padding: 3px 10px;
-  border: 1px solid var(--tc-line);
-  background: var(--tc-bg2);
+  font-weight: 600;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--tc-fg2);
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+#tc-root .tc-edit-btn:hover {
+  background: var(--tc-hover);
   color: var(--tc-fg);
 }
-#tc-root .tc-edit-save {
+#tc-root .tc-edit-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--tc-accent) 60%, transparent);
+  outline-offset: 1px;
+}
+#tc-root .tc-edit-btn.primary {
+  padding-left: 8px;
   background: var(--tc-accent);
-  border-color: var(--tc-accent);
   color: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
+}
+#tc-root .tc-edit-btn.primary:hover {
+  background: color-mix(in srgb, var(--tc-accent) 88%, #fff);
+}
+#tc-root .tc-edit-btn:disabled {
+  @apply cursor-default;
+  opacity: 0.45;
+}
+/* Key hint chip inside the button: a flex box so text and icon center on
+   the chip itself, not on the font's line box. */
+#tc-root .tc-edit-btn kbd {
+  @apply inline-flex items-center justify-center;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  height: 16px;
+  min-width: 18px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  opacity: 0.85;
 }
 #tc-root .tc-undo {
   @apply inline-flex items-center gap-1 cursor-pointer;
@@ -2217,17 +2325,158 @@
 #tc-root .tc-pre.tc-shiki .tc-code-line {
   display: inline;
 }
-#tc-root .tc-pre.tc-shiki[data-lang]::before {
-  content: attr(data-lang);
-  display: block;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--tc-fg2);
-  margin: -2px 0 6px;
+/* Message code block: language + copy header, long blocks folded. */
+#tc-root .tc-codeblock {
+  padding: 0;
+  overflow: hidden;
+}
+#tc-root .tc-code-head {
+  @apply flex items-center;
+  height: 28px;
+  padding: 0 4px 0 12px;
   font-family: var(--tc-font);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tc-fg2);
+}
+#tc-root .tc-code-lang {
+  @apply flex-1 truncate;
+}
+#tc-root .tc-code-btn,
+#tc-root .tc-code-more {
+  @apply inline-flex items-center gap-1 cursor-pointer;
+  border: 0;
+  background: transparent;
+  color: var(--tc-fg2);
+  font-family: var(--tc-font);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 3px 7px;
+}
+#tc-root .tc-code-btn {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+#tc-root .tc-codeblock:hover .tc-code-btn,
+#tc-root .tc-code-btn:focus-visible {
+  opacity: 1;
+}
+#tc-root .tc-code-btn:hover,
+#tc-root .tc-code-more:hover {
+  color: var(--tc-fg);
+  background: color-mix(in srgb, var(--tc-fg) 8%, transparent);
+}
+#tc-root .tc-code-body {
+  margin: 0;
+  padding: 0 12px 10px;
+  overflow-x: auto;
+}
+#tc-root .tc-codeblock.folded .tc-code-body {
+  max-height: calc(12 * 1.5 * 12.5px + 10px);
+  overflow-y: hidden;
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
+}
+#tc-root .tc-code-more {
+  @apply flex w-full justify-center;
+  border-radius: 0;
+  border-top: 1px solid color-mix(in srgb, var(--tc-fg) 10%, transparent);
+  padding: 5px 0;
 }
 
+/* Code block dialog: language picker + a highlighted monospace field. The
+   highlighted copy (.tc-codedlg-hl) sits behind a textarea with transparent
+   glyphs, like the composer; both must share font, size and padding. */
+#tc-root .tc-codedlg {
+  width: min(720px, calc(100vw - 32px));
+}
+#tc-root .tc-codedlg-tools {
+  @apply flex items-center gap-2;
+  font-weight: 400;
+}
+#tc-root .tc-codedlg-tools .tc-select select {
+  min-width: 140px;
+}
+#tc-root .tc-codedlg-box {
+  @apply flex overflow-hidden;
+  height: min(360px, 50vh);
+  background: var(--tc-bg3);
+  border: 1px solid var(--tc-line);
+  border-radius: 10px;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+#tc-root .tc-codedlg-box.tc-shiki {
+  background: #0d1117;
+  border-color: #222a35;
+}
+@media (prefers-color-scheme: light) {
+  #tc-root .tc-codedlg-box.tc-shiki {
+    background: #ffffff;
+    border-color: var(--tc-line);
+  }
+}
+#tc-root .tc-codedlg-box:focus-within {
+  border-color: var(--tc-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tc-accent) 22%, transparent);
+}
+#tc-root .tc-codedlg-gutter,
+#tc-root .tc-codedlg-hl,
+#tc-root .tc-codedlg-field textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  letter-spacing: normal;
+  tab-size: 2;
+}
+#tc-root .tc-codedlg-gutter {
+  @apply flex-none overflow-hidden select-none;
+  padding: 10px 8px 10px 12px;
+  min-width: 40px;
+  text-align: right;
+  color: var(--tc-fg2);
+  opacity: 0.6;
+}
+#tc-root .tc-codedlg-field {
+  @apply relative flex-1 overflow-hidden;
+  min-width: 0;
+}
+#tc-root .tc-codedlg-hl,
+#tc-root .tc-codedlg-field textarea {
+  margin: 0;
+  padding: 10px 12px 10px 4px;
+  white-space: pre;
+  border: 0;
+}
+#tc-root .tc-codedlg-hl {
+  @apply absolute pointer-events-none;
+  inset: 0 auto auto 0;
+  min-width: 100%;
+  color: var(--tc-fg);
+  background: none;
+}
+#tc-root .tc-codedlg-field textarea {
+  @apply absolute inset-0 resize-none;
+  width: 100%;
+  height: 100%;
+  outline: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--tc-fg);
+  overflow: auto;
+}
+#tc-root .tc-codedlg-field textarea::selection {
+  background: color-mix(in srgb, var(--tc-accent) 35%, transparent);
+  color: transparent;
+}
+#tc-root .tc-codedlg-field textarea::placeholder {
+  color: var(--tc-fg2);
+}
+#tc-root .tc-codedlg-foot {
+  @apply flex items-center justify-end gap-1.5;
+  padding-top: 10px;
+}
 /* Sidebar: section header + show-more */
 #tc-root .tc-sec {
   @apply flex items-center gap-1 cursor-pointer select-none;
@@ -2981,8 +3230,7 @@
 /* Scrollbars: thin, themed. */
 #tc-root .tc-list,
 #tc-root .tc-msgs,
-#tc-root .tc-profile-chats,
-#tc-root .tc-edit-area {
+#tc-root .tc-profile-chats {
   scrollbar-width: thin;
   scrollbar-color: var(--tc-line) transparent;
 }

@@ -174,13 +174,17 @@ export async function editMessage(
   messageId: string,
   text: string,
   quoteHtml = "",
+  /** @mentions the edited text keeps or adds (see mentions.ts). */
+  picks: readonly MentionPick[] = [],
 ): Promise<WriteResult> {
-  const content = (quoteHtml || "") + formatMessage(String(text)).html;
+  const mc = formatMessage(String(text), picks);
+  const content = (quoteHtml || "") + mc.html;
   const ref = msgRefs.get(String(messageId));
   if (ref && !isChannelId(conversationId)) {
     const c = await chat.sendMessage({
       convId: conversationId,
       content,
+      mentions: mentionInputs(mc.mentions),
       clientMessageId: ref.clientMessageId || chat.newClientMessageId(),
       edit: { id: String(messageId), time: ref.time },
     });
@@ -192,6 +196,9 @@ export async function editMessage(
   }
   const r = await chatsvc.putMessage(conversationId, messageId, content);
   if (!r.ok) return toWrite(r);
+  // The content PUT leaves properties alone: keep the mention list in step with
+  // the new spans (best effort; the text is saved either way).
+  await chatsvc.putMessageProperty(conversationId, messageId, "mentions", mc.mentions);
   remoteCache.delete(conversationId);
   return { ok: true };
 }

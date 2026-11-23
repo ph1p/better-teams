@@ -50,6 +50,10 @@ function inlineOne(n: Node): string {
       return "`" + textOf(n) + "`";
     case "img":
       return n.attrs.alt || "";
+    case "span":
+      if (mentionMark && /schema\.skype\.com\/Mention/i.test(n.attrs.itemtype || ""))
+        return mentionMark(Number(n.attrs.itemid), inline(n.children));
+      return inline(n.children);
     case "a": {
       const href = decodeEntities(n.attrs.href || "");
       const text = inline(n.children).trim();
@@ -168,8 +172,21 @@ const BLOCKS = new Set([
   "h6",
 ]);
 
-export function htmlToMarkdown(html: string): string {
+// Set for one htmlToMarkdown call: renders a mention span (itemid, its text).
+let mentionMark: ((itemid: number, text: string) => string) | null = null;
+
+/** `mention` rewrites each @mention span's text, e.g. to "@Name" (see mentions.ts editMentions). */
+export function htmlToMarkdown(html: string, mention?: (itemid: number, text: string) => string): string {
   if (!html) return "";
+  mentionMark = mention ?? null;
+  try {
+    return toMarkdown(html);
+  } finally {
+    mentionMark = null;
+  }
+}
+
+function toMarkdown(html: string): string {
   const root = parse(html);
   // Drop the CodeBlockEditor marker paragraph that precedes each <pre>.
   root.children = root.children.filter((c) => !(isEl(c) && /CodeBlockEditor/i.test(c.attrs.itemtype || "")));

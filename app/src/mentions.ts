@@ -103,3 +103,71 @@ export function buildMentionContent(text: string, picks: readonly MentionPick[])
   html += escText(text.slice(cursor));
   return { html, mentions: "[" + entries.join(",") + "]" };
 }
+
+/** A mention as stored on a sent message (properties.mentions or CDL `mentions`). */
+export interface MentionRef {
+  itemid: number;
+  mri: string;
+  name: string;
+  mentionType: string;
+}
+
+/** properties.mentions (JSON string, IDB/REST) or CDL's mention list -> MentionRef[]. */
+export function parseMentions(raw: unknown): MentionRef[] {
+  let list: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      list = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(list)) return [];
+  const out: MentionRef[] = [];
+  for (const e of list) {
+    if (!e || typeof e !== "object") continue;
+    const o = e as Record<string, unknown>;
+    const itemid = Number(o.itemid ?? o.itemId);
+    const mri = String(o.mri ?? o.userId ?? "");
+    if (!Number.isFinite(itemid) || !mri) continue;
+    out.push({ itemid, mri, name: String(o.displayName ?? ""), mentionType: String(o.mentionType || "person") });
+  }
+  return out;
+}
+
+// Re-editing a sent message: its mention spans go back to "@Name" draft text,
+// and the picks that make them mentions again on save. Teams' own composer
+// stores a person as one span per word ("Maya", "Chen"; consecutive itemids,
+// same mri): those merge back into one "@Maya Chen" pick.
+export function editMentions(refs: readonly MentionRef[]): {
+  mark: (itemid: number, text: string) => string;
+  picks: () => MentionPick[];
+} {
+  const byId = new Map(refs.map((r) => [r.itemid, r]));
+  const seen = new Map<number, string>();
+  const isPart = (r: MentionRef | undefined): boolean => !!r && !/\s/.test(r.name);
+  // A word span continuing the previous itemid's word span for the same person.
+  const cont = (id: number): boolean => {
+    const r = byId.get(id);
+    const prev = byId.get(id - 1);
+    return isPart(r) && isPart(prev) && prev!.mri === r!.mri;
+  };
+  return {
+    mark: (id, text) => {
+      if (!byId.has(id)) return text;
+      seen.set(id, text);
+      return cont(id) ? text : "@" + text;
+    },
+    picks: () => {
+      const out: MentionPick[] = [];
+      for (const r of [...refs].sort((a, b) => a.itemid - b.itemid)) {
+        const name = (seen.get(r.itemid) ?? r.name).trim();
+        if (!name) continue;
+        const last = out[out.length - 1];
+        if (last && cont(r.itemid)) last.name += " " + name;
+        else out.push({ mri: r.mri, name, mentionType: r.mentionType });
+      }
+      return out;
+    },
+  };
+}

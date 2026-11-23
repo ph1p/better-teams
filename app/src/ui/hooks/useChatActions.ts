@@ -16,6 +16,7 @@ import {
   removeChatMember,
   renameChat,
   sendRemote,
+  setChatFavorite,
   setChatHidden,
   setChatMuted,
   type PeopleHit,
@@ -280,6 +281,18 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
     [optimistic, flash],
   );
 
+  // Add to or remove from Teams' Favorites (right-click menu).
+  const setFavorite = useCallback(
+    (chat: Chat, favorite: boolean): Promise<boolean> =>
+      optimistic(
+        chat,
+        { favorite },
+        () => setChatFavorite(chat.id, favorite),
+        (r) => t().app.favoriteFailed(favorite, r),
+      ),
+    [optimistic],
+  );
+
   const rename = useCallback(
     (chat: Chat, title: string): Promise<boolean> => {
       const name = title.trim();
@@ -437,6 +450,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
     meetNow,
     setChatUnread,
     setHidden,
+    setFavorite,
     rename,
     setMuted,
     addMembers,

@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { Bell, BellOff, Eye, EyeOff, Mail, MailOpen } from "lucide-react";
+import { Bell, BellOff, Eye, EyeOff, Mail, MailOpen, Star, StarOff } from "lucide-react";
 import { useDismiss } from "../lib/dismiss";
 import type { Chat } from "../../types";
 import type { Flash } from "../lib/toast";
@@ -18,6 +18,7 @@ interface ChatMenuProps {
   onClose: () => void;
   onSetUnread: (chat: Chat, unread: boolean) => void;
   onSetHidden: (chat: Chat, hidden: boolean) => void;
+  onSetFavorite: (chat: Chat, favorite: boolean) => void;
   onSetMuted: (chat: Chat, muted: boolean) => void;
   onLeave: (chat: Chat, what?: "channel" | "team" | "delete") => void;
   onNewChannel: (chat: Chat) => void;
@@ -31,6 +32,7 @@ export function ChatMenu({
   onClose,
   onSetUnread,
   onSetHidden,
+  onSetFavorite,
   onSetMuted,
   onLeave,
   onNewChannel,
@@ -62,6 +64,20 @@ export function ChatMenu({
         >
           {menu.chat.unread ? <MailOpen size={14} /> : <Mail size={14} />}
           {menu.chat.unread ? s.markRead : s.markUnread}
+        </button>
+      )}
+      {/* Channel favorites are Teams' show/hide, not the Favorites folder;
+          Notes always sits in the sidebar footer. */}
+      {menu.chat.isChannel || menu.chat.kind === "notes" ? null : (
+        <button
+          className="tc-menu-item"
+          onClick={() => {
+            onSetFavorite(menu.chat, !menu.chat.favorite);
+            onClose();
+          }}
+        >
+          {menu.chat.favorite ? <StarOff size={14} /> : <Star size={14} />}
+          {menu.chat.favorite ? s.removeFavorite : s.addFavorite}
         </button>
       )}
       {menu.chat.isChannel || menu.chat.kind === "notes" ? null : (

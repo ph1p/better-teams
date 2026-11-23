@@ -73,10 +73,10 @@ describe("prunePending", () => {
 
 describe("editedContent", () => {
   it("renders markdown", () => {
-    expect(editedContent("**b**")).toBe("<p><strong>b</strong></p>");
+    expect(editedContent("**b**").content).toBe("<p><strong>b</strong></p>");
   });
   it("escapes and prefixes the quote", () => {
-    expect(editedContent("a<b", "<blockquote>q</blockquote>")).toBe("<blockquote>q</blockquote><p>a&lt;b</p>");
+    expect(editedContent("a<b", "<blockquote>q</blockquote>").content).toBe("<blockquote>q</blockquote><p>a&lt;b</p>");
   });
 });
 

@@ -10,6 +10,13 @@ export const composer = {
   codeBlockTitle:
     "Code block (⌘⇧C)\n**bold** ⌘B · *italic* ⌘I · `code` ⌘E · ~~strike~~ ⌘⇧X\n```lang for highlighted code · - lists · > quotes",
   insertCodeBlock: "Insert code block",
+  codeTitle: "Code block",
+  codeEditTitle: "Edit code block",
+  codeLanguage: "Language",
+  codePlaceholder: "Paste or type code…",
+  codeHint: "Tab indent · Shift+Tab outdent",
+  codePlain: "Plain text",
+  codeInsert: "Insert",
   placeholderThread: "Reply in thread…",
   placeholderChannel: (channel: string) => `Start a new post in #${channel}`,
   placeholderChat: (title: string) => `Message ${title}`,

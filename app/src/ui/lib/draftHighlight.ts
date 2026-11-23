@@ -7,8 +7,11 @@
 
 import { FENCE_CLOSE, FENCE_OPEN } from "../../markdown";
 
-/** Plain text, or a styled span around more segments. */
-export type Seg = string | { cls: string; kids: Seg[] };
+/** Plain text, or a styled span around more segments (color: a code token). */
+export type Seg = string | { cls: string; kids: Seg[]; color?: string };
+
+/** Code → colored token lines (highlight.ts), or null when not highlighted. */
+export type CodeTokens = (code: string, lang: string) => { content: string; color?: string }[][] | null;
 
 const span = (cls: string, ...kids: Seg[]): Seg => ({ cls, kids });
 
@@ -57,19 +60,41 @@ export function mentionRe(names: readonly string[]): RegExp | null {
   return new RegExp(`@(?:${alts})`, "g");
 }
 
-/** Draft text → backdrop segments; `re` from mentionRe. */
-export function highlightDraft(text: string, re: RegExp | null = null): Seg[] {
-  let fenced = false;
+/** Draft text → backdrop segments; `re` from mentionRe, `code` colors fenced code. */
+export function highlightDraft(text: string, re: RegExp | null = null, code?: CodeTokens): Seg[] {
+  const lines = text.split("\n");
   const out: Seg[] = [];
-  text.split("\n").forEach((line, i) => {
-    if (i) out.push("\n");
-    // Same fence rules as the sender (src/markdown.ts).
-    if (fenced ? FENCE_CLOSE.test(line) : FENCE_OPEN.test(line)) {
-      fenced = !fenced;
-      out.push(span("tc-hl-fence", line));
-    } else out.push(...(fenced ? [span("tc-hl-pre", line)] : inline(line, re)));
-  });
+  for (let i = 0; i < lines.length;) {
+    const open = FENCE_OPEN.exec(lines[i]);
+    if (!open) {
+      out.push(...inline(lines[i], re));
+      if (++i < lines.length) out.push("\n");
+      continue;
+    }
+    // A ``` block (same fence rules as the sender, src/markdown.ts) becomes one
+    // display:block span, so it can carry a full-width background. The line
+    // break after it goes inside: a newline right after a block would add an
+    // empty line, while one closing the block adds none.
+    let j = i + 1;
+    while (j < lines.length && !FENCE_CLOSE.test(lines[j])) j++;
+    const body = lines.slice(i + 1, j);
+    const toks = body.length ? code?.(body.join("\n"), open[1]) : null;
+    const kids: Seg[] = [span("tc-hl-fence", lines[i])];
+    body.forEach((line, k) => {
+      const tk = toks?.[k];
+      kids.push(
+        "\n",
+        tk
+          ? span("tc-hl-pre", ...tk.map((t) => ({ cls: "", kids: [t.content], color: t.color })))
+          : span("tc-hl-pre", line),
+      );
+    });
+    if (j < lines.length) kids.push("\n", span("tc-hl-fence", lines[j]));
+    i = Math.min(j, lines.length - 1) + 1;
+    if (i < lines.length) kids.push("\n");
+    out.push(span("tc-hl-block", ...kids));
+  }
   // A trailing newline needs a glyph after it, or the backdrop is a line short.
-  out.push("​");
+  out.push("\u200b");
   return out;
 }

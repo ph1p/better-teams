@@ -7,11 +7,11 @@ calls, meetings and files still work natively. Toggle with **Option+Cmd+T**.
 
 ![Group chat](assets/screenshots/group-chat.png)
 
-| Inbox and activity                                                        | Status messages                                                                      |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| ![Bell inbox with the activity feed](assets/screenshots/activity.png)     | ![1:1 chat with the partner's status message](assets/screenshots/status-message.png) |
-| **Channels and meetings**                                                 | **Status menu**                                                                      |
-| ![Channel with a live meeting](assets/screenshots/channel-meeting.png)    | ![Status and settings menu](assets/screenshots/user-menu.png)                        |
+| Inbox and activity                                                     | Status messages                                                                      |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| ![Bell inbox with the activity feed](assets/screenshots/activity.png)  | ![1:1 chat with the partner's status message](assets/screenshots/status-message.png) |
+| **Channels and meetings**                                              | **Status menu**                                                                      |
+| ![Channel with a live meeting](assets/screenshots/channel-meeting.png) | ![Status and settings menu](assets/screenshots/user-menu.png)                        |
 
 Screenshots show the built-in mock data (`pnpm run mock` in `app/`).
 

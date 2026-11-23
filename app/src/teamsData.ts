@@ -25,7 +25,7 @@
 
 export { CURRENT_OID, myMri } from "./data/idb";
 export { profilePhotoUrl, loadProfiles, profile } from "./data/profiles";
-export { listChats } from "./data/chats";
+export { listChats, setChatFavorite } from "./data/chats";
 export { listMessages, fetchOlderRemote, primeRemote, resetPaging } from "./data/messages";
 export { sendRemote, setReaction, deleteMessage, editMessage, undoDelete, removeFiles } from "./data/writes";
 export { searchPeople, type PeopleHit } from "./data/people";

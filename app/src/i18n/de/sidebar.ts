@@ -52,6 +52,8 @@ export const sidebar: Messages["sidebar"] = {
   markUnread: "Als ungelesen markieren",
   hide: "Ausblenden",
   unhide: "Einblenden",
+  addFavorite: "Zu Favoriten hinzufügen",
+  removeFavorite: "Aus Favoriten entfernen",
 
   statusHeading: "Status",
   appearAway: "Als abwesend anzeigen",

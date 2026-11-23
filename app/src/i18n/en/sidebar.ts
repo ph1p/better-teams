@@ -53,6 +53,8 @@ export const sidebar = {
   markUnread: "Mark as unread",
   hide: "Hide",
   unhide: "Unhide",
+  addFavorite: "Add to favorites",
+  removeFavorite: "Remove from favorites",
 
   // Status menu (MeBar)
   statusHeading: "Status",

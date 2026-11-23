@@ -1,7 +1,7 @@
 // Mock of src/teamsData.ts: same exports, backed by the in-memory store instead
 // of Teams' IndexedDB and chatsvc. parity.ts keeps the signatures in sync.
 import type { Activity, Chat, FileRef, Message, Profile, Quote, WriteResult } from "../types";
-import type { MentionPick } from "../mentions";
+import { parseMentions, type MentionPick } from "../mentions";
 import { formatMessage } from "../markdown";
 import { buildQuoteHtml } from "../quote";
 import { ME, ME_OID, PEOPLE } from "./fixtures";
@@ -79,9 +79,11 @@ export async function sendRemote(
 ): Promise<WriteResult> {
   const body = (text || "").trim();
   if (!body) return fail("empty");
-  const html = buildQuoteHtml(quote) + formatMessage(body, mentions).html;
+  const mc = formatMessage(body, mentions);
   await later(null);
-  return store.post(conversationId, ME, html, rootId) ? ok : fail("unknown chat");
+  const m = store.post(conversationId, ME, buildQuoteHtml(quote) + mc.html, rootId);
+  if (m && mc.mentions !== "[]") m.mentions = parseMentions(mc.mentions);
+  return m ? ok : fail("unknown chat");
 }
 
 export async function searchPeople(query: string, size = 8): Promise<PeopleHit[]> {
@@ -100,6 +102,10 @@ export async function searchPeople(query: string, size = 8): Promise<PeopleHit[]
     .slice(0, size)
     .map((p) => ({ mri: p.mri, displayName: p.displayName, email: p.email, jobTitle: p.jobTitle }));
   return later(hits, 200);
+}
+
+export async function setChatFavorite(conversationId: string, fav: boolean): Promise<WriteResult> {
+  return store.setFavorite(conversationId, fav) ? ok : fail("unknown chat");
 }
 
 export async function setChatHidden(conversationId: string, hidden: boolean): Promise<WriteResult> {
@@ -145,8 +151,12 @@ export async function editMessage(
   messageId: string,
   text: string,
   quoteHtml = "",
+  picks: readonly MentionPick[] = [],
 ): Promise<WriteResult> {
-  return store.edit(conversationId, messageId, quoteHtml + formatMessage(text).html) ? ok : fail("not yours");
+  const mc = formatMessage(text, picks);
+  return store.edit(conversationId, messageId, quoteHtml + mc.html, parseMentions(mc.mentions))
+    ? ok
+    : fail("not yours");
 }
 
 export async function undoDelete(conversationId: string, messageId: string): Promise<WriteResult> {

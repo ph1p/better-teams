@@ -12,6 +12,7 @@ import { extOf } from "../../data/raw";
 import { useNow } from "../lib/now";
 import type { Pending } from "../hooks/useMessages";
 import type { Chat, Message as Msg } from "../../types";
+import type { MentionPick } from "../../mentions";
 
 interface TimelineProps {
   /** Messages to render (already filtered by the in-chat search). */
@@ -19,6 +20,8 @@ interface TimelineProps {
   cid: string;
   chat?: Chat;
   channel: boolean;
+  /** Message picked with the arrow keys, if any. */
+  selectedId?: string | null;
   /** My optimistic messages for this chat. */
   pending: Pending[];
   /** Active in-chat search query (lower-cased), "" when off. */
@@ -44,7 +47,7 @@ interface TimelineProps {
   onDelete: (cid: string, messageId: string) => void;
   onRemoveFile: (cid: string, messageId: string, index: number) => void;
   onUndo: (cid: string, messageId: string) => void;
-  onEdit: (cid: string, messageId: string, text: string, quoteHtml?: string) => void;
+  onEdit: (cid: string, messageId: string, text: string, quoteHtml: string, picks: readonly MentionPick[]) => void;
   onOpenProfile: (mri: string) => void;
   onQuote: (m: Msg) => void;
   onJumpTo: (mid: string) => void;
@@ -106,6 +109,8 @@ export function Timeline(p: TimelineProps): JSX.Element {
       first={first}
       channel={channel}
       cid={cid}
+      chat={chat}
+      selected={m.id === p.selectedId}
       onReact={p.onReact}
       onDelete={p.onDelete}
       onRemoveFile={p.onRemoveFile}

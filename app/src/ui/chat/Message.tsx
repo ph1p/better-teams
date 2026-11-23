@@ -2,7 +2,18 @@ import { memo, useEffect, useRef, useState, type JSX } from "react";
 import { t } from "../../i18n";
 import { personName, useNameFormat } from "../../names";
 import { profile } from "../../teamsData";
-import { SmilePlus, Pencil, Trash2, Undo2, X, Reply, Copy, Check, MessageSquareReply } from "lucide-react";
+import {
+  SmilePlus,
+  Pencil,
+  CornerDownLeft,
+  Trash2,
+  Undo2,
+  X,
+  Reply,
+  Copy,
+  Check,
+  MessageSquareReply,
+} from "lucide-react";
 import { splitQuote } from "../../quote";
 import { RichHtml } from "../../richText";
 import { Avatar } from "../shared/Avatar";
@@ -11,24 +22,30 @@ import { Cards } from "./Cards";
 import { isAppMri } from "../../apps";
 import { Linkified } from "../shared/Linkified";
 import { avatarUri, fmtClock, fmtFull, htmlToText, isHtmlMsg, messageText, oneLine } from "../lib/format";
-import { handleFormatKey } from "../lib/editKeys";
+import { useEditRequest } from "../lib/editRequest";
+import { MessageEditor } from "./MessageEditor";
+import { editMentions, type MentionPick } from "../../mentions";
 import { htmlToMarkdown } from "../lib/htmlToMarkdown";
 import { usePresence } from "../lib/presence";
 import { glyphFor, PICKER } from "../lib/reactions";
 import { imageItem, openViewer } from "../lib/files";
 import { useCopied } from "../lib/clipboard";
-import type { Message as Msg } from "../../types";
+import type { Chat, Message as Msg } from "../../types";
 
 interface MessageProps {
   m: Msg;
   first: boolean;
   channel: boolean;
   cid: string;
+  /** The open chat (members feed the editor's @mention picker). */
+  chat?: Chat;
+  /** Picked with the arrow keys (see useMessageNav). */
+  selected?: boolean;
   onReact: (cid: string, messageId: string, key: string, add: boolean) => void;
   onDelete: (cid: string, messageId: string) => void;
   onRemoveFile: (cid: string, messageId: string, index: number) => void;
   onUndo: (cid: string, messageId: string) => void;
-  onEdit: (cid: string, messageId: string, text: string, quoteHtml: string) => void;
+  onEdit: (cid: string, messageId: string, text: string, quoteHtml: string, picks: readonly MentionPick[]) => void;
   onOpenProfile: (mri: string) => void;
   onQuote: (m: Msg) => void;
   onJumpTo?: (mid: string) => void;
@@ -40,12 +57,15 @@ interface MessageProps {
 
 // One rendered message: avatar + meta on the first of a group, content (rich
 // HTML or linkified text), files, reactions, and a hover toolbar (react / quote
-// / edit / delete). Edit swaps the content for a textarea with a quote chip.
+// / edit / delete). Edit swaps the content for the shared MessageEditor with a
+// quote chip.
 export const Message = memo(function Message({
   m,
   first,
   channel,
   cid,
+  chat,
+  selected,
   onReact,
   onDelete,
   onRemoveFile,
@@ -62,6 +82,12 @@ export const Message = memo(function Message({
   const [pick, setPick] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
+  // @mentions in the edit draft: the message's own (rebuilt from its mention
+  // spans) plus any picked while editing.
+  const [editPicks, setEditPicks] = useState<readonly MentionPick[]>([]);
+  // Where focus returns when the edit ends (the composer, for Arrow Up edits).
+  const editBack = useRef<(() => void) | undefined>(undefined);
+  const editInput = useRef<HTMLTextAreaElement>(null);
   // Quote preserved while editing: the verbatim leading blockquote HTML, or ""
   // once the user removes it. null = message has no quote.
   const [editQuote, setEditQuote] = useState<string | null>(null);
@@ -87,28 +113,52 @@ export const Message = memo(function Message({
   const { quoteHtml: origQuote, body: bodyHtml } = splitQuote(m.content);
   const bodyText = htmlToText(bodyHtml);
   // The editor works in the composer's markdown-lite so formatting survives.
-  // Only editing needs the Markdown form, so compute it on demand.
-  const editSource = (): string => (html ? htmlToMarkdown(bodyHtml) : bodyText);
-  const startEdit = (): void => {
-    setDraft(editSource());
+  // Only editing needs the Markdown form, so compute it on demand. Mention
+  // spans come back as "@Name" with their picks, so mentions survive the edit.
+  const editSource = (): { text: string; picks: MentionPick[] } => {
+    if (!html) return { text: bodyText, picks: [] };
+    const em = editMentions(m.mentions ?? []);
+    const text = htmlToMarkdown(bodyHtml, em.mark);
+    return { text, picks: em.picks() };
+  };
+  const startEdit = (back?: () => void): void => {
+    const src = editSource();
+    setDraft(src.text);
+    setEditPicks(src.picks);
     setEditQuote(origQuote || null);
+    editBack.current = back;
     setEditing(true);
+    setPick(false);
+  };
+  const endEdit = (): void => {
+    setEditing(false);
+    editBack.current?.();
+    editBack.current = undefined;
   };
   const saveEdit = (): void => {
     const v = draft.trim();
-    setEditing(false);
+    endEdit();
     const keptQuote = editQuote || "";
     // Save if the body changed, or the quote was removed.
-    if ((v && v !== editSource()) || keptQuote !== (origQuote || "")) {
-      if (v) onEdit(cid, m.id, v, keptQuote);
+    if ((v && v !== editSource().text.trim()) || keptQuote !== (origQuote || "")) {
+      if (v) onEdit(cid, m.id, v, keptQuote, editPicks);
     }
   };
+  const editable = m.mine && !m.deleted && !cards;
+  useEditRequest(m.id, editable, startEdit);
+  // An edit opened from the composer (Arrow Up) may be off screen.
+  useEffect(() => {
+    if (editing) editInput.current?.closest(".tc-msg")?.scrollIntoView({ block: "nearest" });
+  }, [editing]);
   const copyText = (): void => copy(bodyText || text);
   return (
     <div
       ref={root}
       data-mid={m.id}
-      className={"tc-msg" + (first ? " first" : "") + (m.isReply && channel ? " reply" : "")}
+      className={
+        "tc-msg" + (first ? " first" : "") + (m.isReply && channel ? " reply" : "") + (selected ? " kbd-sel" : "")
+      }
+      data-hint={selected ? t().chat.selectHint(editable) : undefined}
     >
       {first ? (
         <Avatar
@@ -166,26 +216,32 @@ export const Message = memo(function Message({
                 </button>
               </div>
             ) : null}
-            <textarea
-              className="tc-edit-area"
+            <MessageEditor
+              chat={chat ?? { id: cid, isChannel: channel, members: [] }}
               value={draft}
-              autoFocus
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (handleFormatKey(e)) return;
-                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  saveEdit();
-                }
-                if (e.key === "Escape") setEditing(false);
+              onChange={setDraft}
+              inputRef={editInput}
+              picks={editPicks}
+              onPick={(p) => setEditPicks((cur) => (cur.some((x) => x.mri === p.mri) ? cur : [...cur, p]))}
+              onSubmit={saveEdit}
+              onEscape={() => {
+                endEdit();
+                return true;
               }}
+              autoFocus
             />
             <div className="tc-edit-actions">
-              <button className="tc-edit-save" onClick={saveEdit}>
-                {t().common.save}
-              </button>
-              <button className="tc-edit-cancel" onClick={() => setEditing(false)}>
+              <span className="tc-edit-hint">{t().chat.editHint}</span>
+              <button className="tc-edit-btn" onClick={endEdit}>
                 {t().common.cancel}
+                <kbd>Esc</kbd>
+              </button>
+              <button className="tc-edit-btn primary" onClick={saveEdit} disabled={!draft.trim()}>
+                <Check size={13} />
+                {t().common.save}
+                <kbd>
+                  <CornerDownLeft size={11} />
+                </kbd>
               </button>
             </div>
           </div>
@@ -254,7 +310,7 @@ export const Message = memo(function Message({
               <Reply size={16} />
             </button>
             {m.mine ? (
-              <button className="tc-tool" title={t().chat.edit} onClick={startEdit}>
+              <button className="tc-tool" title={t().chat.edit} onClick={() => startEdit()}>
                 <Pencil size={15} />
               </button>
             ) : null}

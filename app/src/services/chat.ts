@@ -286,6 +286,23 @@ export async function setChatHidden(convId: string, hidden: boolean): Promise<Cd
   return c.ok ? { ok: true, data: true } : c;
 }
 
+/**
+ * Add a chat to Teams' Favorites folder (moves it out of any other user
+ * folder), or take it out of its folder again. `folderId` is the Favorites
+ * folder's id; the worker splits the global id on "|" and keeps the second part.
+ */
+export async function setChatFavorite(convId: string, fav: boolean, folderId: string): Promise<CdlRes<true>> {
+  const r = fav
+    ? await cdl<Record<string, unknown>>("MoveItemToConversationFolderMutation", D.MOVE_TO_FOLDER, {
+        input: { conversationId: convId, toFolderId: `ConversationFolder|${folderId}` },
+      })
+    : await cdl<Record<string, unknown>>("RemoveConversationFromFolderMutation", D.REMOVE_FROM_FOLDER, {
+        input: { conversationId: convId },
+      });
+  const c = check(r, fav ? "moveItemToConversationFolder" : "removeConversationFromFolder", /Error$/);
+  return c.ok ? { ok: true, data: true } : c;
+}
+
 /** One live event for a chat, reduced to what the overlay acts on. */
 export interface ChatEvent {
   /** Teams' event type: NewMessage, MessageUpdate, MessageRemoved, ThreadUpdate, ... */

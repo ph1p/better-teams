@@ -45,6 +45,12 @@ export const TYPING_SUB =
 export const CHAT_HIDDEN =
   "mutation useSetChatHiddenMutation($input: OneGQL_SetChatHiddenInput!) {\n  setChatHidden(input: $input) {\n    __typename\n    ... on OneGQL_SetChatHiddenSuccess {\n      convId\n    }\n    ... on OneGQL_SetChatHiddenError {\n      errorMessage\n    }\n  }\n}\n";
 
+export const MOVE_TO_FOLDER =
+  "mutation MoveItemToConversationFolderMutation($input: OneGQL_MoveItemToConversationFolderInput!) {\n  moveItemToConversationFolder(input: $input) {\n    __typename\n    ... on OneGQL_MoveItemToConversationFolderError {\n      errorCode\n      errorDetail\n    }\n  }\n}\n";
+
+export const REMOVE_FROM_FOLDER =
+  "mutation RemoveConversationFromFolderMutation($input: OneGQL_RemoveConversationFromFolderInput!) {\n  removeConversationFromFolder(input: $input) {\n    __typename\n    ... on OneGQL_RemoveConversationFromFolderError {\n      errorCode\n      errorDetail\n    }\n  }\n}\n";
+
 /**
  * ComponentsComposeMessagePresenceBatchSubscription (avatars, chat list). The
  * catalog holds only its GQL_STOP; text from Teams' bundle, printed the way

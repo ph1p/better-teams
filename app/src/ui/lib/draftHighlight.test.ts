@@ -21,4 +21,15 @@ describe("highlightDraft", () => {
     expect(out).toContain("<tc-hl-pre>**x**</>");
     expect(out).toContain("<tc-hl-b>");
   });
+  it("wraps a fence in one block, the next line break inside it", () => {
+    const out = html(highlightDraft("a\n```\nx\n```\nb"));
+    expect(out).toBe("a\n<tc-hl-block><tc-hl-fence>```</>\n<tc-hl-pre>x</>\n<tc-hl-fence>```</>\n</>b\u200b");
+  });
+  it("colors fenced code with the given tokens", () => {
+    const segs = highlightDraft("```ts\nlet x\n```", null, (code, lang) =>
+      code === "let x" && lang === "ts" ? [[{ content: "let", color: "#f00" }, { content: " x" }]] : null,
+    );
+    expect(JSON.stringify(segs)).toContain('{"cls":"","kids":["let"],"color":"#f00"}');
+    expect(text(segs)).toBe("```ts\nlet x\n```\u200b");
+  });
 });

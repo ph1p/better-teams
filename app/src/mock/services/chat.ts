@@ -52,6 +52,10 @@ export async function listMessages(convId: string, _cursor?: string): Promise<Cd
     : no("unknown chat");
 }
 
+export async function setChatFavorite(convId: string, fav: boolean, _folderId: string): Promise<CdlRes<true>> {
+  return store.setFavorite(convId, fav) ? done : no("unknown chat");
+}
+
 export async function setChatHidden(convId: string, hidden: boolean): Promise<CdlRes<true>> {
   return store.setHidden(convId, hidden) ? done : no("unknown chat");
 }

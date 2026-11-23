@@ -1,5 +1,6 @@
 import { htmlToText } from "../lib/format";
 import { formatMessage } from "../../markdown";
+import { parseMentions, type MentionPick } from "../../mentions";
 import type { Message as Msg } from "../../types";
 
 // Plain text without whitespace or "@", for matching a draft to its synced copy.
@@ -44,9 +45,16 @@ export function reuseUnchanged(prev: Msg[], next: Msg[]): Msg[] {
   });
 }
 
-// The HTML an edit stores: the same as data/writes.ts editMessage sends.
-export const editedContent = (text: string, quoteHtml = ""): string =>
-  (quoteHtml || "") + formatMessage(String(text)).html;
+// What an edit stores: the same HTML and mentions data/writes.ts editMessage sends.
+export function editedContent(
+  text: string,
+  quoteHtml = "",
+  picks: readonly MentionPick[] = [],
+): Pick<Msg, "content" | "mentions"> {
+  const mc = formatMessage(String(text), picks);
+  const mentions = parseMentions(mc.mentions);
+  return { content: (quoteHtml || "") + mc.html, mentions: mentions.length ? mentions : undefined };
+}
 
 // Drop optimistic messages once Teams has synced the real one. The draft is
 // markdown and the synced copy HTML, so both go through the same renderer

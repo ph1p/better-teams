@@ -20,6 +20,7 @@ import { INITIAL_REMOTE, POLL_MS } from "../lib/constants";
 import type { Flash } from "../lib/toast";
 import type { Chat, Message as Msg } from "../../types";
 import { t } from "../../i18n";
+import type { MentionPick } from "../../mentions";
 import { editedContent, msgSig, prunePending, reuseUnchanged, type Pending } from "./messageSync";
 
 export type { Pending } from "./messageSync";
@@ -68,7 +69,13 @@ export interface Messages {
   remove: (cid: string, messageId: string) => Promise<void>;
   removeFile: (cid: string, messageId: string, index: number) => Promise<void>;
   undo: (cid: string, messageId: string) => Promise<void>;
-  edit: (cid: string, messageId: string, text: string, quoteHtml?: string) => Promise<void>;
+  edit: (
+    cid: string,
+    messageId: string,
+    text: string,
+    quoteHtml?: string,
+    picks?: readonly MentionPick[],
+  ) => Promise<void>;
 }
 
 // Messages of the selected chat: polled, plus live events for chats; backward
@@ -431,10 +438,16 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
   // Edit my message. `text` is the reply body; `quoteHtml` ("" if removed) is a
   // preserved leading blockquote. Optimistically rebuild the stored HTML so the
   // bubble updates at once; refetch on failure.
-  async function edit(cid: string, messageId: string, text: string, quoteHtml = ""): Promise<void> {
-    const content = editedContent(text, quoteHtml);
-    patchMsg(messageId, (m) => ({ ...m, content, edited: true }));
-    const res = await editMessage(cid, messageId, text, quoteHtml);
+  async function edit(
+    cid: string,
+    messageId: string,
+    text: string,
+    quoteHtml = "",
+    picks: readonly MentionPick[] = [],
+  ): Promise<void> {
+    const next = editedContent(text, quoteHtml, picks);
+    patchMsg(messageId, (m) => ({ ...m, ...next, edited: true }));
+    const res = await editMessage(cid, messageId, text, quoteHtml, picks);
     if (!res.ok) {
       refetch();
       flash(t().app.editFailed(res.reason));

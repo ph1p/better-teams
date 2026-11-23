@@ -7,6 +7,7 @@ import { safeHref } from "../safeUrl";
 import { arr, extOf, get, mriOf, obj, str, toMs, type Dict } from "./raw";
 import { deletedHere, rememberRef } from "./state";
 import { parseCards, type Card } from "../cards";
+import { parseMentions } from "../mentions";
 
 const SKIP_TYPES = /ThreadActivity|Control|Event\//i;
 
@@ -149,6 +150,11 @@ function asImportance(v: unknown): Message["importance"] {
   return v === "high" || v === "urgent" ? v : "normal";
 }
 
+function withMentions(raw: unknown): { mentions?: Message["mentions"] } {
+  const mentions = parseMentions(raw);
+  return mentions.length ? { mentions } : {};
+}
+
 export function normMessage(raw: unknown, rc: ChainCtx | null): Message {
   const m = obj(raw);
   const props = obj(m.properties);
@@ -178,6 +184,7 @@ export function normMessage(raw: unknown, rc: ChainCtx | null): Message {
     reactions: reactionsOf(m),
     files: parseFiles(props.files),
     ...withCards(str(m.content), props.cards),
+    ...withMentions(props.mentions),
     time,
   };
 }
@@ -269,6 +276,7 @@ export function normCdlMessage(raw: unknown, channel = false): Message | null {
       reactions,
       files: parseFiles(m.files),
       ...withCards(str(m.content), m.cards),
+      ...withMentions(m.mentions),
       time,
     },
     m,

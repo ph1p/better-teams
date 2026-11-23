@@ -30,6 +30,10 @@ export const app: Messages["app"] = {
   readStateFailed: (reason) => `Lesestatus konnte nicht geändert werden (${reason})`,
   hideFailed: (hidden, reason) =>
     hidden ? `Chat konnte nicht ausgeblendet werden (${reason})` : `Chat konnte nicht eingeblendet werden (${reason})`,
+  favoriteFailed: (favorite, reason) =>
+    favorite
+      ? `Zu Favoriten hinzufügen fehlgeschlagen (${reason})`
+      : `Aus Favoriten entfernen fehlgeschlagen (${reason})`,
   chatHidden: "Chat ausgeblendet. Die Suche findet ihn; eine neue Nachricht holt ihn zurück.",
   renameFailed: (reason) => `Umbenennen fehlgeschlagen (${reason})`,
   muteFailed: (muted, reason) =>

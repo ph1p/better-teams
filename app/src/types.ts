@@ -1,4 +1,5 @@
 import type { Card } from "./cards";
+import type { MentionRef } from "./mentions";
 // Shared domain types for the overlay. These describe the NORMALIZED shapes the
 // data layer (teamsData) emits after narrowing Teams' untyped IndexedDB rows and
 // chatsvc REST payloads. UI code consumes only these, never raw Teams data.
@@ -98,6 +99,8 @@ export interface Message {
   files: FileRef[];
   /** Bot / connector cards (Adaptive, hero, O365 connector), see cards.ts. */
   cards?: Card[];
+  /** @mentions in `content` (absent when none), matched to its spans by itemid. */
+  mentions?: MentionRef[];
   /** Message time, ms since epoch. */
   time: number;
   /** Channel meeting event: the thread root ("start") or its end marker. */

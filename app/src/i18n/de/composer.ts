@@ -12,6 +12,13 @@ export const composer: Messages["composer"] = {
   codeBlockTitle:
     "Codeblock (⌘⇧C)\n**fett** ⌘B · *kursiv* ⌘I · `Code` ⌘E · ~~durchgestrichen~~ ⌘⇧X\n```Sprache für hervorgehobenen Code · - Listen · > Zitate",
   insertCodeBlock: "Codeblock einfügen",
+  codeTitle: "Codeblock",
+  codeEditTitle: "Codeblock bearbeiten",
+  codeLanguage: "Sprache",
+  codePlaceholder: "Code einfügen oder tippen…",
+  codeHint: "Tab einrücken · Shift+Tab ausrücken",
+  codePlain: "Nur Text",
+  codeInsert: "Einfügen",
   placeholderThread: "Im Thread antworten…",
   placeholderChannel: (channel: string) => `Neuen Beitrag in #${channel} beginnen`,
   placeholderChat: (title: string) => `Nachricht an ${title}`,

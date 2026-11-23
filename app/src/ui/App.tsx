@@ -27,6 +27,7 @@ import { useShortcuts } from "./hooks/useShortcuts";
 import { useFollowNative } from "./hooks/useFollowNative";
 import { t, useLang } from "../i18n";
 import { useNameFormat } from "../names";
+import { useMessageNav } from "./hooks/useMessageNav";
 
 export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   // Re-render everything on a language switch; tag the overlay for screen readers.
@@ -290,6 +291,8 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
       )
     : m.shown;
 
+  const nav = useMessageNav(content, cs.composer, selChat?.id ?? null);
+
   return (
     <>
       <Sidebar
@@ -370,12 +373,13 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                   if (e.deltaY < 0 && e.currentTarget.scrollTop < 60) void loadOlder();
                 }}
               >
-                <div className="tc-msgs-inner" ref={content}>
+                <div className="tc-msgs-inner" ref={content} tabIndex={-1}>
                   <Timeline
                     visible={visible}
                     cid={selChat.id}
                     chat={selChat}
                     channel={selIsChannel}
+                    selectedId={nav.selected}
                     pending={m.myPending}
                     mq={mq}
                     searchText={msgSearch}
@@ -403,7 +407,13 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                 </div>
               </div>
             </div>
-            <Composer chat={selChat} cs={cs} atBottom={m.atBottom} onScrollToBottom={m.scrollToBottom} />
+            <Composer
+              chat={selChat}
+              cs={cs}
+              atBottom={m.atBottom}
+              onScrollToBottom={m.scrollToBottom}
+              onUpEmpty={nav.selectLast}
+            />
           </>
         ) : (
           <>
@@ -463,6 +473,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
           onClose={() => setMenu(null)}
           onSetUnread={(chat, unread) => void a.setChatUnread(chat, unread)}
           onSetHidden={(chat, hidden) => void a.setHidden(chat, hidden)}
+          onSetFavorite={(chat, favorite) => void a.setFavorite(chat, favorite)}
           onSetMuted={a.setMuted}
           onLeave={a.leave}
           onNewChannel={a.setNewChannel}

@@ -10,6 +10,9 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode, type JSX } from "react";
 import { highlightLines, initHighlighter, onHighlighterReady, normLang } from "./highlight";
 import { hostOf, isTrustedImgHost, safeHref, safeImgSrc } from "./safeUrl";
+import { Check, ChevronDown, ChevronUp, Copy } from "lucide-react";
+import { useCopied } from "./ui/lib/clipboard";
+import { codeLangLabel } from "./ui/lib/codeLangs";
 import { t } from "./i18n";
 
 const ENTITIES: Record<string, string> = {
@@ -240,8 +243,13 @@ function langHint(node: Node): string {
 // A fenced code block highlighted by Shiki. Falls back to plain text until the
 // highlighter has loaded (or forever, if the language is unknown), and
 // re-renders when it becomes ready. No innerHTML: tokens become React spans.
+// Longer blocks start collapsed to COLLAPSED_LINES (CSS sets the height).
+const COLLAPSE_OVER = 15;
+
 function CodeBlock({ code, lang }: { code: string; lang: string }): JSX.Element {
   const [ready, bump] = useState(0);
+  const [open, setOpen] = useState(false);
+  const [copied, copy] = useCopied();
   useEffect(() => onHighlighterReady(() => bump((n) => n + 1)), []);
   // Compile the grammars on the first code block, not at injection. Idempotent.
   useEffect(() => {
@@ -250,28 +258,58 @@ function CodeBlock({ code, lang }: { code: string; lang: string }): JSX.Element 
   // `ready` re-runs the highlight once the highlighter has loaded.
   // oxlint-disable-next-line react-hooks/exhaustive-deps
   const lines = useMemo(() => (lang ? highlightLines(code, lang) : null), [code, lang, ready]);
-  if (!lines) {
-    return (
-      <pre className="tc-pre">
-        <code className="tc-code">{code}</code>
-      </pre>
-    );
-  }
+  const count = code.replace(/\n$/, "").split("\n").length;
+  const long = count > COLLAPSE_OVER;
+  const c = t().chat;
+  // Clicks here stay in the block (the message row has its own click handling).
+  const stop = (e: React.MouseEvent): void => e.stopPropagation();
   return (
-    <pre className="tc-pre tc-shiki" data-lang={lang}>
-      <code className="tc-code">
-        {lines.map((line, i) => (
-          <span key={i} className="tc-code-line">
-            {line.map((t, j) => (
-              <span key={j} style={t.color ? { color: t.color } : undefined}>
-                {t.content}
-              </span>
-            ))}
-            {"\n"}
-          </span>
-        ))}
-      </code>
-    </pre>
+    <div className={"tc-pre tc-codeblock" + (lines ? " tc-shiki" : "") + (long && !open ? " folded" : "")}>
+      <div className="tc-code-head">
+        <span className="tc-code-lang">{codeLangLabel(lang)}</span>
+        <button
+          className="tc-code-btn"
+          onClick={(e) => {
+            stop(e);
+            copy(code);
+          }}
+          title={copied ? c.copied : c.copyCode}
+          aria-label={c.copyCode}
+        >
+          {copied ? <Check size={13} /> : <Copy size={13} />}
+          {copied ? c.copied : c.copyCode}
+        </button>
+      </div>
+      <pre className="tc-code-body">
+        <code className="tc-code">
+          {lines
+            ? lines.map((line, i) => (
+                <span key={i} className="tc-code-line">
+                  {line.map((tk, j) => (
+                    <span key={j} style={tk.color ? { color: tk.color } : undefined}>
+                      {tk.content}
+                    </span>
+                  ))}
+                  {"\n"}
+                </span>
+              ))
+            : code}
+        </code>
+      </pre>
+      {long ? (
+        <button
+          className="tc-code-more"
+          onClick={(e) => {
+            stop(e);
+            setOpen((o) => !o);
+          }}
+          aria-expanded={open}
+        >
+          {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {open ? c.codeCollapse : c.codeExpand(count)}
+        </button>
+      ) : null}
+    </div>
   );
 }
 

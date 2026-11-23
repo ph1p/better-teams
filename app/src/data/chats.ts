@@ -1,5 +1,6 @@
 // Chat list: Teams' conversation store -> sidebar rows.
-import type { Chat, ChatKind } from "../types";
+import type { Chat, ChatKind, WriteResult } from "../types";
+import { chat } from "../services";
 import { isAppMri } from "../apps";
 import { getAll, myMri, open } from "./idb";
 import { shortName } from "../names";
@@ -48,22 +49,44 @@ function chatTitle(c: Dict, kind: ChatKind, others: string[]): string {
 // Teams' real favorites live in the conversation-folder-manager DB, in a folder
 // with folderType "Favorites" (pinned chats were migrated into it). The old
 // properties.favorite flag on a conversation is only set for channels, not
-// chats, so reading it alone made the overlay disagree with Teams. Returns a Set
-// of favorited conversation ids; empty on any failure (favorites are optional).
-async function favoriteIds(): Promise<Set<string>> {
+// chats, so reading it alone made the overlay disagree with Teams. Returns the
+// folder's id and its conversation ids; empty on any failure (favorites are
+// optional).
+async function favoritesFolder(): Promise<{ id: string; ids: Set<string> }> {
+  const ids = new Set<string>();
   try {
     const db = await open("conversation-folder");
     const folders = await getAll(db, "folders", 200);
     const fav = folders.map(obj).find((f) => f.folderType === "Favorites" && !f.isDeleted);
-    const ids = new Set<string>();
     for (const c of arr(fav && fav.conversations)) {
       const id = str(get(c, "id"));
       if (id) ids.add(id);
     }
-    return ids;
+    return { id: str(fav && fav.id), ids };
   } catch {
-    return new Set<string>();
+    return { id: "", ids };
   }
+}
+
+// Local favorite overrides: what we last set, held until the folder in Teams'
+// IndexedDB agrees (the worker writes it a moment after the mutation answers).
+const favOverride = new Map<string, boolean>();
+
+function effectiveFavorite(conversationId: string, idbFav: boolean): boolean {
+  const ov = favOverride.get(conversationId);
+  if (ov === undefined) return idbFav;
+  if (ov === idbFav) favOverride.delete(conversationId);
+  return ov;
+}
+
+/** Add a chat to or take it out of Teams' Favorites (syncs to all clients). */
+export async function setChatFavorite(conversationId: string, fav: boolean): Promise<WriteResult> {
+  const { id } = await favoritesFolder();
+  if (!id) return { ok: false, reason: "no Favorites folder" };
+  const r = await chat.setChatFavorite(conversationId, fav, id);
+  if (!r.ok) return r;
+  favOverride.set(conversationId, fav);
+  return { ok: true, via: "cdl" };
 }
 
 // Running call: Teams keeps "awareness_conversationLiveState:<rootId>" in the
@@ -93,7 +116,7 @@ export async function listChats(): Promise<Chat[]> {
   void flushPendingHorizons();
   const db = await open("conversation");
   const rows = (await getAll(db, "conversations", 10000)).map(obj);
-  const favs = await favoriteIds();
+  const favs = (await favoritesFolder()).ids;
   const spaces: Record<string, Dict> = {};
   for (const c of rows) if (c.type === "Space") spaces[str(c.id)] = c;
   const me = myMri();
@@ -172,7 +195,7 @@ export async function listChats(): Promise<Chat[]> {
         // Other participants' MRIs — powers the "chats with this user" panel.
         members: others,
         app: kind === "chat" && others.length === 1 && isAppMri(others[0]),
-        favorite: favs.has(str(c.id)),
+        favorite: effectiveFavorite(str(c.id), favs.has(str(c.id))),
         pinned: props.ispinned === "true" || props.ispinned === true,
         hidden,
         // The worker's setMuteChat writes the conversation property alerts = String(!mute).

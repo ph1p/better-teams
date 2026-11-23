@@ -6,6 +6,7 @@
 import type { Activity, Chat, FileRef, Message, Profile, Reaction } from "../types";
 import { APPS, CHATS, CHATTER, ME, PEOPLE, PRESENCE, REPLIES, type SeedChat } from "./fixtures";
 import { isAppMri } from "../apps";
+import type { MentionRef } from "../mentions";
 import { parseCards } from "../cards";
 import { shortName } from "../names";
 import { extOf } from "../data/raw";
@@ -302,10 +303,11 @@ export function post(
   return m;
 }
 
-export function edit(convId: string, messageId: string, html: string): boolean {
+export function edit(convId: string, messageId: string, html: string, mentions: MentionRef[] = []): boolean {
   const hit = find(convId, messageId);
   if (!hit || !hit.m.mine) return false;
   hit.m.content = html;
+  hit.m.mentions = mentions.length ? mentions : undefined;
   hit.m.edited = true;
   emit(convId, "MessageUpdate", messageId);
   return true;
@@ -349,6 +351,13 @@ export function setRead(convId: string, read: boolean): boolean {
   } else {
     c.marked = true;
   }
+  return true;
+}
+
+export function setFavorite(convId: string, fav: boolean): boolean {
+  const c = chats.get(convId);
+  if (!c) return false;
+  c.favorite = fav;
   return true;
 }
 
