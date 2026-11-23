@@ -64,10 +64,6 @@ export default defineConfig(({ mode }) =>
             formats: ["iife"],
             fileName: () => "better-teams-app.js",
           },
-          rollupOptions: {
-            output: { inlineDynamicImports: true },
-          },
-          minify: "esbuild",
         },
       },
 );

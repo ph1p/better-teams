@@ -26,7 +26,12 @@ export function useMessageNav(
   const ids = (): string[] =>
     [...(list.current?.querySelectorAll<HTMLElement>(".tc-msg[data-mid]") ?? [])].map((el) => el.dataset.mid!);
 
-  useEffect(() => setSelected(null), [chatId]);
+  // Chat switch drops the pick; reset during render, not in an effect.
+  const [pickChat, setPickChat] = useState(chatId);
+  if (pickChat !== chatId) {
+    setPickChat(chatId);
+    setSelected(null);
+  }
 
   useEffect(() => {
     if (!selected) return;

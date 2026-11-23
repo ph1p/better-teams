@@ -1,5 +1,6 @@
 import { useEffect, useRef, type MutableRefObject } from "react";
 import { nativeDriven, nativeThreadId } from "../../send";
+import { useLatest } from "../lib/latest";
 import type { Chat } from "../../types";
 
 const POLL = 400;
@@ -21,10 +22,8 @@ export function useFollowNative(
 ): void {
   const last = useRef("");
   const pending = useRef<{ id: string; at: number } | null>(null);
-  const selRef = useRef(sel);
-  selRef.current = sel;
-  const openRef = useRef(open);
-  openRef.current = open;
+  const selRef = useLatest(sel);
+  const openRef = useLatest(open);
 
   const tryOpen = (): void => {
     const p = pending.current;
