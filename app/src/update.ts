@@ -41,6 +41,9 @@ const emit = (v: string | null): void => {
 
 export const updateCheckOn = (): boolean => read("updateCheck", true);
 
+/** Result of a check: a newer version, up to date, or GitHub not reachable. */
+export type UpdateResult = { kind: "newer"; version: string } | { kind: "current" } | { kind: "failed" };
+
 export function setUpdateCheck(on: boolean): void {
   write("updateCheck", on);
   if (on) void checkForUpdate();
@@ -63,18 +66,27 @@ async function fetchTag(): Promise<string | null> {
   }
 }
 
-/** Refresh the latest-release tag if the cached one is a day old, then publish it. */
-export async function checkForUpdate(now = Date.now()): Promise<void> {
-  if (!updateCheckOn()) return;
+/**
+ * Refresh the latest-release tag if the cached one is a day old, then publish it. `force` (the
+ * "Check now" button) asks GitHub right away, even with the daily check turned off.
+ */
+export async function checkForUpdate(force = false, now = Date.now()): Promise<UpdateResult | null> {
+  if (!force && !updateCheckOn()) return null;
   const seen = read<Seen | null>("latestRelease", null);
   let tag = seen?.tag ?? "";
-  if (!seen || now - seen.at > DAY) {
+  let failed = false;
+  if (force || !seen || now - seen.at > DAY) {
     // A failed request also counts as a check, so a blocked fetch isn't retried on every load.
-    tag = (await fetchTag()) ?? tag;
+    const fresh = await fetchTag();
+    failed = fresh === null;
+    tag = fresh ?? tag;
     write<Seen>("latestRelease", { at: now, tag });
   }
-  if (!updateCheckOn()) return;
-  emit(isNewer(tag, __VERSION__) ? tag.replace(/^v/, "") : null);
+  if (!force && !updateCheckOn()) return null;
+  const newer = isNewer(tag, __VERSION__) ? tag.replace(/^v/, "") : null;
+  emit(newer);
+  if (newer) return { kind: "newer", version: newer };
+  return failed ? { kind: "failed" } : { kind: "current" };
 }
 
 const subscribe = (f: () => void): (() => void) => {

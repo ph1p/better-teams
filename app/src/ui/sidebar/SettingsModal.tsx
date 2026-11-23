@@ -4,7 +4,7 @@ import { NAME_FORMATS, nameFormat, setNameFormat, type NameFormat } from "../../
 import { Select } from "../shared/Select";
 import { LANGS, autoLang, langPref, setLangPref, t, type LangPref } from "../../i18n";
 import { useModalExit } from "../lib/modalExit";
-import { setUpdateCheck, updateCheckOn } from "../../update";
+import { checkForUpdate, setUpdateCheck, updateCheckOn, type UpdateResult } from "../../update";
 
 interface SettingsModalProps {
   compact: boolean;
@@ -18,6 +18,22 @@ export function SettingsModal({ compact, onCompact, onClose }: SettingsModalProp
   const { closing, close } = useModalExit(onClose);
   const c = t().common;
   const [updates, setUpdates] = useState(updateCheckOn);
+  const [checked, setChecked] = useState<UpdateResult | "checking" | null>(null);
+  const checkNow = (): void => {
+    if (checked === "checking") return;
+    setChecked("checking");
+    void checkForUpdate(true).then(setChecked);
+  };
+  const updateHint =
+    checked === null
+      ? c.updateCheckHint
+      : checked === "checking"
+        ? c.updateChecking
+        : checked.kind === "newer"
+          ? c.updateFound(checked.version)
+          : checked.kind === "current"
+            ? c.upToDate(__VERSION__)
+            : c.updateFailed;
   useEffect(() => {
     const key = (e: KeyboardEvent): void => {
       if (e.key === "Escape") close();
@@ -53,7 +69,36 @@ export function SettingsModal({ compact, onCompact, onClose }: SettingsModalProp
                 ))}
               </Select>
             </Row>
-            <Row icon={<RefreshCw size={15} />} label={c.updateCheck} hint={c.updateCheckHint}>
+            <Row
+              icon={<RefreshCw size={15} />}
+              label={c.updateCheck}
+              hint={
+                <>
+                  {updateHint}
+                  {" · "}
+                  {/* A span, not a <button>: the row is a <label>, and a button would become the
+                      control the label clicks, so clicking the title would start a check. */}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className="tc-settings-link"
+                    aria-disabled={checked === "checking"}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      checkNow();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        checkNow();
+                      }
+                    }}
+                  >
+                    {c.checkNow}
+                  </span>
+                </>
+              }
+            >
               <Select
                 value={updates ? "on" : "off"}
                 onChange={(e) => {
@@ -105,7 +150,7 @@ function Row({
 }: {
   icon: ReactNode;
   label: string;
-  hint: string;
+  hint: ReactNode;
   children: ReactNode;
 }): JSX.Element {
   return (

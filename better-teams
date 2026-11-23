@@ -67,7 +67,9 @@ better-teams ${VERSION:-} — a calmer client inside the new Microsoft Teams (ma
 Usage: $ME [command]
 
   start       Build, patch Teams if needed, restart it (default).
-  update      Install the latest release and restart Teams (release install).
+  update      Install the latest release and restart Teams if it is newer
+              (--check: only compare, --force: reinstall anyway). A source
+              checkout pulls main instead.
   dev         Hot-reload dev mode (source checkout; debug port $PORT while running).
   build       Build the overlay only; Teams is not touched.
   patch       Build + patch, no restart (takes effect on next Teams launch).
@@ -286,6 +288,14 @@ open_teams() {
 }
 
 launch_plain() { open_teams; }
+
+# Latest release version ("1.2.1"): the tag that /releases/latest redirects to.
+# No GitHub API call, so no rate limit.
+latest_version() {
+  local u
+  u="$(curl --proto '=https' -fsSIL -o /dev/null -w '%{url_effective}' "https://github.com/ph1p/better-teams/releases/latest" 2>/dev/null)" || return 1
+  case "$u" in */tag/v*) printf '%s\n' "${u##*/tag/v}" ;; *) return 1 ;; esac
+}
 launch_debug() { WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=$PORT" open_teams; }
 
 build() {
@@ -362,7 +372,25 @@ case "$cmd" in
     if teams_running; then restart_plain; else say "Teams starts without the overlay next time."; fi
     ;;
   update)
-    [ "$PREBUILT" = 1 ] || die "this is a source checkout: git pull, then run ./better-teams"
+    force=0; check=0
+    for a in "$@"; do case "$a" in --force) force=1 ;; --check) check=1 ;; *) die "unknown option: $a" ;; esac; done
+    latest="$(latest_version)" || die "could not look up the latest release on GitHub"
+    if [ "$check" = 1 ]; then
+      say "Installed: ${VERSION:-?}"; say "Latest:    $latest"
+      if [ "$latest" = "${VERSION:-}" ]; then say "Up to date."; else say "Run '$ME update' to install it."; fi
+      exit 0
+    fi
+    if [ "$PREBUILT" = 0 ]; then
+      # Source checkout: follow main, which can be ahead of the latest release.
+      say "Source checkout: pulling the latest code..."
+      git -C "$DIR" pull --ff-only || die "git pull failed; resolve it, then run $ME"
+      exec "$DIR/better-teams" start
+    fi
+    if [ "$latest" = "${VERSION:-}" ] && [ "$force" = 0 ]; then
+      say "Already up to date ($latest). '$ME update --force' reinstalls it."
+      exit 0
+    fi
+    say "Updating ${VERSION:-?} -> $latest..."
     f="$(mktemp)"; trap 'rm -f "$f"' EXIT
     curl --proto '=https' -fsSL "$INSTALL_URL" -o "$f" || die "could not download $INSTALL_URL"
     bash "$f"
