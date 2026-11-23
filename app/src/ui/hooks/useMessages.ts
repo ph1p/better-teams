@@ -15,30 +15,15 @@ import { chat as chatSvc } from "../../services";
 import { htmlToText } from "../lib/format";
 import { useLatest } from "../lib/latest";
 import { useChanged } from "../lib/changed";
-import { formatMessage } from "../../markdown";
 import { isIdle, onTeamsChange } from "../lib/live";
 import { INITIAL_REMOTE, POLL_MS } from "../lib/constants";
 import type { Flash } from "../lib/toast";
 import type { Chat, Message as Msg } from "../../types";
 import { t } from "../../i18n";
+import { editedContent, msgSig, prunePending, type Pending } from "./messageSync";
 
-// Plain text without whitespace or "@", for matching a draft to its synced copy.
-const bare = (s: string): string => s.replace(/[\s@]+/g, "");
-const STALE_PENDING_MS = 15_000;
-const CLOCK_SKEW_MS = 5_000;
+export type { Pending } from "./messageSync";
 
-// An optimistic message shown immediately after sending, before Teams syncs the
-// real one back.
-export interface Pending {
-  key: number;
-  chatId: string;
-  text: string;
-  time: number;
-  /** Channel thread it replies in. */
-  rootId?: string;
-  /** Names of the files it carries. */
-  files?: string[];
-}
 // Recent/older message buckets for the open chat (older is the paged-up history).
 interface MsgBucket {
   id: string | null;
@@ -50,15 +35,6 @@ interface OldBucket {
   id: string | null;
   list: Msg[];
 }
-
-// Cheap change signature so polling doesn't re-render (and jump) when idle.
-const sig = (list: Msg[]): string =>
-  list
-    .map(
-      (m) =>
-        `${m.id}:${m.time}:${m.edited}:${m.deleted}:${m.reactions.map((r) => r.key + r.count + (r.mine ? "*" : "")).join()}`,
-    )
-    .join("|");
 
 export interface Messages {
   /** Recent + paged-older messages of the open chat, merged and sorted. */
@@ -91,32 +67,6 @@ export interface Messages {
   removeFile: (cid: string, messageId: string, index: number) => Promise<void>;
   undo: (cid: string, messageId: string) => Promise<void>;
   edit: (cid: string, messageId: string, text: string, quoteHtml?: string) => Promise<void>;
-}
-
-// Drop optimistic messages once Teams has synced the real one. The draft is
-// markdown and the synced copy HTML, so both go through the same renderer
-// and compare as plain text without whitespace or "@"; a suffix match
-// allows for the quote Teams puts in front of a reply.
-function prunePending(pending: Pending[], chatId: string, list: Msg[], now: number): Pending[] {
-  if (!pending.length) return pending;
-  const mine = list.filter((m) => m.mine);
-  const texts = mine.map((m) => bare(htmlToText(m.content)));
-  const kept = pending.filter((x) => {
-    if (x.chatId !== chatId) return true;
-    const s = bare(htmlToText(formatMessage(x.text).html));
-    if (s && texts.some((t) => t.endsWith(s))) return false;
-    // A file-only send has no text: match a newer message of mine with the same files.
-    const names = x.files || [];
-    if (
-      !s &&
-      names.length &&
-      mine.some((m) => m.time >= x.time - CLOCK_SKEW_MS && names.every((n) => m.files.some((f) => f.name === n)))
-    )
-      return false;
-    // Unmatched (rewritten by Teams?): give up once a newer message of mine has synced.
-    return !(now - x.time > STALE_PENDING_MS && mine.some((m) => m.time >= x.time - CLOCK_SKEW_MS));
-  });
-  return kept.length === pending.length ? pending : kept;
 }
 
 // Messages of the selected chat: polled, plus live events for chats; backward
@@ -196,7 +146,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
           return;
         }
         nullTicks.current = 0;
-        const s = sig(list);
+        const s = msgSig(list);
         if (s !== lastMsgSig.current || force) {
           lastMsgSig.current = s;
           setMsgs({ id: sel, list, loaded: true });
@@ -204,8 +154,12 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
           // never paint together.
           setPending((p) => prunePending(p, sel, list, Date.now()));
         }
-      } catch {
-        if (alive) setMsgs({ id: sel, list: [], loaded: true });
+      } catch (e) {
+        if (!alive) return;
+        console.warn("[better-teams] message poll failed", e);
+        // Keep what is on screen; force the next good tick to repaint.
+        lastMsgSig.current = "";
+        setMsgs((b) => (b.id === sel ? { ...b, loaded: true } : { id: sel, list: [], loaded: true }));
       }
     };
     tick(true);
@@ -439,8 +393,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
   // preserved leading blockquote. Optimistically rebuild the stored HTML so the
   // bubble updates at once; refetch on failure.
   async function edit(cid: string, messageId: string, text: string, quoteHtml = ""): Promise<void> {
-    const esc = String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const content = (quoteHtml || "") + "<p>" + esc.replace(/\n/g, "<br>") + "</p>";
+    const content = editedContent(text, quoteHtml);
     patchMsg(messageId, (m) => ({ ...m, content, edited: true }));
     const res = await editMessage(cid, messageId, text, quoteHtml);
     if (!res.ok) {
