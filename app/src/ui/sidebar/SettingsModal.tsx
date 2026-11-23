@@ -1,16 +1,18 @@
 import { useEffect, type JSX } from "react";
-import { Contact, Languages, X } from "lucide-react";
+import { Contact, Languages, Rows3, X } from "lucide-react";
 import { NAME_FORMATS, nameFormat, setNameFormat, type NameFormat } from "../../names";
 import { Select } from "../shared/Select";
 import { LANGS, autoLang, langPref, setLangPref, t, type LangPref } from "../../i18n";
 
 interface SettingsModalProps {
+  compact: boolean;
+  onCompact: (compact: boolean) => void;
   onClose: () => void;
 }
 
-// Small settings dialog (language, name format), opened from the status menu so
+// Small settings dialog (language, name format, chat list density), opened from the status menu so
 // the menu itself stays short.
-export function SettingsModal({ onClose }: SettingsModalProps): JSX.Element {
+export function SettingsModal({ compact, onCompact, onClose }: SettingsModalProps): JSX.Element {
   const c = t().common;
   useEffect(() => {
     const key = (e: KeyboardEvent): void => {
@@ -55,6 +57,14 @@ export function SettingsModal({ onClose }: SettingsModalProps): JSX.Element {
                 {c.nameFormats[f]}
               </option>
             ))}
+          </Select>
+        </label>
+        <label className="tc-settings-row">
+          <Rows3 size={15} />
+          <span>{c.chatList}</span>
+          <Select value={compact ? "compact" : "previews"} onChange={(e) => onCompact(e.target.value === "compact")}>
+            <option value="compact">{c.chatLists.compact}</option>
+            <option value="previews">{c.chatLists.previews}</option>
           </Select>
         </label>
       </div>

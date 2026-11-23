@@ -25,6 +25,8 @@ const choiceLabel = (st: Exclude<SettableStatus, "Reset">): string =>
 const EXPIRY: NoteExpiry[] = ["never", "1h", "4h", "today", "week"];
 
 interface MeBarProps {
+  compact: boolean;
+  onCompact: (compact: boolean) => void;
   onSwitchToTeams?: () => void;
   onError?: (msg: string) => void;
 }
@@ -32,7 +34,7 @@ interface MeBarProps {
 // Sidebar footer: the signed-in user with their presence, plus a menu to change
 // status (REST when possible, else Teams' own profile menu), to set a status
 // message, and to switch to the native Teams UI underneath.
-export function MeBar({ onSwitchToTeams, onError }: MeBarProps): JSX.Element {
+export function MeBar({ compact, onCompact, onSwitchToTeams, onError }: MeBarProps): JSX.Element {
   const { statusOf, self } = usePresence();
   const [open, setOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
@@ -240,7 +242,7 @@ export function MeBar({ onSwitchToTeams, onError }: MeBarProps): JSX.Element {
         </div>
       ) : null}
       {row(false)}
-      {settingsOpen ? <SettingsModal onClose={closeSettings} /> : null}
+      {settingsOpen ? <SettingsModal compact={compact} onCompact={onCompact} onClose={closeSettings} /> : null}
     </div>
   );
 }

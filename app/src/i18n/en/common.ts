@@ -30,6 +30,8 @@ export const common = {
   languageAuto: (name: string) => `Automatic (${name})`,
   nameFormat: "Names",
   settings: "Settings",
+  chatList: "Chat list",
+  chatLists: { compact: "Compact", previews: "With previews" },
   nameFormats: {
     teams: "As in Teams",
     first: "First name",

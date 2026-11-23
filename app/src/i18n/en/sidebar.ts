@@ -13,8 +13,6 @@ export const sidebar = {
   showOlder: (n: number) => `Show ${n} older`,
 
   // Header, search and filter
-  showPreviews: "Show message previews",
-  compactList: "Compact list",
   newChat: "New chat",
   madeBy: (site: string) => `by ${site}`,
   sourceOnGitHub: "Source code on GitHub",

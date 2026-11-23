@@ -14,8 +14,6 @@ export const sidebar: Messages["sidebar"] = {
   showLess: "Weniger anzeigen",
   showOlder: (n) => `${n} ältere anzeigen`,
 
-  showPreviews: "Nachrichtenvorschau anzeigen",
-  compactList: "Kompakte Liste",
   madeBy: (site) => `by ${site}`,
   sourceOnGitHub: "Quellcode auf GitHub",
   newChat: "Neuer Chat",

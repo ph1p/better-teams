@@ -256,7 +256,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
         sel={sel}
         error={error}
         compact={compact}
-        onToggleCompact={() => setCompact((c) => !c)}
+        onCompact={(c) => setCompact(c)}
         onNewChat={() => a.setNewChat({ people: [], draft: false })}
         query={query}
         onQuery={setQuery}

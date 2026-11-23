@@ -1,5 +1,5 @@
 import type { JSX, MouseEvent, RefObject } from "react";
-import { CheckCheck, Rows2, Rows3, Search, SquarePen } from "lucide-react";
+import { CheckCheck, Search, SquarePen } from "lucide-react";
 import { Section } from "./Section";
 import { Row } from "./Row";
 import { MeBar } from "./MeBar";
@@ -14,7 +14,7 @@ interface SidebarProps {
   sel: string | null;
   error: string;
   compact: boolean;
-  onToggleCompact: () => void;
+  onCompact: (compact: boolean) => void;
   onNewChat: () => void;
   query: string;
   onQuery: (q: string) => void;
@@ -45,7 +45,7 @@ export function Sidebar(p: SidebarProps): JSX.Element {
     unreadOnly,
     unreadCount,
     searchRef,
-    onToggleCompact,
+    onCompact,
     onNewChat,
     onQuery,
     onSearchEnter,
@@ -62,14 +62,6 @@ export function Sidebar(p: SidebarProps): JSX.Element {
     <aside className="tc-side">
       <div className="tc-side-head">
         <div className="tc-side-spacer" />
-        <button
-          className="tc-side-btn"
-          onClick={onToggleCompact}
-          title={compact ? s.showPreviews : s.compactList}
-          aria-label={compact ? s.showPreviews : s.compactList}
-        >
-          {compact ? <Rows2 size={16} /> : <Rows3 size={16} />}
-        </button>
         <button className="tc-side-btn" onClick={onNewChat} title={s.newChat} aria-label={s.newChat}>
           <SquarePen size={16} />
         </button>
@@ -158,7 +150,7 @@ export function Sidebar(p: SidebarProps): JSX.Element {
           />
         </div>
       ) : null}
-      <MeBar onSwitchToTeams={onHide} onError={onError} />
+      <MeBar compact={compact} onCompact={onCompact} onSwitchToTeams={onHide} onError={onError} />
     </aside>
   );
 }
