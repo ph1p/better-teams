@@ -48,7 +48,7 @@ export async function markUnread(convId: string, _last: MsgRef): Promise<CdlRes<
 export async function listMessages(convId: string, _cursor?: string): Promise<CdlRes<MessagePage>> {
   const list = store.recent(convId);
   return list
-    ? { ok: true, data: { messages: [...list].reverse(), older: null, available: true } }
+    ? { ok: true, data: { messages: [...list].reverse(), older: null, available: true, synced: true } }
     : no("unknown chat");
 }
 

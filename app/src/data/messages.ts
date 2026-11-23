@@ -59,8 +59,10 @@ export async function listMessages(
     // Same query Teams' chat pane sends; the worker may hold the chat in memory.
     // Channels too: the worker answers them as one flat list, replies included.
     const fromWorker = await cdlFirstPage(conversationId, channel);
-    if (fromWorker && fromWorker.length) {
+    if (fromWorker) {
       remoteCache.set(conversationId, { at: Date.now(), msgs: fromWorker });
+      // [] = the worker knows the chat is empty: no REST fallback (it is not
+      // reachable for every account, e.g. personal accounts on teams.live.com).
       return fromWorker.slice(-remoteLimit);
     }
     const remote = await fetchRemoteMessages(conversationId, remoteLimit, channel);
@@ -106,24 +108,36 @@ const cdlCursors = new Map<string, string | null>();
 // from it again would refetch that page forever instead of walking on.
 const pagedFrom = new Map<string, string>();
 
-// One CDL page, oldest first. null when the worker failed or holds nothing for
-// the chat (uncached: it answers an empty page), so callers fall back to REST.
+// One CDL page, oldest first. null when the worker failed. `empty` marks a chat
+// the worker knows has no messages; an unsynced chat answers an empty page.
 async function cdlPage(
   conversationId: string,
   cursor?: string,
   channel = false,
-): Promise<{ msgs: Message[]; older: string | null } | null> {
+): Promise<{ msgs: Message[]; older: string | null; empty: boolean; synced: boolean } | null> {
   const r = await chat.listMessages(conversationId, cursor);
   if (!r.ok) return null;
   const msgs = r.data.messages.map((m) => normCdlMessage(m, channel)).filter((n): n is Message => !!n);
   sortMessages(msgs, channel);
-  return { msgs, older: r.data.older };
+  // Synced, nothing available, nothing on the page: the chat has no messages.
+  const empty = r.data.synced && !r.data.available && !r.data.messages.length;
+  return { msgs, older: r.data.older, empty, synced: r.data.synced };
 }
 
+// The worker starts syncing a chat it never loaded when first asked for it
+// (isConvSynced:false, empty page) and holds the messages a moment later.
+const SYNC_WAIT_MS = 1_200;
+
 // First page of an uncached chat through Teams' worker. Keeps an existing
-// cursor so a poll does not reset scroll-up paging.
+// cursor so a poll does not reset scroll-up paging. [] = the chat really has
+// no messages; null = the worker could not answer (callers fall back to REST).
 async function cdlFirstPage(conversationId: string, channel = false): Promise<Message[] | null> {
-  const p = await cdlPage(conversationId, undefined, channel);
+  let p = await cdlPage(conversationId, undefined, channel);
+  if (p && !p.synced && !p.msgs.length && !p.older) {
+    await new Promise((r) => setTimeout(r, SYNC_WAIT_MS));
+    p = await cdlPage(conversationId, undefined, channel);
+  }
+  if (p?.empty) return [];
   if (!p || (!p.msgs.length && !p.older)) return null;
   if (!cdlCursors.has(conversationId)) cdlCursors.set(conversationId, p.older);
   return p.msgs;

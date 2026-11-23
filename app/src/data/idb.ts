@@ -1,11 +1,29 @@
 // Teams IndexedDB plumbing: find and open Teams' own databases, read rows.
+import { cdlAccountOid, whenCdl } from "../services/cdl";
 import { get } from "./raw";
 
 const DB_CACHE: Record<string, IDBDatabase> = {};
 
+// Teams:<store>:react-web-client:<tenant>:<oid>:<locale>
+const oidOf = (name: string): string => name.split(":").at(-2) ?? "";
+const localeOf = (name: string): string => (name.split(":").at(-1) ?? "").toLowerCase();
+
+// The origin keeps a DB set per account that ever signed in there, and one
+// per UI locale. Pick the signed-in account (from Teams' worker context),
+// then the page's locale; the first match only when nothing tells them apart.
 async function findDb(fragment: string): Promise<string | undefined> {
   const names = (await indexedDB.databases()).map((d) => d.name).filter((n): n is string => !!n);
-  return names.find((n) => n.includes(`:${fragment}-manager:`)) || names.find((n) => n.includes(`:${fragment}:`));
+  let hits = names.filter((n) => n.includes(`:${fragment}-manager:`));
+  if (!hits.length) hits = names.filter((n) => n.includes(`:${fragment}:`));
+  if (hits.length < 2) return hits[0];
+  if (new Set(hits.map(oidOf)).size > 1) {
+    if (!cdlAccountOid()) await whenCdl(3_000);
+    const oid = cdlAccountOid();
+    const mine = hits.filter((n) => oidOf(n) === oid);
+    if (mine.length) hits = mine;
+  }
+  const lang = document.documentElement.lang.toLowerCase();
+  return hits.find((n) => localeOf(n) === lang) ?? hits[0];
 }
 
 export async function open(fragment: string): Promise<IDBDatabase> {
@@ -26,9 +44,7 @@ export async function open(fragment: string): Promise<IDBDatabase> {
   };
   db.onclose = () => delete DB_CACHE[fragment];
   DB_CACHE[fragment] = db;
-  // Teams:<store>:react-web-client:<tenant>:<oid>:<locale>
-  const parts = name.split(":");
-  if (parts.length >= 3) CURRENT_OID = parts[parts.length - 2];
+  if (name.split(":").length >= 3) CURRENT_OID = oidOf(name);
   return db;
 }
 

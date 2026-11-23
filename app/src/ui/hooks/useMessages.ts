@@ -103,7 +103,9 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
   // await it instead of returning early as if nothing was there.
   const inflight = useRef<Promise<boolean> | null>(null);
   const noMore = useRef(false);
-  const lastMsgSig = useRef("");
+  // null = nothing painted yet: an empty chat's signature is "", which must
+  // still count as a change so it leaves the loading state.
+  const lastMsgSig = useRef<string | null>(null);
   const nullTicks = useRef(0); // consecutive unreachable ticks for the open chat
   const hydrated = useRef(false); // tried native-open to populate IDB for this chat
 
@@ -117,7 +119,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
   useEffect(() => {
     if (!sel) return;
     let alive = true;
-    lastMsgSig.current = "";
+    lastMsgSig.current = null;
     nullTicks.current = 0;
     hydrated.current = false;
     stick.current = true;
@@ -176,7 +178,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
         if (!alive) return;
         console.warn("[better-teams] message poll failed", e);
         // Keep what is on screen; force the next good tick to repaint.
-        lastMsgSig.current = "";
+        lastMsgSig.current = null;
         setMsgs((b) => (b.id === sel ? { ...b, loaded: true } : { id: sel, list: [], loaded: true }));
       }
     };
@@ -385,7 +387,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     if (!res.ok) {
       // Force a re-fetch so the view returns to the server's truth.
       setMsgs((s) => ({ ...s, loaded: false }));
-      lastMsgSig.current = "";
+      lastMsgSig.current = null;
       flash(t().app.reactionFailed(res.reason));
     }
   }
@@ -398,7 +400,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
   }
   const refetch = (): void => {
     setMsgs((s) => ({ ...s, loaded: false, failed: false }));
-    lastMsgSig.current = "";
+    lastMsgSig.current = null;
     nullTicks.current = 0;
     hydrated.current = false;
   };

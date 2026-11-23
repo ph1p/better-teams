@@ -180,6 +180,13 @@ export function cdlReady(): boolean {
   return !!state().ctx;
 }
 
+/** Object id of the account this Teams window is signed in as, once learned. */
+export function cdlAccountOid(): string {
+  const au = state().ctx?.authenticationUser as { profile?: { objectId?: unknown } } | undefined;
+  const oid = au?.profile?.objectId;
+  return typeof oid === "string" ? oid : "";
+}
+
 /** Resolves true when ready, false after `ms`. */
 export function whenCdl(ms = 10_000): Promise<boolean> {
   installCdl();

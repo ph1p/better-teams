@@ -238,6 +238,12 @@ export interface MessagePage {
   older: string | null;
   /** Worker's own `areMessagesAvailable` (false when it holds nothing for the chat). */
   available: boolean;
+  /**
+   * Worker's `isConvSynced`. False: the worker never loaded this chat and has
+   * just started syncing it in the background (ask again shortly). True with
+   * `available` false and no messages: the chat really has no messages.
+   */
+  synced: boolean;
 }
 
 /**
@@ -256,7 +262,12 @@ export async function listMessages(convId: string, cursor?: string): Promise<Cdl
     replyChainId: null,
     ...(cursor ? { cursor: { value: cursor, source: "CHAT_MESSAGES" }, direction: "BACKWARD" } : {}),
   });
-  const c = check<{ messages?: unknown; cursor?: { value?: unknown } | null; areMessagesAvailable?: unknown }>(
+  const c = check<{
+    messages?: unknown;
+    cursor?: { value?: unknown } | null;
+    areMessagesAvailable?: unknown;
+    isConvSynced?: unknown;
+  }>(
     r,
     "messages",
   );
@@ -269,7 +280,15 @@ export async function listMessages(convId: string, cursor?: string): Promise<Cdl
   const oldest = messages.length ? String((messages[messages.length - 1] as { id?: unknown })?.id ?? "") : "";
   const next = typeof v === "string" && v ? v : oldest;
   const older = messages.length && next && next !== cursor ? next : null;
-  return { ok: true, data: { messages, older, available: c.data.areMessagesAvailable === true } };
+  return {
+    ok: true,
+    data: {
+      messages,
+      older,
+      available: c.data.areMessagesAvailable === true,
+      synced: c.data.isConvSynced === true,
+    },
+  };
 }
 
 /**
