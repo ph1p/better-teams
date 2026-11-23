@@ -5,6 +5,14 @@ app on macOS. It is a React overlay above Teams: same login, same chats, read
 and written through Teams' own backend. Teams keeps running underneath, so
 calls, meetings and files still work natively. Toggle with **Option+Cmd+T**.
 
+![Group chat](assets/screenshots/group-chat.png)
+
+| Status messages                                                                      | Channels and meetings                                                  | Status menu                                                   |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- | ------------------------------------------------------------- |
+| ![1:1 chat with the partner's status message](assets/screenshots/status-message.png) | ![Channel with a live meeting](assets/screenshots/channel-meeting.png) | ![Status and settings menu](assets/screenshots/user-menu.png) |
+
+Screenshots show the built-in mock data (`pnpm run mock` in `app/`).
+
 > Better Teams is an independent project. It is not affiliated with, endorsed by
 > or supported by Microsoft. "Microsoft Teams" is a trademark of Microsoft.
 
