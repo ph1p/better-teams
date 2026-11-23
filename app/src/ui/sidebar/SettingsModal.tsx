@@ -1,6 +1,7 @@
 import { useEffect, type JSX } from "react";
 import { Contact, Languages, X } from "lucide-react";
 import { NAME_FORMATS, nameFormat, setNameFormat, type NameFormat } from "../../names";
+import { Select } from "../shared/Select";
 import { LANGS, autoLang, langPref, setLangPref, t, type LangPref } from "../../i18n";
 
 interface SettingsModalProps {
@@ -36,25 +37,25 @@ export function SettingsModal({ onClose }: SettingsModalProps): JSX.Element {
         <label className="tc-settings-row">
           <Languages size={15} />
           <span>{c.language}</span>
-          <select value={langPref()} onChange={(e) => setLangPref(e.target.value as LangPref)} autoFocus>
+          <Select value={langPref()} onChange={(e) => setLangPref(e.target.value as LangPref)} autoFocus>
             <option value="auto">{c.languageAuto(LANGS.find((l) => l.id === autoLang())!.name)}</option>
             {LANGS.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.name}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label className="tc-settings-row">
           <Contact size={15} />
           <span>{c.nameFormat}</span>
-          <select value={nameFormat()} onChange={(e) => setNameFormat(e.target.value as NameFormat)}>
+          <Select value={nameFormat()} onChange={(e) => setNameFormat(e.target.value as NameFormat)}>
             {NAME_FORMATS.map((f) => (
               <option key={f} value={f}>
                 {c.nameFormats[f]}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
       </div>
     </div>

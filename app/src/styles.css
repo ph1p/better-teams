@@ -2548,6 +2548,10 @@
   border-radius: 10px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.22);
 }
+#tc-root .tc-me-menu .tc-menu-item {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
 #tc-root .tc-me-menu-label {
   @apply flex-1 min-w-0 truncate;
 }
@@ -2609,14 +2613,8 @@
   color: var(--tc-fg2);
   cursor: pointer;
 }
-#tc-root .tc-me-note-row select {
+#tc-root .tc-me-note-row .tc-select {
   margin-left: auto;
-  padding: 2px 4px;
-  font-size: 12.5px;
-  color: inherit;
-  background: var(--tc-bg);
-  border: 1px solid var(--tc-line);
-  border-radius: 5px;
 }
 #tc-root .tc-me-note-actions {
   @apply flex justify-end gap-2;
@@ -2978,15 +2976,12 @@
   @apply flex items-center gap-2;
   margin-top: 8px;
 }
-#tc-root .tc-members-go select {
+#tc-root .tc-members-go .tc-select {
   flex: 1 1 auto;
-  min-width: 0;
-  border: 1px solid var(--tc-line);
-  border-radius: 8px;
-  background: var(--tc-bg);
-  color: var(--tc-fg);
-  font: 12.5px var(--tc-font);
-  padding: 6px 6px;
+}
+#tc-root .tc-members-go .tc-select select {
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 #tc-root .tc-members-go .tc-newchat-go {
   @apply inline-flex items-center gap-1.5;
@@ -3045,15 +3040,51 @@
 #tc-root .tc-settings-row + .tc-settings-row {
   border-top: 1px solid var(--tc-line);
 }
-#tc-root .tc-settings-row select {
+#tc-root .tc-settings-row .tc-select {
   margin-left: auto;
-  max-width: 190px;
+  width: 190px;
+}
+
+/* Select field: native <select> without the platform arrow, plus a chevron */
+#tc-root .tc-select {
+  @apply relative inline-flex items-center;
+  min-width: 0;
+}
+#tc-root .tc-select select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 4px 26px 4px 9px;
+  font: 12.5px var(--tc-font);
+  color: var(--tc-fg);
+  background: var(--tc-bg2);
   border: 1px solid var(--tc-line);
   border-radius: 7px;
-  background: var(--tc-bg);
-  color: var(--tc-fg);
-  font: 12.5px var(--tc-font);
-  padding: 3px 4px;
+  cursor: pointer;
+  outline: none;
+  text-overflow: ellipsis;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+#tc-root .tc-select select:hover {
+  background: var(--tc-hover);
+}
+#tc-root .tc-select select:focus-visible {
+  border-color: var(--tc-accent);
+  box-shadow: 0 0 0 3px var(--tc-accent-soft);
+}
+#tc-root .tc-select select:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+#tc-root .tc-select svg {
+  position: absolute;
+  right: 8px;
+  color: var(--tc-fg2);
+  pointer-events: none;
 }
 #tc-root .tc-member-badge {
   flex: none;

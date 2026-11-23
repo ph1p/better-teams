@@ -6,6 +6,7 @@ import { Avatar } from "../shared/Avatar";
 import { avatarUri } from "../lib/format";
 import { t } from "../../i18n";
 import { SettingsModal } from "./SettingsModal";
+import { Select } from "../shared/Select";
 import { STATUS_COLOR, statusLabel, setSelfPresence, usePresence, type Status } from "../lib/presence";
 
 const CHOICES: Exclude<SettableStatus, "Reset">[] = [
@@ -129,10 +130,6 @@ export function MeBar({ onSwitchToTeams, onError }: MeBarProps): JSX.Element {
               {status === st ? <Check size={14} /> : null}
             </button>
           ))}
-          <button className="tc-menu-item" onClick={() => choose("Reset")}>
-            <RotateCcw size={14} />
-            <span className="tc-me-menu-label">{s.resetStatus}</span>
-          </button>
           <div className="tc-menu-sep" />
           {noteOpen ? (
             <form
@@ -152,13 +149,13 @@ export function MeBar({ onSwitchToTeams, onError }: MeBarProps): JSX.Element {
               />
               <label className="tc-me-note-row">
                 <span>{s.clearAfter}</span>
-                <select value={expiry} onChange={(e) => setExpiry(e.target.value as NoteExpiry)}>
+                <Select value={expiry} onChange={(e) => setExpiry(e.target.value as NoteExpiry)}>
                   {EXPIRY.map((k) => (
                     <option key={k} value={k}>
                       {s.expiry[k]}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
               <label className="tc-me-note-row">
                 <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
@@ -194,6 +191,10 @@ export function MeBar({ onSwitchToTeams, onError }: MeBarProps): JSX.Element {
               <span className="tc-me-menu-label">{note ? s.editStatusMessage : s.setStatusMessage}</span>
             </button>
           )}
+          <button className="tc-menu-item" onClick={() => choose("Reset")}>
+            <RotateCcw size={14} />
+            <span className="tc-me-menu-label">{s.resetStatus}</span>
+          </button>
           <div className="tc-menu-sep" />
           <button
             className="tc-menu-item"
@@ -205,7 +206,6 @@ export function MeBar({ onSwitchToTeams, onError }: MeBarProps): JSX.Element {
             <Settings size={14} />
             <span className="tc-me-menu-label">{t().common.settings}…</span>
           </button>
-          <div className="tc-menu-sep" />
           <button
             className="tc-menu-item"
             onClick={() => {

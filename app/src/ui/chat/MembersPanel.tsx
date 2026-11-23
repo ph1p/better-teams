@@ -9,6 +9,7 @@ import { useRef, useState, type JSX } from "react";
 import { Trash2, UserPlus, X } from "lucide-react";
 import { myMri, profile, type PeopleHit } from "../../teamsData";
 import { Avatar } from "../shared/Avatar";
+import { Select } from "../shared/Select";
 import { avatarUri } from "../lib/format";
 import { useDismiss } from "../lib/dismiss";
 import { useArm } from "../lib/arm";
@@ -208,7 +209,7 @@ export function MembersPanel({ chat, known, onClose, onOpenProfile, onAdd, onRem
         />
         {picked.length ? (
           <div className="tc-members-go">
-            <select
+            <Select
               value={history}
               onChange={(e) => setHistory(Number(e.target.value))}
               aria-label={t().chat.historyLabel}
@@ -218,7 +219,7 @@ export function MembersPanel({ chat, known, onClose, onOpenProfile, onAdd, onRem
                   {h.label()}
                 </option>
               ))}
-            </select>
+            </Select>
             <button className="tc-newchat-go" disabled={busy} onClick={() => void add()}>
               <UserPlus size={14} /> {addLabel(picked)}
             </button>
