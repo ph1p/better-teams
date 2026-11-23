@@ -123,7 +123,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
         return { id: sel, list: [...page.filter((m) => !seen.has(m.id)), ...base] };
       });
     })();
-    const tick = async (force?: boolean): Promise<void> => {
+    const run = async (force?: boolean): Promise<void> => {
       if (!force && isIdle()) return;
       try {
         const list = await listMessages(sel, { channel: selIsChannel, remoteLimit: INITIAL_REMOTE });
@@ -160,6 +160,28 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
         // Keep what is on screen; force the next good tick to repaint.
         lastMsgSig.current = "";
         setMsgs((b) => (b.id === sel ? { ...b, loaded: true } : { id: sel, list: [], loaded: true }));
+      }
+    };
+    // One poll at a time: triggers (interval, DOM changes, chat events) can
+    // fire while a slow read is in flight, and a late stale answer must not
+    // overwrite a newer one. Coalesce into one trailing run instead.
+    let running = false;
+    let again: boolean | null = null;
+    const tick = async (force?: boolean): Promise<void> => {
+      if (running) {
+        again = !!(again || force);
+        return;
+      }
+      running = true;
+      try {
+        await run(force);
+      } finally {
+        running = false;
+      }
+      if (again !== null && alive) {
+        const f = again;
+        again = null;
+        void tick(f);
       }
     };
     tick(true);
