@@ -45,6 +45,7 @@ PORT=9222
 APP="Microsoft Teams"
 TEAMS_APP="/Applications/$APP.app"
 TARGET="$TEAMS_APP/Contents/Resources/client-bindings/bundle.js"
+BACKUP_DIR="/Library/Application Support/better-teams"   # root-owned copy of Teams' original bundle.js while patched
 TESTED="26289"                       # Teams build line the patch was verified on
 NODE_MIN=20                          # vite 6 / tailwind 4
 NODE_DEV_MIN=22                      # dev mode uses Node's global WebSocket
@@ -86,7 +87,7 @@ say()  { printf '%s\n' "$*"; }
 warn() { printf 'warning: %s\n' "$*" >&2; }
 die()  { printf 'error: %s\n' "$*" >&2; exit 1; }
 
-# ---- root-only helpers (run via sudo by `patch` / `unpatch`) -----------------
+# ---- root helpers (root_write is shipped to `sudo /bin/bash -c`) -------------
 
 # Byte offset where our payload starts (the "\n" before the marker), or empty.
 payload_offset() {
@@ -95,22 +96,81 @@ payload_offset() {
   if [ -n "$off" ]; then echo $((off - 1)); fi
 }
 
-# Rewrite bundle.js as <original bytes> [+ payload] in one step. Writes through
-# `cat >` so the file keeps its owner, mode and inode.
+# Runs as root. `run_root_write` sends this function's source to
+# `sudo /bin/bash -c`, so root reads nothing the user can edit except the
+# payload on stdin. Self-contained: no other helper exists on the root side.
+# Args: target mode(patch|restore) backup_dir mark old_mark
+# Returns: 0 ok, 2 bad input, 3 original differs from backup,
+#          4 write failed (previous bytes put back).
+# Writes in place with `cat >` so bundle.js keeps its owner, mode and inode
+# and no stray file lands inside the signed .app.
 root_write() {
-  [ "$(id -u)" = 0 ] || die "must run as root"
-  [ -f "$TARGET" ] || die "$TARGET not found"
-  local payload="${1:-}" off
-  TMP_OUT="$(mktemp)"
-  trap 'rm -f "$TMP_OUT"' EXIT
-  local tmp="$TMP_OUT"
-  off="$(payload_offset)"
-  if [ -n "$off" ]; then head -c "$off" "$TARGET" > "$tmp"; else cat "$TARGET" > "$tmp"; fi
-  if [ -n "$payload" ]; then
-    LC_ALL=C grep -qF "$MARK" "$payload" || die "$payload is not a better-teams payload"
-    cat "$payload" >> "$tmp"
+  local target="$1" mode="$2" backup="$3" mark="$4" old_mark="$5"
+  local work off want have
+  case "$mode" in patch | restore) ;; *) echo "bad mode: $mode" >&2; return 2 ;; esac
+  if [ ! -f "$target" ] || [ -L "$target" ]; then echo "not a regular file: $target" >&2; return 2; fi
+  work="$(mktemp -d /tmp/better-teams-root.XXXXXX)"
+  # Expand $work now: it is local, so it is already gone when the EXIT trap runs.
+  trap "rm -rf '$work'" EXIT
+  cat "$target" > "$work/old"
+
+  # Original bytes = everything before the "\n" that precedes the marker.
+  off="$(LC_ALL=C grep -abo -F -e "$mark" -e "$old_mark" "$work/old" | head -1 | cut -d: -f1 || true)"
+  if [ -n "$off" ]; then head -c "$((off - 1))" "$work/old" > "$work/prefix"
+  else cp "$work/old" "$work/prefix"; fi
+
+  if [ "$mode" = restore ] && [ -z "$off" ]; then return 0; fi
+
+  # While patched, the prefix must equal the original saved at patch time.
+  if [ -n "$off" ] && [ -f "$backup/bundle.js.orig.sha256" ]; then
+    want="$(cut -d' ' -f1 "$backup/bundle.js.orig.sha256")"
+    have="$(shasum -a 256 "$work/prefix" | cut -d' ' -f1)"
+    if [ "$want" != "$have" ]; then echo "original bytes differ from $backup" >&2; return 3; fi
   fi
-  cat "$tmp" > "$TARGET"
+
+  cp "$work/prefix" "$work/new"
+  want=$(( $(wc -c < "$work/prefix") ))
+  if [ "$mode" = patch ]; then
+    cat > "$work/payload"
+    if ! LC_ALL=C grep -qF "$mark" "$work/payload"; then echo "stdin is not a better-teams payload" >&2; return 2; fi
+    cat "$work/payload" >> "$work/new"
+    want=$(( want + $(wc -c < "$work/payload") ))
+  elif LC_ALL=C grep -qF -e "$mark" -e "$old_mark" "$work/new"; then
+    echo "marker still present after restore" >&2; return 2
+  fi
+  have=$(( $(wc -c < "$work/new") ))
+  if [ "$have" -ne "$want" ]; then echo "size mismatch: $have != $want" >&2; return 4; fi
+
+  # Unpatched Teams (first patch, or Teams updated itself): save its bytes.
+  if [ "$mode" = patch ] && [ -z "$off" ]; then
+    mkdir -p "$backup" && chmod 700 "$backup"
+    cp "$work/prefix" "$backup/bundle.js.orig"
+    (cd "$backup" && shasum -a 256 bundle.js.orig > bundle.js.orig.sha256)
+  fi
+
+  cat "$work/new" > "$target"
+  if ! cmp -s "$work/new" "$target"; then
+    cat "$work/old" > "$target"
+    echo "write to $target did not verify; previous bytes put back" >&2
+    return 4
+  fi
+  if [ "$mode" = restore ]; then rm -rf "$backup"; fi
+}
+
+# Run root_write as root. Its source travels as the `bash -c` string, so
+# sudo never executes this (user-writable) file.
+run_root_write() {
+  local mode="$1" src=/dev/null rc=0
+  [ "$mode" = patch ] && src="$PAYLOAD"
+  sudo /bin/bash -c "set -euo pipefail; $(declare -f root_write); root_write \"\$@\"" \
+    better-teams-root "$TARGET" "$mode" "$BACKUP_DIR" "$MARK" "$OLD_MARK" < "$src" || rc=$?
+  case "$rc" in
+    0) ;;
+    2) die "refused to write $TARGET (bad input, see above); Teams left as it was." ;;
+    3) die "Teams' bundle.js no longer matches the original saved in $BACKUP_DIR; not touching it. Reinstall Teams to recover." ;;
+    4) die "writing $TARGET failed; the previous file was put back." ;;
+    *) die "root write failed (exit $rc); Teams left as it was." ;;
+  esac
 }
 
 # ---- checks ------------------------------------------------------------------
@@ -239,7 +299,7 @@ patch() {
   if patch_current; then say "Teams is already patched with the current build."; return 0; fi
   warn_untested
   say "Patching Teams (administrator password needed: the app is owned by root)..."
-  sudo "$SELF" __root-write "$PAYLOAD"
+  run_root_write patch
   patch_current || die "patch did not apply; Teams left as it was."
 }
 
@@ -247,7 +307,7 @@ unpatch() {
   [ -f "$TARGET" ] || { say "Teams not found; nothing to restore."; return 0; }
   if ! is_patched; then say "Teams is not patched."; return 0; fi
   say "Restoring Teams' original files (administrator password needed)..."
-  sudo "$SELF" __root-write
+  run_root_write restore
   is_patched && die "could not remove the patch from $TARGET"
   if codesign --verify "$TEAMS_APP" 2>/dev/null; then say "Code signature valid again."
   else warn "codesign still fails; reinstall Teams if it misbehaves."; fi
@@ -356,9 +416,6 @@ case "$cmd" in
     ;;
   version|-v|--version)
     say "${VERSION:-unknown}"
-    ;;
-  __root-write)
-    root_write "${1:-}"
     ;;
   *)
     usage >&2; exit 1
