@@ -9,9 +9,19 @@
 import { profile, profilePhotoUrl } from "../../teamsData";
 import type { Chat, Message } from "../../types";
 import { locale, t } from "../../i18n";
+import { nameFormat, personName, shortName } from "../../names";
 
 /** A chat's display name. The data layer keeps "Notes" untranslated; the UI shows it in the current language. */
-export const chatTitle = (c: Chat): string => (c.kind === "notes" ? t().common.notes : c.title);
+export function chatTitle(c: Chat): string {
+  if (c.kind === "notes") return t().common.notes;
+  if (!c.nameTitle || nameFormat() === "teams") return c.title;
+  if (c.avatarMri) return personName(profile(c.avatarMri), c.title, c.avatarMri);
+  // A group: the first 3 named members, like the data layer builds it.
+  const named = c.members.map((m) => profile(m)).filter((p) => p.displayName);
+  if (!named.length) return c.title;
+  const shown = named.slice(0, 3).map(shortName).join(", ");
+  return named.length > 3 ? `${shown} +${named.length - 3}` : shown;
+}
 
 export function initials(name: string): string {
   const parts = (name || "?")

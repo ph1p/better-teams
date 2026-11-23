@@ -14,12 +14,26 @@ let seq = 1;
 function person(name: string, jobTitle: string, department: string, officeLocation = "Hamburg"): Person {
   const oid = `00000000-0000-4000-8000-${String(++seq).padStart(12, "0")}`;
   const email = name.toLowerCase().replace(/\s+/g, ".") + "@example.com";
-  return { mri: "8:orgid:" + oid, displayName: name, imageUri: "", email, jobTitle, department, officeLocation };
+  const [givenName, ...rest] = name.split(" ");
+  const surname = rest.join(" ");
+  return {
+    mri: "8:orgid:" + oid,
+    displayName: name,
+    givenName,
+    surname,
+    imageUri: "",
+    email,
+    jobTitle,
+    department,
+    officeLocation,
+  };
 }
 
 const me: Person = {
   mri: ME,
   displayName: "Sam Taylor",
+  givenName: "Sam",
+  surname: "Taylor",
   imageUri: "",
   email: "sam.taylor@example.com",
   jobTitle: "Software Engineer",

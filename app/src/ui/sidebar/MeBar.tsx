@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type JSX, type CSSProperties } from "react";
-import { ArrowLeftRight, Check, RotateCcw, ChevronUp, Github, Languages, MessageSquare } from "lucide-react";
+import { ArrowLeftRight, Check, Contact, RotateCcw, ChevronUp, Github, Languages, MessageSquare } from "lucide-react";
+import { NAME_FORMATS, nameFormat, setNameFormat, type NameFormat } from "../../names";
 import { myMri, profile } from "../../teamsData";
 import { myNote, setMyNote, setMyStatus, type NoteExpiry, type SettableStatus } from "../../status";
 import { Avatar } from "../shared/Avatar";
@@ -203,6 +204,21 @@ export function MeBar({ onSwitchToTeams, onError }: MeBarProps): JSX.Element {
               {LANGS.map((l) => (
                 <option key={l.id} value={l.id}>
                   {l.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="tc-menu-item tc-me-lang">
+            <Contact size={14} />
+            <span className="tc-me-menu-label">{t().common.nameFormat}</span>
+            <select
+              value={nameFormat()}
+              onChange={(e) => setNameFormat(e.target.value as NameFormat)}
+              aria-label={t().common.nameFormat}
+            >
+              {NAME_FORMATS.map((f) => (
+                <option key={f} value={f}>
+                  {t().common.nameFormats[f]}
                 </option>
               ))}
             </select>

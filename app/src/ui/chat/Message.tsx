@@ -1,5 +1,7 @@
 import { memo, useEffect, useRef, useState, type JSX } from "react";
 import { t } from "../../i18n";
+import { personName, useNameFormat } from "../../names";
+import { profile } from "../../teamsData";
 import { SmilePlus, Pencil, Trash2, Undo2, X, Reply, Copy, Check, MessageSquareReply } from "lucide-react";
 import { splitQuote } from "../../quote";
 import { RichHtml } from "../../richText";
@@ -51,6 +53,7 @@ export const Message = memo(function Message({
   onJumpTo,
   onThreadReply,
 }: MessageProps): JSX.Element {
+  useNameFormat();
   const { statusOf } = usePresence();
   const [pick, setPick] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -115,7 +118,9 @@ export const Message = memo(function Message({
       <div className="tc-msg-body">
         {first && (
           <div className="tc-msg-meta">
-            <span className="who">{m.from || (m.mine ? t().common.you : t().common.unknown)}</span>
+            <span className="who">
+              {personName(profile(m.fromMri), m.from, m.fromMri) || (m.mine ? t().common.you : t().common.unknown)}
+            </span>
             {isAppMri(m.fromMri) ? <span className="tc-app-badge">{t().common.app}</span> : null}
             <span className="when" title={fmtFull(m.time)}>
               {fmtClock(m.time)}

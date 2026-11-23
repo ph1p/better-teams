@@ -6,6 +6,7 @@
 import type { Chat, FileRef, Message, Profile, Reaction } from "../types";
 import { APPS, CHATS, CHATTER, ME, PEOPLE, PRESENCE, REPLIES, type SeedChat } from "./fixtures";
 import { isAppMri } from "../apps";
+import { shortName } from "../names";
 import { extOf } from "../data/raw";
 import { isOneToOneId } from "../data/state";
 
@@ -218,8 +219,9 @@ export function listChats(): Chat[] {
             ? names[0]
             : names
                 .slice(0, 3)
-                .map((n) => n.split(" ")[0])
+                .map((_, i) => shortName(profiles[others[i]] ?? { displayName: names[i] }))
                 .join(", "));
+    const nameTitle = (seed.kind === "chat" || seed.kind === "meeting") && !seed.topic && others.length > 0;
     const lastFromMe = !!last && last.fromMri === ME;
     // A message newer than the hide time brings a hidden chat back, as in Teams.
     out.push({
@@ -227,6 +229,7 @@ export function listChats(): Chat[] {
       id: seed.id,
       kind: seed.kind,
       title,
+      ...(nameTitle ? { nameTitle: true } : {}),
       team: seed.team || "",
       isChannel: seed.kind === "channel",
       avatarMri: seed.kind === "chat" && others.length === 1 ? others[0] : "",

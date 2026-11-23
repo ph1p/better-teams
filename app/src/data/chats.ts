@@ -2,6 +2,7 @@
 import type { Chat, ChatKind } from "../types";
 import { isAppMri } from "../apps";
 import { getAll, myMri, open } from "./idb";
+import { shortName } from "../names";
 import { profile } from "./profiles";
 import { arr, get, mriOf, obj, str, toMs, type Dict } from "./raw";
 import { isDeparted, withPending } from "./groups";
@@ -16,7 +17,12 @@ const KIND: Record<string, ChatKind> = {
   StreamOfNotes: "notes",
 };
 
-const firstName = (n: string): string => n.split(/[\s,]+/)[0];
+/** The title is built from member names (no topic, at least one named member). */
+function isNameTitle(c: Dict, kind: ChatKind, others: string[]): boolean {
+  if (kind !== "chat" && kind !== "meeting") return false;
+  if (str(obj(c.threadProperties).topic)) return false;
+  return others.some((m) => profile(m).displayName);
+}
 
 function chatTitle(c: Dict, kind: ChatKind, others: string[]): string {
   const tp = obj(c.threadProperties);
@@ -28,10 +34,10 @@ function chatTitle(c: Dict, kind: ChatKind, others: string[]): string {
     return str(tp.topic) || str(tp.topicThreadTopic) || "General";
   }
   if (str(tp.topic)) return str(tp.topic);
-  const names = others.map((m) => profile(m).displayName).filter(Boolean);
-  if (names.length === 1) return names[0];
+  const names = others.map((m) => profile(m)).filter((p) => p.displayName);
+  if (names.length === 1) return names[0].displayName;
   if (names.length > 1) {
-    const shown = names.slice(0, 3).map(firstName).join(", ");
+    const shown = names.slice(0, 3).map(shortName).join(", ");
     return names.length > 3 ? `${shown} +${names.length - 3}` : shown;
   }
   const lm = obj(c.lastMessage);
@@ -158,6 +164,7 @@ export async function listChats(): Promise<Chat[]> {
         id: str(c.id),
         kind,
         title: chatTitle(c, kind, others),
+        ...(isNameTitle(c, kind, others) ? { nameTitle: true } : {}),
         team: teamName,
         isChannel: kind === "channel",
         // 1:1 chats get the other person's photo.

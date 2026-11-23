@@ -1,0 +1,94 @@
+// How people's names are shown. Display only: outbound content (sent messages,
+// mentions, quotes) must keep Teams' own displayName and never go through here.
+// The format is a global preference, persisted and reactive like the UI language.
+import { useSyncExternalStore } from "react";
+import { isAppMri } from "./apps";
+import type { Profile } from "./types";
+import { read, write } from "./ui/lib/prefs";
+
+export type NameFormat = "teams" | "first" | "first-last" | "last-first" | "first-initial";
+export const NAME_FORMATS: NameFormat[] = ["teams", "first", "first-last", "last-first", "first-initial"];
+
+interface NameParts {
+  displayName?: string;
+  givenName?: string;
+  surname?: string;
+}
+
+/** Split a person into first and last name, or null when that cannot be done safely. */
+export function splitName(p: NameParts): { first: string; last: string } | null {
+  const given = (p.givenName ?? "").trim();
+  const sur = (p.surname ?? "").trim();
+  if (given && sur) return { first: given, last: sur };
+  const name = (p.displayName ?? "")
+    .trim()
+    .replace(/\s*(\([^)]*\)|\[[^\]]*\])$/, "")
+    .trim();
+  const commas = name.split(",");
+  if (commas.length === 2) {
+    const last = commas[0].trim();
+    const first = commas[1].trim();
+    return first && last ? { first, last } : null;
+  }
+  if (commas.length > 2) return null;
+  const words = name.split(/\s+/).filter(Boolean);
+  if (words.length === 2) return { first: words[0], last: words[1] };
+  return null;
+}
+
+export function formatName(p: NameParts, fmt: NameFormat): string {
+  const raw = p.displayName ?? "";
+  if (fmt === "teams") return raw;
+  const parts = splitName(p);
+  if (!parts) return raw;
+  const { first, last } = parts;
+  switch (fmt) {
+    case "first":
+      return first;
+    case "first-last":
+      return `${first} ${last}`;
+    case "last-first":
+      return `${last} ${first}`;
+    case "first-initial":
+      return `${first} ${[...last][0].toUpperCase()}.`;
+  }
+}
+
+let current: NameFormat = readPref();
+const subs = new Set<() => void>();
+
+function readPref(): NameFormat {
+  const v = read<unknown>("nameFormat", "teams");
+  return NAME_FORMATS.includes(v as NameFormat) ? (v as NameFormat) : "teams";
+}
+
+export const nameFormat = (): NameFormat => current;
+
+export function setNameFormat(f: NameFormat): void {
+  current = f;
+  write("nameFormat", f);
+  for (const fn of subs) fn();
+}
+
+const subscribe = (fn: () => void): (() => void) => {
+  subs.add(fn);
+  return () => subs.delete(fn);
+};
+
+/** Re-render on a name format switch. Memoized components must call it themselves. */
+export function useNameFormat(): NameFormat {
+  return useSyncExternalStore(subscribe, nameFormat, nameFormat);
+}
+
+/** A short name for group titles and the typing indicator. */
+export function shortName(p: NameParts): string {
+  if (current === "teams") return (p.displayName ?? "").split(/[\s,]+/)[0];
+  return formatName(p, current);
+}
+
+/** A person's name in the chosen format. Apps and bots are never reformatted. */
+export function personName(p: Profile | undefined, raw: string, mri: string): string {
+  if (isAppMri(mri) || current === "teams") return raw || p?.displayName || "";
+  if (p?.displayName) return formatName(p, current);
+  return formatName({ displayName: raw }, current);
+}

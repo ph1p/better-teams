@@ -28,4 +28,12 @@ export const common = {
   },
   language: "Language",
   languageAuto: (name: string) => `Automatic (${name})`,
+  nameFormat: "Names",
+  nameFormats: {
+    teams: "As in Teams",
+    first: "First name",
+    "first-last": "First Last",
+    "last-first": "Last First",
+    "first-initial": "First L.",
+  },
 };

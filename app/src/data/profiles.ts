@@ -32,6 +32,8 @@ export async function loadProfiles(): Promise<Record<string, Profile>> {
         department: str(p.department),
         officeLocation: str(p.officeLocation) || str(p.physicalDeliveryOfficeName),
         ...(str(p.developer) ? { developer: str(p.developer) } : {}),
+        ...(str(p.givenName) ? { givenName: str(p.givenName) } : {}),
+        ...(str(p.surname) ? { surname: str(p.surname) } : {}),
       };
     }
     PROFILES = map;

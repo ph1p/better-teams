@@ -1,4 +1,5 @@
 import { t } from "../../i18n";
+import { shortName, useNameFormat } from "../../names";
 import { useEffect, useState, type JSX } from "react";
 import { useChanged } from "../lib/changed";
 import { typing } from "../../services";
@@ -12,7 +13,7 @@ const MAX_FACES = 3;
 const LINGER_MS = 220;
 
 function firstName(mri: string): string {
-  return (profile(mri).displayName || "").split(/[\s,]+/)[0] || t().chat.someone;
+  return shortName(profile(mri)) || t().chat.someone;
 }
 
 // Teams' localized label when it has one, else "Ann", "Ann and Bo",
@@ -33,6 +34,7 @@ function label(users: TypingUser[]): string {
 // Who is typing in the open chat: the typers' faces, an animated dots bubble
 // and Teams' label. Floats above the composer so it never shifts the layout.
 export function TypingIndicator({ chatId }: { chatId: string }): JSX.Element | null {
+  useNameFormat();
   const [users, setUsers] = useState<TypingUser[]>([]);
   // Last non-empty typers, kept on screen while the pill fades out.
   const [last, setLast] = useState<TypingUser[]>([]);
