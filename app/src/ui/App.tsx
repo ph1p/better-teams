@@ -407,13 +407,25 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                 </div>
               </div>
             </div>
-            <Composer
-              chat={selChat}
-              cs={cs}
-              atBottom={m.atBottom}
-              onScrollToBottom={m.scrollToBottom}
-              onUpEmpty={nav.selectLast}
-            />
+            {selChat.request ? (
+              <div className="tc-composer tc-request">
+                <span>{t().chat.requestBanner(selChat.title)}</span>
+                <button className="tc-edit-btn" onClick={() => void a.answerRequest(selChat, "Block")}>
+                  {t().chat.requestBlock}
+                </button>
+                <button className="tc-edit-btn primary" onClick={() => void a.answerRequest(selChat, "Accept")}>
+                  {t().chat.requestAccept}
+                </button>
+              </div>
+            ) : (
+              <Composer
+                chat={selChat}
+                cs={cs}
+                atBottom={m.atBottom}
+                onScrollToBottom={m.scrollToBottom}
+                onUpEmpty={nav.selectLast}
+              />
+            )}
           </>
         ) : (
           <>

@@ -1,5 +1,6 @@
 export const sidebar = {
   sections: {
+    requests: "Requests",
     fav: "Favorites",
     dms: "Direct messages",
     groups: "Groups",

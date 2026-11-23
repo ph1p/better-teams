@@ -267,10 +267,7 @@ export async function listMessages(convId: string, cursor?: string): Promise<Cdl
     cursor?: { value?: unknown } | null;
     areMessagesAvailable?: unknown;
     isConvSynced?: unknown;
-  }>(
-    r,
-    "messages",
-  );
+  }>(r, "messages");
   if (!c.ok) return c;
   const messages = Array.isArray(c.data.messages) ? c.data.messages : [];
   // Teams' cursor value is the oldest message id on the page. The worker may
@@ -319,6 +316,33 @@ export async function setChatFavorite(convId: string, fav: boolean, folderId: st
         input: { conversationId: convId },
       });
   const c = check(r, fav ? "moveItemToConversationFolder" : "removeConversationFromFolder", /Error$/);
+  return c.ok ? { ok: true, data: true } : c;
+}
+
+// Not in docs/cdl-catalog.json (Teams' chat-request pane wasn't recorded).
+// Written from the worker's schema: contactAcceptOrBlockExtended(convId: ID!,
+// inviterId: String, action: ContactAcceptOrBlockAction!, callerInfo: String!)
+// -> BlockedContactUpdateExtended. Resolved by accept-block-chat-worker-resolver.
+const ACCEPT_BLOCK =
+  "mutation ContactAcceptOrBlockExtendedMutation($convId: ID!, $inviterId: String, $action: ContactAcceptOrBlockAction!, $callerInfo: String!) {\n  contactAcceptOrBlockExtended(convId: $convId, inviterId: $inviterId, action: $action, callerInfo: $callerInfo) {\n    id\n    userId\n    isBlocked\n    __typename\n  }\n}";
+
+/**
+ * Answer a chat request (someone outside your contacts wrote first), as
+ * Teams' request pane: Accept moves it into the chat list, Block blocks the
+ * inviter. On personal accounts the worker adds the inviter to the buddy group.
+ */
+export async function answerChatRequest(
+  convId: string,
+  inviterId: string,
+  action: "Accept" | "Block",
+): Promise<CdlRes<true>> {
+  const r = await cdl<Record<string, unknown>>("ContactAcceptOrBlockExtendedMutation", ACCEPT_BLOCK, {
+    convId,
+    inviterId: inviterId || null,
+    action,
+    callerInfo: "better-teams",
+  });
+  const c = check(r, "contactAcceptOrBlockExtended");
   return c.ok ? { ok: true, data: true } : c;
 }
 

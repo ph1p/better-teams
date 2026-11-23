@@ -89,6 +89,25 @@ export async function setChatFavorite(conversationId: string, fav: boolean): Pro
   return { ok: true, via: "cdl" };
 }
 
+// Chat requests: someone outside your contacts wrote first. Teams keeps the
+// chat hidden until you accept it (consumer: interopconversationstatus;
+// enterprise: conversationstatus AcceptPendingRecipient).
+const PENDING = new Set(["AcceptPending", "ExtendedDirectoryAcceptPending"]);
+function isRequest(props: Dict): boolean {
+  return PENDING.has(str(props.interopconversationstatus)) || props.conversationstatus === "AcceptPendingRecipient";
+}
+
+// Our answer to a request, held while IndexedDB still says pending.
+const requestOverride = new Map<string, "Accept" | "Block">();
+
+/** Accept or block a chat request. Block also hides the chat. */
+export async function answerChatRequest(c: Chat, action: "Accept" | "Block"): Promise<WriteResult> {
+  const r = await chat.answerChatRequest(c.id, c.inviter ?? "", action);
+  if (!r.ok) return r;
+  requestOverride.set(c.id, action);
+  return { ok: true, via: "cdl" };
+}
+
 // Running call: Teams keeps "awareness_conversationLiveState:<rootId>" in the
 // thread properties (JSON: status, expiration in s). A call whose end event got
 // lost stays "Active" but expires, so expiration is checked too.
@@ -134,7 +153,8 @@ export async function listChats(): Promise<Chat[]> {
     if (!kind || !c.id) continue;
     if (tp.isdeleted === "true" || tp.isdeleted === true) continue;
     // A brand-new channel has no message yet; list it from its creation time.
-    if (!c.lastMessage && kind !== "channel") continue;
+    // Notes (chat with yourself) may be empty too and always stay listed.
+    if (!c.lastMessage && kind !== "channel" && kind !== "notes") continue;
     const props = obj(c.properties);
     const lm = obj(c.lastMessage);
     const time =
@@ -142,7 +162,7 @@ export async function listChats(): Promise<Chat[]> {
       toMs(lm.originalarrivaltime) ||
       toMs(lm.composetime) ||
       (kind === "channel" ? toMs(tp.createdat) : 0);
-    if (!time) continue;
+    if (!time && kind !== "notes") continue;
     const lmTime = toMs(lm.originalarrivaltime) || time;
     if (lm.id) lastByConv.set(str(c.id), { id: String(lm.id), clientMessageId: str(lm.clientmessageid), time: lmTime });
 
@@ -179,7 +199,14 @@ export async function listChats(): Promise<Chat[]> {
     // Hidden (Teams' "Hide"): the worker keeps the hide time in the user
     // property unpinnedTime; a newer message brings the chat back.
     const hiddenAt = Number(props.unpinnedTime) || 0;
-    const hidden = effectiveHidden(str(c.id), hiddenAt > 0 && time <= hiddenAt);
+    let hidden = effectiveHidden(str(c.id), hiddenAt > 0 && time <= hiddenAt);
+    let request = isRequest(props);
+    const answer = requestOverride.get(str(c.id));
+    if (answer && !request) requestOverride.delete(str(c.id));
+    if (answer) request = false;
+    // A request is hidden in Teams until answered; we list it in its own section.
+    if (request || answer === "Accept") hidden = false;
+    if (answer === "Block" || props.interopconversationstatus === "Blocked") hidden = true;
 
     chats.push(
       withPending(str(c.id), {
@@ -208,7 +235,9 @@ export async function listChats(): Promise<Chat[]> {
           tp.uniquerosterthread !== true,
         left,
         time,
-        unread: !left && (effectiveMarked(str(c.id), props) || (!lastFromMe && horizon > 0 && time > horizon)),
+        ...(request ? { request: true, inviter: str(tp.creator) || others[0] || "" } : {}),
+        unread:
+          !left && !request && (effectiveMarked(str(c.id), props) || (!lastFromMe && horizon > 0 && time > horizon)),
         last: {
           from: lastFromMe ? "You" : str(lm.imdisplayname),
           content: str(lm.content),

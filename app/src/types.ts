@@ -73,6 +73,10 @@ export interface Chat {
   time: number;
   unread: boolean;
   last: LastMessage;
+  /** A chat request: someone outside your contacts wrote first; accept or block it. */
+  request?: boolean;
+  /** MRI of who started the chat (the request's inviter). */
+  inviter?: string;
   /** Root message id of a call running in this conversation right now, if any. */
   liveCall?: string;
 }

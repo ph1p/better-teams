@@ -3,6 +3,7 @@ import { useCallback, useState, type Dispatch, type MutableRefObject, type SetSt
 import {
   addChannelMembers,
   addChatMembers,
+  answerChatRequest,
   createChannel,
   deleteChannel,
   getChannelActions,
@@ -281,6 +282,19 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
     [optimistic, flash],
   );
 
+  // Accept or block a chat request (banner in place of the composer).
+  const answerRequest = useCallback(
+    async (chat: Chat, action: "Accept" | "Block"): Promise<void> => {
+      await optimistic(
+        chat,
+        { request: false, ...(action === "Block" ? { hidden: true } : {}) },
+        () => answerChatRequest(chat, action),
+        t().app.requestFailed,
+      );
+    },
+    [optimistic],
+  );
+
   // Add to or remove from Teams' Favorites (right-click menu).
   const setFavorite = useCallback(
     (chat: Chat, favorite: boolean): Promise<boolean> =>
@@ -450,6 +464,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
     meetNow,
     setChatUnread,
     setHidden,
+    answerRequest,
     setFavorite,
     rename,
     setMuted,

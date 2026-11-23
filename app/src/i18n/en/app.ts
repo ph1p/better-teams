@@ -24,6 +24,7 @@ export const app = {
     hidden ? `Couldn't hide the chat (${reason})` : `Couldn't unhide the chat (${reason})`,
   favoriteFailed: (favorite: boolean, reason: string) =>
     favorite ? `Couldn't add to favorites (${reason})` : `Couldn't remove from favorites (${reason})`,
+  requestFailed: (reason: string) => `Couldn't answer the chat request (${reason})`,
   chatHidden: "Chat hidden. Search finds it; a new message brings it back.",
   renameFailed: (reason: string) => `Couldn't rename (${reason})`,
   muteFailed: (muted: boolean, reason: string) =>

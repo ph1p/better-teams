@@ -60,6 +60,14 @@ export async function setChatHidden(convId: string, hidden: boolean): Promise<Cd
   return store.setHidden(convId, hidden) ? done : no("unknown chat");
 }
 
+export async function answerChatRequest(
+  convId: string,
+  _inviterId: string,
+  action: "Accept" | "Block",
+): Promise<CdlRes<true>> {
+  return store.answerRequest(convId, action) ? done : no("unknown chat");
+}
+
 export function watchChatEvents(convId: string, onEvents: (events: ChatEvent[]) => void): () => void {
   return store.onChatEvent((id, type, messageId) => {
     if (id === convId) onEvents([{ type, convId: id, ...(messageId ? { messageId } : {}) }]);

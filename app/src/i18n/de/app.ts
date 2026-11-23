@@ -34,6 +34,7 @@ export const app: Messages["app"] = {
     favorite
       ? `Zu Favoriten hinzufügen fehlgeschlagen (${reason})`
       : `Aus Favoriten entfernen fehlgeschlagen (${reason})`,
+  requestFailed: (reason) => `Chat-Anfrage konnte nicht beantwortet werden (${reason})`,
   chatHidden: "Chat ausgeblendet. Die Suche findet ihn; eine neue Nachricht holt ihn zurück.",
   renameFailed: (reason) => `Umbenennen fehlgeschlagen (${reason})`,
   muteFailed: (muted, reason) =>

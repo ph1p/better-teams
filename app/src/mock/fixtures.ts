@@ -53,8 +53,10 @@ const ben = person("Ben Hughes", "Account Executive", "Sales", "London");
 // In the directory only: findable via people search, no chat yet.
 const clara = person("Clara Jensen", "Engineering Manager", "Engineering", "Copenhagen");
 const david = person("David Kim", "Security Engineer", "Platform", "Remote");
+// Outside your contacts: wrote first, so the chat waits as a request.
+const rico = person("Rico Stern", "Freelancer", "External", "Vienna");
 
-export const PEOPLE: Person[] = [me, maya, jonas, priya, lukas, sofia, tom, elena, aiko, noah, ben, clara, david];
+export const PEOPLE: Person[] = [me, maya, jonas, priya, lukas, sofia, tom, elena, aiko, noah, ben, clara, david, rico];
 
 // Teams apps (bots) sit in the 28: MRI space and carry a square app icon.
 const appIcon = (letter: string, color: string): string =>
@@ -119,6 +121,8 @@ export interface SeedChat {
   favorite?: boolean;
   pinned?: boolean;
   hidden?: boolean;
+  /** A chat request from someone outside your contacts. */
+  request?: boolean;
   /** Messages newer than this many minutes ago count as unread. */
   readAgo?: number;
   /** Index of the call root that is running right now. */
@@ -450,6 +454,13 @@ export const CHATS: SeedChat[] = [
         ),
       },
     ],
+  },
+  {
+    id: "19:dm-rico@unq.gbl.spaces",
+    kind: "chat",
+    members: [rico.mri],
+    request: true,
+    messages: [{ from: rico.mri, ago: 2 * H, html: p("Hi! Saw your talk, could we chat about a project?") }],
   },
   {
     id: "48:notes",

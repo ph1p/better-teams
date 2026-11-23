@@ -2,6 +2,7 @@ import type { Messages } from "../en";
 
 export const sidebar: Messages["sidebar"] = {
   sections: {
+    requests: "Anfragen",
     fav: "Favoriten",
     dms: "Direktnachrichten",
     groups: "Gruppen",

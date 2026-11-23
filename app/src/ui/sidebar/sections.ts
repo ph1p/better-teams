@@ -48,8 +48,9 @@ export function buildSections(
   }
   // The self-chat (Notes) lives in its own slot at the bottom of the sidebar,
   // never in a section.
-  const pinned = (c: Chat): boolean => c.kind !== "notes" && (c.favorite || c.pinned);
-  const rest = list.filter((c) => !pinned(c) && c.kind !== "notes");
+  // Chat requests wait on top until accepted or blocked, outside every other section.
+  const pinned = (c: Chat): boolean => c.kind !== "notes" && !c.request && (c.favorite || c.pinned);
+  const rest = list.filter((c) => !pinned(c) && c.kind !== "notes" && !c.request);
   // Channels grouped by team; teams ordered by their latest activity, so the
   // busy team sits on top. Within a team, newest first (list order).
   const channels = rest.filter((c) => c.kind === "channel");
@@ -60,6 +61,7 @@ export function buildSections(
   channels.sort((a, b) => teamRank.get(a.team)! - teamRank.get(b.team)!);
   return (
     [
+      { id: "requests", rows: list.filter((c) => c.request) },
       { id: "fav", rows: list.filter(pinned) },
       { id: "dms", rows: rest.filter(isDirect) },
       { id: "groups", rows: rest.filter((c) => c.kind === "chat" && c.group) },

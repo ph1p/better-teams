@@ -108,6 +108,10 @@ export async function setChatFavorite(conversationId: string, fav: boolean): Pro
   return store.setFavorite(conversationId, fav) ? ok : fail("unknown chat");
 }
 
+export async function answerChatRequest(c: Chat, action: "Accept" | "Block"): Promise<WriteResult> {
+  return store.answerRequest(c.id, action) ? ok : fail("unknown chat");
+}
+
 export async function setChatHidden(conversationId: string, hidden: boolean): Promise<WriteResult> {
   return store.setHidden(conversationId, hidden) ? ok : fail("unknown chat");
 }

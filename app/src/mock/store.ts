@@ -25,6 +25,8 @@ interface MockChat {
   readMs: number;
   marked: boolean;
   hidden: boolean;
+  /** A chat request not yet accepted or blocked. */
+  request?: boolean;
   muted?: boolean;
   left?: boolean;
   /** Channel notification preset (channels only). */
@@ -127,6 +129,7 @@ for (const seed of CHATS) {
     readMs: at(seed.readAgo ?? 0) + 1,
     marked: false,
     hidden: !!seed.hidden,
+    ...(seed.request ? { request: true } : {}),
     favorite: !!seed.favorite,
     pinned: !!seed.pinned,
     ...(seed.liveCall !== undefined ? { liveCall: messages[seed.liveCall].id } : {}),
@@ -232,6 +235,7 @@ export function listChats(): Chat[] {
       favorite: c.favorite,
       pinned: c.pinned,
       hidden: c.hidden,
+      ...(c.request ? { request: true, inviter: others[0] } : {}),
       muted: !!c.muted,
       group: c.group,
       left: !!c.left,
@@ -358,6 +362,15 @@ export function setFavorite(convId: string, fav: boolean): boolean {
   const c = chats.get(convId);
   if (!c) return false;
   c.favorite = fav;
+  return true;
+}
+
+/** Accept moves a chat request into the list; Block drops it. */
+export function answerRequest(convId: string, action: "Accept" | "Block"): boolean {
+  const c = chats.get(convId);
+  if (!c) return false;
+  c.request = false;
+  if (action === "Block") c.hidden = true;
   return true;
 }
 
