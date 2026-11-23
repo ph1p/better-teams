@@ -52,7 +52,7 @@ export function Row({
     <GroupAvatar members={chat.members} small={compact} />
   ) : (
     <Avatar
-      name={chatTitle(chat)}
+      name={chat.title}
       uri={avatarUri(chat.avatarMri)}
       mri={chat.avatarMri}
       small={compact}

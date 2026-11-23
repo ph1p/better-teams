@@ -132,7 +132,7 @@ export function ChatHeader({
           <GroupAvatar members={chat.members} />
         ) : (
           <Avatar
-            name={chatTitle(chat)}
+            name={chat.title}
             uri={avatarUri(chat.avatarMri)}
             mri={chat.avatarMri}
             status={statusOf(chat.avatarMri)}
