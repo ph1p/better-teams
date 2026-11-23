@@ -397,6 +397,16 @@
 #tc-root .tc-main-head .tc-name {
   font-size: 15px;
 }
+/* One line each: a long status / job title truncates instead of wrapping the
+   header past its fixed height when the chat column gets narrow. */
+#tc-root .tc-main-head .tc-sub,
+#tc-root .tc-main-head .tc-name {
+  @apply truncate;
+}
+#tc-root .tc-main-head > .tc-av,
+#tc-root .tc-main-head > .tc-av-ring {
+  flex-shrink: 0;
+}
 /* Message column + composer centre at ~820px on wide windows (line length). */
 #tc-root .tc-msgs {
   @apply flex-1 overflow-y-auto;

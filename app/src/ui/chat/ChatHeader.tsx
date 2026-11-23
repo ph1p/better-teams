@@ -151,7 +151,11 @@ export function ChatHeader({
             {chat.muted ? <BellOff size={13} className="tc-head-muted" aria-label={t().common.muted} /> : null}
             {chat.app ? <span className="tc-app-badge">{t().common.app}</span> : null}
           </span>
-          {headSub ? <span className="tc-sub">{headSub}</span> : null}
+          {headSub ? (
+            <span className="tc-sub" title={headSub}>
+              {headSub}
+            </span>
+          ) : null}
         </div>
         <button
           className={"tc-ghost tc-icon-only" + (searchOpen ? " on" : "")}
