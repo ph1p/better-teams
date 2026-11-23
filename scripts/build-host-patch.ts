@@ -30,10 +30,10 @@ const app = readFileSync(src, "utf8");
 // Teams shows a badge for.
 
 const payload = `
-/*teams-calm:begin*/
+/*better-teams:begin*/
 ;(function () {
-  if (window.opener || self.__teamsCalmHost) return;
-  self.__teamsCalmHost = 1;
+  if (window.opener || self.__betterTeamsHost) return;
+  self.__betterTeamsHost = 1;
 
   // Sloppy-mode on purpose: \`with\` routes free identifiers to the child window.
   function run(w) { with (w) { (function () {
@@ -45,10 +45,10 @@ ${app}
         if (w.closed) { clearInterval(iv); return; }
         var d = w.document;
         if (!d || !d.body || w.location.origin !== location.origin) return;
-        if (w.__teamsCalmDoc === d) return; // already injected into this document
-        w.__teamsCalmDoc = d;
+        if (w.__betterTeamsDoc === d) return; // already injected into this document
+        w.__betterTeamsDoc = d;
         run(w);
-      } catch (e) { console.warn("[teams-calm]", e); }
+      } catch (e) { console.warn("[better-teams]", e); }
     }, 300);
   }
   var open0 = window.open;
@@ -58,7 +58,7 @@ ${app}
     return w;
   };
 })();
-/*teams-calm:end*/
+/*better-teams:end*/
 `;
 writeFileSync(out, payload);
 console.log(`wrote ${out} (${(payload.length / 1024).toFixed(0)} KB)`);

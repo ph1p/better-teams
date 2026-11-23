@@ -1,42 +1,42 @@
-# Teams Calm
+# Better Teams
 
 A calmer, Slack-like client that runs **inside the new Microsoft Teams** desktop
 app on macOS. It is a React overlay above Teams: same login, same chats, read
 and written through Teams' own backend. Teams keeps running underneath, so
 calls, meetings and files still work natively. Toggle with **Option+Cmd+T**.
 
-> Teams Calm is an independent project. It is not affiliated with, endorsed by
+> Better Teams is an independent project. It is not affiliated with, endorsed by
 > or supported by Microsoft. "Microsoft Teams" is a trademark of Microsoft.
 
 ## Requirements
 
 - macOS with the **new** Microsoft Teams in `/Applications` (tested on 26289.x)
-- Node.js 20+ and pnpm (`corepack enable pnpm`; `teams-calm dev` needs Node 22+)
+- Node.js 20+ and pnpm (`corepack enable pnpm`; `better-teams dev` needs Node 22+)
 - An administrator password: the Teams app bundle is owned by root
 
-Check everything with `./teams-calm doctor`.
+Check everything with `./better-teams doctor`.
 
 ## Install
 
 ```sh
-git clone <this repo> teams-calm && cd teams-calm
+git clone <this repo> better-teams && cd better-teams
 ./install.sh               # or ./install.sh --no-start
 ```
 
 The installer checks the requirements, installs dependencies with `pnpm install`,
-links a `teams-calm` launcher into `~/.local/bin`, builds the overlay, patches
+links a `better-teams` launcher into `~/.local/bin`, builds the overlay, patches
 Teams and relaunches it. It is safe to re-run, e.g. after `git pull`.
 
-After a **Teams update** the patch is gone: run `teams-calm` again.
+After a **Teams update** the patch is gone: run `better-teams` again.
 
 ## Use
 
 ```sh
-teams-calm            # build, patch if needed, relaunch Teams
-teams-calm status     # Teams version, patch state, debug port
-teams-calm off        # restore original Teams (relaunch if it was running)
-teams-calm doctor     # check requirements
-teams-calm help       # all commands
+better-teams            # build, patch if needed, relaunch Teams
+better-teams status     # Teams version, patch state, debug port
+better-teams off        # restore original Teams (relaunch if it was running)
+better-teams doctor     # check requirements
+better-teams help       # all commands
 ```
 
 The overlay follows Teams' language (English or German); the status menu
@@ -46,7 +46,7 @@ in the overlay too, not only in Teams underneath.
 ## Uninstall
 
 ```sh
-./uninstall.sh             # or: teams-calm uninstall
+./uninstall.sh             # or: better-teams uninstall
 ./uninstall.sh --purge     # also delete node_modules and build output
 ```
 
@@ -58,21 +58,21 @@ delete it to remove everything.
 
 | Symptom                             | Fix                                                                       |
 | ----------------------------------- | ------------------------------------------------------------------------- |
-| Overlay gone after a Teams update   | Run `teams-calm`.                                                         |
-| Teams misbehaves or won't start     | `teams-calm off`, then report the Teams version from `teams-calm status`. |
+| Overlay gone after a Teams update   | Run `better-teams`.                                                         |
+| Teams misbehaves or won't start     | `better-teams off`, then report the Teams version from `better-teams status`. |
 | `client-bindings/bundle.js missing` | This Teams build loads differently and is not supported.                  |
-| `teams-calm: command not found`     | Add `~/.local/bin` to `PATH` (the installer prints the line).             |
+| `better-teams: command not found`     | Add `~/.local/bin` to `PATH` (the installer prints the line).             |
 | Teams did not quit                  | Quit it from the menu bar, then run the command again.                    |
 
 ## Develop
 
 ```sh
-teams-calm dev      # or: cd app && pnpm run dev
+better-teams dev      # or: cd app && pnpm run dev
 ```
 
 Relaunches Teams with a DevTools port, runs `vite build --watch` and re-injects
 the overlay into every Teams window on each save (~1s, UI state resets).
-Ctrl-C relaunches Teams without the port. Run `teams-calm` afterwards to bake
+Ctrl-C relaunches Teams without the port. Run `better-teams` afterwards to bake
 your changes into the patch.
 
 Type-check with `cd app && pnpm run typecheck`.
@@ -95,11 +95,11 @@ real module's exports.
 ### Layout
 
 ```
-teams-calm                 launcher (start, dev, patch, off, status, uninstall…)
+better-teams                 launcher (start, dev, patch, off, status, uninstall…)
 install.sh / uninstall.sh  thin wrappers around the launcher
 scripts/
   build-host-patch.ts     wraps the app bundle into the bundle.js payload
-  dev.ts                  CDP hot-reload for `teams-calm dev`
+  dev.ts                  CDP hot-reload for `better-teams dev`
   presence-bridge.ts      presence events in dev mode
 app/src/
   mount.tsx                entry: mounts the overlay into a Teams window
@@ -115,8 +115,8 @@ docs/                      notes on the Teams APIs used
 
 Teams ships local JS (`Contents/Resources/client-bindings/bundle.js`) that it
 runs in a hidden 1×1 host page; every visible window is `window.open`ed from
-there. `teams-calm` appends the overlay to that file (between
-`/*teams-calm:begin*/` markers, built by `scripts/build-host-patch.ts`). The
+there. `better-teams` appends the overlay to that file (between
+`/*better-teams:begin*/` markers, built by `scripts/build-host-patch.ts`). The
 visible windows enforce Trusted Types, so no script can be injected into them;
 instead the host page runs the overlay inside `with (childWindow) { … }`, so
 `document`, `fetch`, timers etc. resolve to the child window.
@@ -124,7 +124,7 @@ instead the host page runs the overlay inside `with (childWindow) { … }`, so
 ## Security & caveats
 
 - **Patching breaks the app's code-signature seal** (`codesign --verify`
-  fails). Teams still launches and signs in. `teams-calm off` restores the
+  fails). Teams still launches and signs in. `better-teams off` restores the
   exact original bytes and the signature verifies again.
 - **Dev mode opens debug port 9222.** While it runs, any local process can
   read and control your signed-in Teams session. Normal use has no port.

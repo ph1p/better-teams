@@ -25,7 +25,7 @@ declare module "shiki/wasm" {
 declare const __BUILD__: string;
 
 interface Window {
-  __teamsCalmApp?: {
+  __betterTeamsApp?: {
     show: () => void;
     hide: () => void;
     toggle: () => void;

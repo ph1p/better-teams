@@ -1,12 +1,12 @@
 {
-  "name": "teams-calm-app",
+  "name": "better-teams-app",
   "version": "0.1.0",
   "private": true,
   "description": "A calmer, Slack-like overlay inside the new Microsoft Teams desktop app (macOS)",
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "../teams-calm dev",
+    "dev": "../better-teams dev",
     "mock": "vite --mode mock",
     "build": "vite build",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json",

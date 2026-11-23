@@ -114,7 +114,7 @@ export function initHighlighter(): void {
       readyCbs.clear();
     })
     .catch((e) => {
-      console.warn("[teams-calm] highlighter init failed; plain <pre> renders", e);
+      console.warn("[better-teams] highlighter init failed; plain <pre> renders", e);
     });
 }
 

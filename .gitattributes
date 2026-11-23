@@ -1,6 +1,6 @@
 # Keep LF everywhere so bash scripts run after a clone on Windows (WSL, Git Bash).
 * text=auto eol=lf
-teams-calm text eol=lf
+better-teams text eol=lf
 *.sh text eol=lf
 *.png binary
 *.jpg binary

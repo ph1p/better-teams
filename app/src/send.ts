@@ -1,4 +1,4 @@
-// Send layer for Teams Calm.
+// Send layer for Better Teams.
 //
 // We deliberately do NOT replay Teams' undocumented internal POST endpoints
 // (they change and need the live auth token). Instead we drive Teams' own

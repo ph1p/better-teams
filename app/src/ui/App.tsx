@@ -160,7 +160,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     if (!selChat) return;
     onHide?.();
     const ok = await openNativeChat(selChat.id, selChat.title);
-    if (!ok) console.info("teams-calm: chat row not rendered in Teams sidebar:", selChat.title);
+    if (!ok) console.info("better-teams: chat row not rendered in Teams sidebar:", selChat.title);
   }
 
   const openProfile = useCallback((mri: string): void => {

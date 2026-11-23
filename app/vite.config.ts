@@ -54,9 +54,9 @@ export default defineConfig(({ mode }) =>
           cssCodeSplit: false,
           lib: {
             entry: "src/mount.tsx",
-            name: "TeamsCalmApp",
+            name: "BetterTeamsApp",
             formats: ["iife"],
-            fileName: () => "teams-calm-app.js",
+            fileName: () => "better-teams-app.js",
           },
           rollupOptions: {
             output: { inlineDynamicImports: true },

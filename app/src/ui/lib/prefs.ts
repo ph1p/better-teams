@@ -3,11 +3,13 @@
 // guarded and the UI falls back to the default value.
 import { useCallback, useState } from "react";
 
-const PREFIX = "teams-calm:";
+export const PREFIX = "better-teams:";
+// Keys saved before the app was renamed from Teams Calm; read as a fallback.
+const OLD_PREFIX = "teams-calm:";
 
 export function read<T>(key: string, fallback: T): T {
   try {
-    const raw = localStorage.getItem(PREFIX + key);
+    const raw = localStorage.getItem(PREFIX + key) ?? localStorage.getItem(OLD_PREFIX + key);
     return raw === null ? fallback : (JSON.parse(raw) as T);
   } catch {
     return fallback;

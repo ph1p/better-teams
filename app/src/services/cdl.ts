@@ -20,7 +20,7 @@
 // page handler the same way, as if it were the worker, and takes the answer
 // out of the wrapper before it reaches the real worker (see cdlToken()).
 
-const KEY = Symbol.for("teams-calm.cdl");
+const KEY = Symbol.for("better-teams.cdl");
 
 interface Ctx {
   worker: Worker;
@@ -316,7 +316,7 @@ export async function cdlToken(resource: string, ms = 8_000): Promise<string> {
     });
     try {
       const req = {
-        rendererId: "teams-calm",
+        rendererId: "better-teams",
         windowId: ctx.windowId,
         requestId,
         type: "auth",

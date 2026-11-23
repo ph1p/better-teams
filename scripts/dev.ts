@@ -1,7 +1,7 @@
 // Dev reloader: watches the overlay bundle and re-injects it into every visible
 // Teams window over CDP whenever it is rebuilt (pair with `vite build --watch`).
 //
-// Teams must run with remote debugging on port 9222 (`teams-calm dev` does
+// Teams must run with remote debugging on port 9222 (`better-teams dev` does
 // that). Each reinjection replaces the running overlay in place (mount.tsx
 // destroys the previous build when __BUILD__ differs); Teams itself keeps
 // running. A new-document script is kept per window so a reload of that window

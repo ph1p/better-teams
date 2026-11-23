@@ -1,4 +1,4 @@
-// Read/write layer for Teams Calm.
+// Read/write layer for Better Teams.
 //
 // Teams v2 keeps every chat, message and profile in IndexedDB, synced live by
 // its own background worker. We read that same local store directly — no auth

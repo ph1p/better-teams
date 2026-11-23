@@ -51,7 +51,7 @@ interface Vault {
   installed: { fetch?: boolean; xhr?: boolean };
 }
 
-const KEY = Symbol.for("teams-calm.vault");
+const KEY = Symbol.for("better-teams.vault");
 type VaultHost = { [KEY]?: Vault };
 
 // The realm this module runs in: `window` in the host/child page, the worker

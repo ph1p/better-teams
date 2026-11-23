@@ -26,6 +26,6 @@ jobs:
       - run: pnpm run lint
       - run: pnpm run fmt:check
       - run: pnpm run build
-      - run: node ../scripts/build-host-patch.ts dist/teams-calm-app.js dist/teams-calm-host.js
+      - run: node ../scripts/build-host-patch.ts dist/better-teams-app.js dist/better-teams-host.js
       - name: shell scripts parse
-        run: for f in ../teams-calm ../install.sh ../uninstall.sh; do bash -n "$f"; done
+        run: for f in ../better-teams ../install.sh ../uninstall.sh; do bash -n "$f"; done

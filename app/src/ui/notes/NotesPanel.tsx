@@ -1,13 +1,13 @@
 import { useEffect, useRef, type JSX } from "react";
 import { X } from "lucide-react";
-import { usePref } from "../lib/prefs";
+import { PREFIX, usePref } from "../lib/prefs";
 import { t } from "../../i18n";
 
 interface NotesPanelProps {
   onClose: () => void;
 }
 
-// Pref key of the sheet text (stored as "teams-calm:notes").
+// Pref key of the sheet text (stored as "better-teams:notes").
 const KEY = "notes";
 
 // Right-hand scratchpad drawer. Plain text, saved to localStorage on every
@@ -24,7 +24,7 @@ export function NotesPanel({ onClose }: NotesPanelProps): JSX.Element {
 
   useEffect(() => {
     const onStorage = (e: StorageEvent): void => {
-      if (e.key !== "teams-calm:" + KEY || e.newValue === null) return;
+      if (e.key !== PREFIX + KEY || e.newValue === null) return;
       if (document.activeElement === area.current) return;
       try {
         setText(JSON.parse(e.newValue) as string);

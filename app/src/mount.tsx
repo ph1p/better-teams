@@ -39,7 +39,7 @@ function isCallWindow(): boolean {
   return !!document.querySelector(CALL_TIDS);
 }
 
-function mount(): NonNullable<Window["__teamsCalmApp"]> {
+function mount(): NonNullable<Window["__betterTeamsApp"]> {
   // Capture Teams' own ic3 bearer off its chatsvc calls, so uncached chats can
   // load from the same backend. Idempotent; survives re-injection.
   installAuthCapture();
@@ -49,7 +49,7 @@ function mount(): NonNullable<Window["__teamsCalmApp"]> {
   // Warm up Shiki (async WASM + grammars) so code blocks highlight once ready.
   initHighlighter();
   // Re-injecting a new build replaces the running one in place (no reload).
-  const prev = window.__teamsCalmApp;
+  const prev = window.__betterTeamsApp;
   if (prev) {
     if (prev.version === __BUILD__) {
       prev.show();
@@ -173,8 +173,8 @@ function mount(): NonNullable<Window["__teamsCalmApp"]> {
     pill.remove();
   };
 
-  window.__teamsCalmApp = { show, hide, toggle, destroy, version: __BUILD__ };
-  return window.__teamsCalmApp;
+  window.__betterTeamsApp = { show, hide, toggle, destroy, version: __BUILD__ };
+  return window.__betterTeamsApp;
 }
 
 if (document.body) mount();

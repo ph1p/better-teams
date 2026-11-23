@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# teams-calm — run the Teams Calm overlay inside the new Microsoft Teams client.
+# better-teams — run the Better Teams overlay inside the new Microsoft Teams client.
 #
 # How: Teams ships local JS (Contents/Resources/client-bindings/bundle.js) that
 # it runs in a hidden host page; every visible window is opened from there.
@@ -8,7 +8,7 @@
 #
 # Patching breaks the app's code signature seal (`codesign --verify` fails);
 # `unpatch` restores the exact original bytes. A Teams update overwrites the
-# patch — run `teams-calm` again afterwards.
+# patch — run `better-teams` again afterwards.
 #
 # `dev` is different: it relaunches Teams with a DevTools port (9222) and
 # hot-reloads the overlay over CDP on every save. While that port is open, any
@@ -20,7 +20,7 @@
 set -euo pipefail
 
 # Resolve this script's real location even when invoked via a (relative)
-# symlink, e.g. ~/.local/bin/teams-calm.
+# symlink, e.g. ~/.local/bin/better-teams.
 SELF="$0"
 while [ -L "$SELF" ]; do
   link="$(readlink "$SELF")"
@@ -37,17 +37,21 @@ TARGET="$TEAMS_APP/Contents/Resources/client-bindings/bundle.js"
 TESTED="26289"                       # Teams build line the patch was verified on
 NODE_MIN=20                          # vite 6 / tailwind 4
 NODE_DEV_MIN=22                      # dev mode uses Node's global WebSocket
-BIN_LINK="$HOME/.local/bin/teams-calm"
-BUNDLE="$DIR/app/dist/teams-calm-app.js"
-PAYLOAD="$DIR/app/dist/teams-calm-host.js"
-DEV_BUNDLE="$DIR/app/dist-dev/teams-calm-app.js"
-MARK='/*teams-calm:begin*/'
+BIN_LINK="$HOME/.local/bin/better-teams"
+BUNDLE="$DIR/app/dist/better-teams-app.js"
+PAYLOAD="$DIR/app/dist/better-teams-host.js"
+DEV_BUNDLE="$DIR/app/dist-dev/better-teams-app.js"
+MARK='/*better-teams:begin*/'
+# Marker of builds from before the rename: still found, so an old patch is
+# replaced instead of a second overlay appended.
+OLD_MARK='/*teams-calm:begin*/'
+OLD_BIN_LINK="$HOME/.local/bin/teams-calm"
 
 usage() {
   cat <<EOF
-teams-calm ${VERSION:-} — a calmer client inside the new Microsoft Teams (macOS)
+better-teams ${VERSION:-} — a calmer client inside the new Microsoft Teams (macOS)
 
-Usage: teams-calm [command]
+Usage: better-teams [command]
 
   start       Build, patch Teams if needed, restart it (default).
   dev         Hot-reload dev mode (opens debug port $PORT while running).
@@ -74,7 +78,7 @@ die()  { printf 'error: %s\n' "$*" >&2; exit 1; }
 # Byte offset where our payload starts (the "\n" before the marker), or empty.
 payload_offset() {
   local off
-  off="$(LC_ALL=C grep -abo -F "$MARK" "$TARGET" 2>/dev/null | head -1 | cut -d: -f1 || true)"
+  off="$(LC_ALL=C grep -abo -F -e "$MARK" -e "$OLD_MARK" "$TARGET" 2>/dev/null | head -1 | cut -d: -f1 || true)"
   if [ -n "$off" ]; then echo $((off - 1)); fi
 }
 
@@ -90,7 +94,7 @@ root_write() {
   off="$(payload_offset)"
   if [ -n "$off" ]; then head -c "$off" "$TARGET" > "$tmp"; else cat "$TARGET" > "$tmp"; fi
   if [ -n "$payload" ]; then
-    LC_ALL=C grep -qF "$MARK" "$payload" || die "$payload is not a teams-calm payload"
+    LC_ALL=C grep -qF "$MARK" "$payload" || die "$payload is not a better-teams payload"
     cat "$payload" >> "$tmp"
   fi
   cat "$tmp" > "$TARGET"
@@ -117,7 +121,7 @@ need_node() {
 warn_untested() {
   case "$(teams_version)" in
     "$TESTED".*) ;;
-    *) warn "Teams $(teams_version) is untested (verified on $TESTED.x). If the overlay misbehaves, run 'teams-calm off'." ;;
+    *) warn "Teams $(teams_version) is untested (verified on $TESTED.x). If the overlay misbehaves, run 'better-teams off'." ;;
   esac
 }
 
@@ -146,7 +150,7 @@ doctor() {
   ok()   { printf '  ok    %s\n' "$*"; }
   fail() { printf '  FAIL  %s\n' "$*"; bad=1; }
   note() { printf '  note  %s\n' "$*"; }
-  say "teams-calm ${VERSION:-} in $DIR"
+  say "better-teams ${VERSION:-} in $DIR"
   [ "$(uname -s)" = Darwin ] && ok "macOS $(sw_vers -productVersion 2>/dev/null)" || fail "macOS only"
   if command -v node >/dev/null 2>&1; then
     if [ "$(node_major)" -ge "$NODE_MIN" ]; then ok "Node $(node --version)"; else fail "Node $(node --version); need $NODE_MIN+"; fi
@@ -168,7 +172,7 @@ doctor() {
 
 # ---- user-level helpers ------------------------------------------------------
 
-is_patched() { LC_ALL=C grep -qF "$MARK" "$TARGET" 2>/dev/null; }
+is_patched() { LC_ALL=C grep -qF -e "$MARK" -e "$OLD_MARK" "$TARGET" 2>/dev/null; }
 
 # Patched payload equals the current build?
 patch_current() {
@@ -234,9 +238,13 @@ restart_plain() {
 }
 
 remove_launcher() {
+  # The pre-rename launcher points at this checkout's old script name.
+  if [ -L "$OLD_BIN_LINK" ] && [ "$(readlink "$OLD_BIN_LINK")" = "$DIR/teams-calm" ]; then
+    rm -f "$OLD_BIN_LINK"; say "Removed old launcher $OLD_BIN_LINK"
+  fi
   [ -L "$BIN_LINK" ] || return 0
   local to; to="$(readlink "$BIN_LINK")"
-  if [ "$to" = "$SELF" ] || [ "$to" = "$DIR/teams-calm" ]; then rm -f "$BIN_LINK"; say "Removed launcher $BIN_LINK"
+  if [ "$to" = "$SELF" ] || [ "$to" = "$DIR/better-teams" ]; then rm -f "$BIN_LINK"; say "Removed launcher $BIN_LINK"
   else say "Left $BIN_LINK alone (points to $to)."; fi
 }
 
@@ -284,11 +292,11 @@ case "$cmd" in
     wait
     ;;
   status)
-    say "teams-calm: ${VERSION:-?} ($DIR)"
+    say "better-teams: ${VERSION:-?} ($DIR)"
     if [ -d "$TEAMS_APP" ]; then say "Teams:      $(teams_version)$(teams_running && echo ', running' || true)"
     else say "Teams:      not installed"; fi
     if is_patched; then
-      if patch_current; then say "patch:      current build"; else say "patch:      older build (run teams-calm)"; fi
+      if patch_current; then say "patch:      current build"; else say "patch:      older build (run better-teams)"; fi
     else say "patch:      not patched"; fi
     if port_open; then say "debug port: $PORT OPEN"; else say "debug port: closed"; fi
     ;;
@@ -306,7 +314,7 @@ case "$cmd" in
       rm -rf "$DIR/app/node_modules" "$DIR/app/dist" "$DIR/app/dist-dev"
       say "Removed node_modules and build output."
     fi
-    say "Teams Calm is uninstalled. Delete $DIR to remove the source too."
+    say "Better Teams is uninstalled. Delete $DIR to remove the source too."
     say "(Overlay preferences live in Teams' local storage and are inert without the patch.)"
     ;;
   help|-h|--help)
