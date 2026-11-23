@@ -58,7 +58,7 @@ export interface Messages {
   scrollToBottom: () => void;
   /** Pin the view to the bottom on the next render (after a send). */
   stickToBottom: () => void;
-  loadOlder: () => Promise<void>;
+  loadOlder: () => Promise<boolean>;
   /** True once the server has no older page. */
   noMore: RefObject<boolean>;
   refetch: () => void;
@@ -90,6 +90,9 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
   // The open chat, for async work that must not land in a chat opened since.
   const openId = useRef(sel);
   const paging = useRef(false);
+  // The running page load, so concurrent callers (scroll, wheel, jump pump)
+  // await it instead of returning early as if nothing was there.
+  const inflight = useRef<Promise<boolean> | null>(null);
   const noMore = useRef(false);
   const lastMsgSig = useRef("");
   const nullTicks = useRef(0); // consecutive unreachable ticks for the open chat
@@ -110,6 +113,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     hydrated.current = false;
     stick.current = true;
     paging.current = false;
+    inflight.current = null;
     noMore.current = false;
     resetPaging(sel);
     // Capture a backward-paging cursor so scroll-up works even for chats whose
@@ -220,12 +224,13 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     return () => ro.disconnect();
     // hasView: the list mounts only once the chat is known, maybe after `sel`.
   }, [sel, hasView]);
-  const loadOlder = useCallback(async (): Promise<void> => {
-    if (paging.current || noMore.current) return;
+  const loadOlder = useCallback((): Promise<boolean> => {
+    if (inflight.current) return inflight.current;
+    if (noMore.current) return Promise.resolve(false);
     const el = scroller.current;
     const cid = sel;
     paging.current = true;
-    try {
+    const run = async (): Promise<boolean> => {
       // Older pages can overlap what the local cache already shows; keep
       // paging (bounded) until one brings something new, or the view stays
       // stuck at top. An empty page means "nothing yet": stop, retry on the
@@ -234,13 +239,13 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
       let hops = 0;
       do {
         page = await fetchOlderRemote(cid!, selIsChannel, oldestId.current || undefined);
-        if (cid !== openId.current) return; // switched chat mid-fetch
+        if (cid !== openId.current) return false; // switched chat mid-fetch
         if (!page) {
           noMore.current = true;
-          return;
+          return false;
         }
       } while (page.length && page.every((m) => shownIds.current.has(m.id)) && ++hops < 20);
-      if (!page.length) return;
+      if (!page.length) return false;
       if (el) anchor.current = { h: el.scrollHeight, top: el.scrollTop };
       setOlder((o) => {
         const base = o.id === cid ? o.list : [];
@@ -248,9 +253,14 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
         const add = page.filter((m) => !seen.has(m.id));
         return { id: cid, list: [...add, ...base] };
       });
-    } finally {
+      return true;
+    };
+    const p = run().finally(() => {
       paging.current = false;
-    }
+      if (inflight.current === p) inflight.current = null;
+    });
+    inflight.current = p;
+    return p;
   }, [sel, selIsChannel]);
 
   // True while the message list is scrolled near the bottom; drives the
