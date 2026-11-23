@@ -275,8 +275,18 @@ wait_for_port() {
   die "Teams did not open debug port $PORT within 15s"
 }
 
-launch_plain() { open -a "$APP"; }
-launch_debug() { WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=$PORT" open -a "$APP"; }
+# Right after a quit, LaunchServices can still list Teams as running and
+# `open` fails with -600 (procNotFound) for a moment, so retry for a few seconds.
+open_teams() {
+  for _ in $(seq 1 10); do
+    open -a "$APP" 2>/dev/null && return 0
+    sleep 1
+  done
+  open -a "$APP"
+}
+
+launch_plain() { open_teams; }
+launch_debug() { WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=$PORT" open_teams; }
 
 build() {
   if [ "$PREBUILT" = 1 ]; then
