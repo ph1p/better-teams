@@ -20,7 +20,7 @@ import { INITIAL_REMOTE, POLL_MS } from "../lib/constants";
 import type { Flash } from "../lib/toast";
 import type { Chat, Message as Msg } from "../../types";
 import { t } from "../../i18n";
-import { editedContent, msgSig, prunePending, type Pending } from "./messageSync";
+import { editedContent, msgSig, prunePending, reuseUnchanged, type Pending } from "./messageSync";
 
 export type { Pending } from "./messageSync";
 
@@ -153,9 +153,14 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
         const s = msgSig(list);
         if (s !== lastMsgSig.current || force) {
           lastMsgSig.current = s;
-          setMsgs({ id: sel, list, loaded: true });
+          // Reuse unchanged objects so memoized rows skip this poll.
+          setMsgs((cur) => ({
+            id: sel,
+            list: cur.id === sel ? reuseUnchanged(cur.list, list) : list,
+            loaded: true,
+          }));
           // Same batch as the list, so a synced copy and its pending bubble
-          // never paint together.
+          // never paint together. prunePending only reads ids and text.
           setPending((p) => prunePending(p, sel, list, Date.now()));
         }
       } catch (e) {

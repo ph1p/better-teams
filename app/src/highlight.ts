@@ -15,8 +15,6 @@ import themeDark from "shiki/themes/github-dark-default.mjs";
 import themeLight from "shiki/themes/github-light-default.mjs";
 
 import js from "shiki/langs/javascript.mjs";
-import ts from "shiki/langs/typescript.mjs";
-import jsx from "shiki/langs/jsx.mjs";
 import tsx from "shiki/langs/tsx.mjs";
 import json from "shiki/langs/json.mjs";
 import python from "shiki/langs/python.mjs";
@@ -43,7 +41,12 @@ const ALIAS: Record<string, string> = {
   mjs: "javascript",
   cjs: "javascript",
   node: "javascript",
-  ts: "typescript",
+  // tsx covers TS and JSX syntax, so the separate grammars (~430 KB) stay out of the bundle.
+  ts: "tsx",
+  typescript: "tsx",
+  mts: "tsx",
+  cts: "tsx",
+  jsx: "tsx",
   py: "python",
   py3: "python",
   sh: "bash",
@@ -60,8 +63,6 @@ const ALIAS: Record<string, string> = {
 };
 const LOADED = new Set<string>([
   "javascript",
-  "typescript",
-  "jsx",
   "tsx",
   "json",
   "python",
@@ -100,7 +101,7 @@ export function initHighlighter(): void {
   initStarted = true;
   createHighlighterCore({
     themes: [themeDark, themeLight] as ThemeInput,
-    langs: [js, ts, jsx, tsx, json, python, bash, html, css, sql, yaml, md, go, rust, java, csharp] as LangInput,
+    langs: [js, tsx, json, python, bash, html, css, sql, yaml, md, go, rust, java, csharp] as LangInput,
     engine: createJavaScriptRegexEngine(),
   })
     .then((h) => {

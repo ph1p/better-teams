@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { editedContent, msgSig, prunePending, type Pending } from "./messageSync";
+import { editedContent, msgSig, prunePending, reuseUnchanged, type Pending } from "./messageSync";
 import { buildQuoteHtml } from "../../quote";
 import type { Message as Msg } from "../../types";
 
@@ -77,5 +77,33 @@ describe("editedContent", () => {
   });
   it("escapes and prefixes the quote", () => {
     expect(editedContent("a<b", "<blockquote>q</blockquote>")).toBe("<blockquote>q</blockquote><p>a&lt;b</p>");
+  });
+});
+
+describe("reuseUnchanged", () => {
+  it("keeps the same object for an unchanged message", () => {
+    const prev = [msg()];
+    expect(reuseUnchanged(prev, [msg()])[0]).toBe(prev[0]);
+  });
+  it("returns the new object when content changes", () => {
+    const next = [msg({ content: "<p>edited</p>" })];
+    expect(reuseUnchanged([msg()], next)[0]).toBe(next[0]);
+  });
+  it("returns the new object when reactions change", () => {
+    const next = [msg({ reactions: [{ key: "like", count: 1, mine: true } as Msg["reactions"][number]] })];
+    expect(reuseUnchanged([msg()], next)[0]).toBe(next[0]);
+  });
+  it("passes new ids through and drops ids only in prev", () => {
+    const fresh = msg({ id: "2" });
+    const out = reuseUnchanged([msg({ id: "1" })], [fresh]);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toBe(fresh);
+  });
+  it("follows the order of next", () => {
+    const a = msg({ id: "a" });
+    const b = msg({ id: "b" });
+    const out = reuseUnchanged([a, b], [msg({ id: "b" }), msg({ id: "a" })]);
+    expect(out).toEqual([b, a]);
+    expect(out[0]).toBe(b);
   });
 });

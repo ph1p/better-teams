@@ -7,8 +7,8 @@
 // This keeps the rich structure Teams emits — inline images (asyncgw, served
 // with the page's own cookies), @mentions, links, lists, bold/italic, inline
 // code, code blocks and quoted replies — instead of flattening to plain text.
-import { Fragment, useEffect, useState, type ReactNode, type JSX } from "react";
-import { highlightLines, onHighlighterReady, normLang } from "./highlight";
+import { Fragment, useEffect, useMemo, useState, type ReactNode, type JSX } from "react";
+import { highlightLines, initHighlighter, onHighlighterReady, normLang } from "./highlight";
 import { hostOf, isTrustedImgHost, safeHref, safeImgSrc } from "./safeUrl";
 import { t } from "./i18n";
 
@@ -241,9 +241,15 @@ function langHint(node: Node): string {
 // highlighter has loaded (or forever, if the language is unknown), and
 // re-renders when it becomes ready. No innerHTML: tokens become React spans.
 function CodeBlock({ code, lang }: { code: string; lang: string }): JSX.Element {
-  const [, bump] = useState(0);
+  const [ready, bump] = useState(0);
   useEffect(() => onHighlighterReady(() => bump((n) => n + 1)), []);
-  const lines = lang ? highlightLines(code, lang) : null;
+  // Compile the grammars on the first code block, not at injection. Idempotent.
+  useEffect(() => {
+    if (lang) initHighlighter();
+  }, [lang]);
+  // `ready` re-runs the highlight once the highlighter has loaded.
+  // oxlint-disable-next-line react-hooks/exhaustive-deps
+  const lines = useMemo(() => (lang ? highlightLines(code, lang) : null), [code, lang, ready]);
   if (!lines) {
     return (
       <pre className="tc-pre">
@@ -343,9 +349,13 @@ function toReact(node: Node, seq: { n: number }): ReactNode {
 
 // Render a Teams HTML content string as safe React nodes.
 export function RichHtml({ html }: { html: string }): JSX.Element | null {
-  if (!html) return null;
-  const tree = prune(parse(String(html)));
-  if (!tree || typeof tree === "string") return null;
-  const seq = { n: 0 };
-  return <>{tree.children.map((c) => toReact(c, seq))}</>;
+  // Parsing is the costly part, so skip it while the HTML is unchanged.
+  const nodes = useMemo(() => {
+    if (!html) return null;
+    const tree = prune(parse(String(html)));
+    if (!tree || typeof tree === "string") return null;
+    const seq = { n: 0 };
+    return tree.children.map((c) => toReact(c, seq));
+  }, [html]);
+  return nodes ? <>{nodes}</> : null;
 }

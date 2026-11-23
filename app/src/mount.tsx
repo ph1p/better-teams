@@ -5,7 +5,6 @@ import { createRoot } from "react-dom/client";
 import App from "./ui/App";
 import { CSS } from "./styles";
 import { installAuthCapture, installCdl } from "./services";
-import { initHighlighter } from "./highlight";
 import { t } from "./i18n";
 
 const ROOT_ID = "tc-root";
@@ -46,8 +45,6 @@ function mount(): NonNullable<Window["__betterTeamsApp"]> {
   // Learn Teams' worker channel from its own GraphQL traffic (services/cdl.ts),
   // so the overlay can send the same requests Teams' UI sends. Idempotent.
   installCdl();
-  // Warm up Shiki (async WASM + grammars) so code blocks highlight once ready.
-  initHighlighter();
   // Re-injecting a new build replaces the running one in place (no reload).
   const prev = window.__betterTeamsApp;
   if (prev) {
