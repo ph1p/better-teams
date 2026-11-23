@@ -155,7 +155,9 @@ instead the host page runs the overlay inside `with (childWindow) { … }`, so
 - **Dev mode opens debug port 9222.** While it runs, any local process can
   read and control your signed-in Teams session. Normal use has no port.
 - No data leaves your machine except through Teams' own endpoints, with
-  Teams' own tokens.
+  Teams' own tokens. The one exception is a version check: once a day the
+  overlay asks the public GitHub API for the latest release tag, without
+  cookies or tokens. Turn it off under Settings → Update check.
 - Microsoft's terms don't sanction modifying the client; this is a personal,
   local-only tweak. On a managed/work device, check your IT policy first.
 - macOS only.

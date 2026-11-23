@@ -1,11 +1,23 @@
 import { useCallback, useEffect, useRef, useState, type JSX, type CSSProperties } from "react";
-import { ArrowLeftRight, Check, RotateCcw, ChevronUp, Github, MessageSquare, Settings } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Check,
+  CircleArrowUp,
+  Copy,
+  RotateCcw,
+  ChevronUp,
+  Github,
+  MessageSquare,
+  Settings,
+} from "lucide-react";
 import { myMri, profile } from "../../teamsData";
 import { myNote, setMyNote, setMyStatus, type NoteExpiry, type SettableStatus } from "../../status";
 import { Avatar } from "../shared/Avatar";
 import { avatarUri } from "../lib/format";
 import { t } from "../../i18n";
 import { SettingsModal } from "./SettingsModal";
+import { UPDATE_CMD, checkForUpdate, releaseUrl, useUpdate } from "../../update";
+import { useCopied } from "../lib/clipboard";
 import { Select } from "../shared/Select";
 import { STATUS_COLOR, statusLabel, setSelfPresence, usePresence, type Status } from "../lib/presence";
 
@@ -44,6 +56,8 @@ export function MeBar({ compact, onCompact, onSwitchToTeams, onError }: MeBarPro
   const [settingsOpen, setSettingsOpen] = useState(false);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const [, rerender] = useState(0);
+  const update = useUpdate();
+  const [copied, copy] = useCopied();
   const note = myNote();
   const box = useRef<HTMLDivElement>(null);
   const mri = myMri();
@@ -52,6 +66,13 @@ export function MeBar({ compact, onCompact, onSwitchToTeams, onError }: MeBarPro
   const name = (p && p.displayName) || t().common.you;
   const own = self();
   const status: Status = own !== "Unknown" ? own : statusOf(mri);
+
+  // Throttled to one request a day inside; the timer covers a Teams window left open for days.
+  useEffect(() => {
+    void checkForUpdate();
+    const id = setInterval(() => void checkForUpdate(), 6 * 60 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // The note editor closes with the menu.
   if (!open && noteOpen) setNoteOpen(false);
@@ -107,6 +128,7 @@ export function MeBar({ compact, onCompact, onSwitchToTeams, onError }: MeBarPro
         <span className="tc-me-name">{name}</span>
         <span className="tc-me-status">{note ? statusLabel(status) + " · " + note.text : statusLabel(status)}</span>
       </span>
+      {update && !open ? <span className="tc-me-update-dot" title={s.updateAvailable(update)} /> : null}
       <ChevronUp size={15} className="tc-me-chev" />
     </button>
   );
@@ -220,6 +242,24 @@ export function MeBar({ compact, onCompact, onSwitchToTeams, onError }: MeBarPro
             <span className="tc-me-kb">⌥⌘T</span>
           </button>
           <div className="tc-menu-sep" />
+          {update ? (
+            <div className="tc-me-update">
+              <div className="tc-me-update-head">
+                <CircleArrowUp size={14} />
+                <span>{s.updateAvailable(update)}</span>
+              </div>
+              <button className="tc-me-update-cmd" onClick={() => copy(UPDATE_CMD)} title={s.updateCopy}>
+                <code>{UPDATE_CMD}</code>
+                {copied ? <Check size={13} /> : <Copy size={13} />}
+              </button>
+              <div className="tc-me-update-hint">
+                <span>{s.updateHint}</span>
+                <a href={releaseUrl(update)} target="_blank" rel="noreferrer noopener" onClick={() => setOpen(false)}>
+                  {s.updateNotes}
+                </a>
+              </div>
+            </div>
+          ) : null}
           <div className="tc-me-about">
             <span className="tc-me-about-ver">
               Better Teams {__VERSION__}

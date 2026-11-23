@@ -1,9 +1,10 @@
-import { useEffect, type JSX, type ReactNode } from "react";
-import { Contact, Languages, Rows3, X } from "lucide-react";
+import { useEffect, useState, type JSX, type ReactNode } from "react";
+import { Contact, Languages, RefreshCw, Rows3, X } from "lucide-react";
 import { NAME_FORMATS, nameFormat, setNameFormat, type NameFormat } from "../../names";
 import { Select } from "../shared/Select";
 import { LANGS, autoLang, langPref, setLangPref, t, type LangPref } from "../../i18n";
 import { useModalExit } from "../lib/modalExit";
+import { setUpdateCheck, updateCheckOn } from "../../update";
 
 interface SettingsModalProps {
   compact: boolean;
@@ -16,6 +17,7 @@ interface SettingsModalProps {
 export function SettingsModal({ compact, onCompact, onClose }: SettingsModalProps): JSX.Element {
   const { closing, close } = useModalExit(onClose);
   const c = t().common;
+  const [updates, setUpdates] = useState(updateCheckOn);
   useEffect(() => {
     const key = (e: KeyboardEvent): void => {
       if (e.key === "Escape") close();
@@ -49,6 +51,19 @@ export function SettingsModal({ compact, onCompact, onClose }: SettingsModalProp
                     {l.name}
                   </option>
                 ))}
+              </Select>
+            </Row>
+            <Row icon={<RefreshCw size={15} />} label={c.updateCheck} hint={c.updateCheckHint}>
+              <Select
+                value={updates ? "on" : "off"}
+                onChange={(e) => {
+                  const on = e.target.value === "on";
+                  setUpdates(on);
+                  setUpdateCheck(on);
+                }}
+              >
+                <option value="on">{c.on}</option>
+                <option value="off">{c.off}</option>
               </Select>
             </Row>
           </div>

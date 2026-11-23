@@ -16,6 +16,10 @@ export const sidebar: Messages["sidebar"] = {
 
   madeBy: (site) => `by ${site}`,
   sourceOnGitHub: "Quellcode auf GitHub",
+  updateAvailable: (v) => `Version ${v} ist da`,
+  updateNotes: "Neuerungen",
+  updateCopy: "Befehl kopieren",
+  updateHint: "Im Terminal einfügen. Teams startet neu.",
   newChat: "Neuer Chat",
   search: "Suchen  ⌘K",
   unread: "Ungelesen",

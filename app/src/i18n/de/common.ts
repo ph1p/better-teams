@@ -36,6 +36,10 @@ export const common: Messages["common"] = {
   languageHint: "Für Menüs und Beschriftungen",
   nameFormatHint: "In Listen und Nachrichten",
   chatListHint: "Zeilen in der Seitenleiste",
+  updateCheck: "Nach Updates suchen",
+  updateCheckHint: "Fragt GitHub einmal am Tag nach einer neuen Version",
+  on: "An",
+  off: "Aus",
   chatList: "Chatliste",
   chatLists: { compact: "Kompakt", previews: "Mit Vorschau" },
   nameFormats: {

@@ -35,6 +35,10 @@ export const common = {
   languageHint: "For menus and labels",
   nameFormatHint: "In lists and messages",
   chatListHint: "Rows in the sidebar",
+  updateCheck: "Update check",
+  updateCheckHint: "Asks GitHub once a day for a new version",
+  on: "On",
+  off: "Off",
   chatList: "Chat list",
   chatLists: { compact: "Compact", previews: "With previews" },
   nameFormats: {
