@@ -18,6 +18,8 @@ export const sidebar = {
   sourceOnGitHub: "Source code on GitHub",
   search: "Search  ⌘K",
   unread: "Unread",
+  allChats: "All chats",
+  allChatsTitle: "Back to all conversations  ⌥U",
   unreadFilterTitle: "Only unread conversations  ⌥U · next unread ⌥⇧↓",
   cantRead: "Can't read Teams' local data in this window.",
   noMatch: (q: string) => `No chats match “${q}”.`,

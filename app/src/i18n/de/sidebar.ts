@@ -19,6 +19,8 @@ export const sidebar: Messages["sidebar"] = {
   newChat: "Neuer Chat",
   search: "Suchen  ⌘K",
   unread: "Ungelesen",
+  allChats: "Alle Chats",
+  allChatsTitle: "Zurück zu allen Unterhaltungen  ⌥U",
   unreadFilterTitle: "Nur ungelesene Unterhaltungen  ⌥U · nächste ungelesene ⌥⇧↓",
   cantRead: "Die lokalen Teams-Daten sind in diesem Fenster nicht lesbar.",
   noMatch: (q) => `Keine Chats passen zu „${q}“.`,

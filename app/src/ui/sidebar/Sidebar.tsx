@@ -1,5 +1,5 @@
 import type { JSX, MouseEvent, RefObject } from "react";
-import { CheckCheck, Search, SquarePen } from "lucide-react";
+import { ArrowLeft, CheckCheck, Search, SquarePen } from "lucide-react";
 import { Section } from "./Section";
 import { Row } from "./Row";
 import { MeBar } from "./MeBar";
@@ -88,10 +88,19 @@ export function Sidebar(p: SidebarProps): JSX.Element {
           className={"tc-unread-pill" + (unreadOnly ? " on" : "")}
           aria-pressed={unreadOnly}
           onClick={() => onUnreadFilter(!unreadOnly)}
-          title={s.unreadFilterTitle}
+          title={unreadOnly ? s.allChatsTitle : s.unreadFilterTitle}
         >
-          {s.unread}
-          {unreadCount ? <span className="tc-unread-n">{unreadCount}</span> : null}
+          {unreadOnly ? (
+            <>
+              <ArrowLeft size={13} aria-hidden />
+              {s.allChats}
+            </>
+          ) : (
+            <>
+              {s.unread}
+              {unreadCount ? <span className="tc-unread-n">{unreadCount}</span> : null}
+            </>
+          )}
         </button>
       </div>
       <div className="tc-list">
