@@ -24,6 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -49,3 +51,8 @@ jobs:
           -p @semantic-release/exec@6.0.3
           -p @semantic-release/git@10.0.1
           semantic-release
+      - name: attest release tarball
+        if: hashFiles('release/better-teams.tar.gz') != ''
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: release/better-teams.tar.gz
