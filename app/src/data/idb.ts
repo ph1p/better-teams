@@ -1,4 +1,5 @@
 // Teams IndexedDB plumbing: find and open Teams' own databases, read rows.
+import { consumerMri } from "../services/auth";
 import { cdlAccountOid, whenCdl } from "../services/cdl";
 import { get } from "./raw";
 
@@ -49,7 +50,9 @@ export async function open(fragment: string): Promise<IDBDatabase> {
 }
 
 export let CURRENT_OID = "";
-export const myMri = (): string => (CURRENT_OID ? "8:orgid:" + CURRENT_OID : "");
+// Work accounts are "8:orgid:<oid>"; personal (MSA) ones "8:<skype id>", which
+// the oid does not encode.
+export const myMri = (): string => consumerMri() || (CURRENT_OID ? "8:orgid:" + CURRENT_OID : "");
 
 function req(r: IDBRequest): Promise<unknown[]> {
   return new Promise((res) => {

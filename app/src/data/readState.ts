@@ -1,7 +1,7 @@
 // Read state and visibility: mark read/unread, hide, plus the local overrides
 // that bridge the gap until Teams' IndexedDB catches up with a write.
 import type { WriteResult } from "../types";
-import { chat, chatsvc, token } from "../services";
+import { chat, chatAud, chatsvc, token } from "../services";
 import { toWrite, type Dict } from "./raw";
 import { isChannelId, lastByConv } from "./state";
 
@@ -98,7 +98,7 @@ const pendingHorizon = new Map<string, number>();
 
 async function setConsumptionHorizon(conversationId: string, ms: number): Promise<WriteResult> {
   const v = Math.round(ms);
-  if (!token("ic3")) {
+  if (!token(chatAud())) {
     pendingHorizon.set(conversationId, v);
     horizonOverride.set(conversationId, { ms: v });
     return { ok: true, via: "queued" };
@@ -110,7 +110,7 @@ async function setConsumptionHorizon(conversationId: string, ms: number): Promis
 }
 
 export async function flushPendingHorizons(): Promise<void> {
-  if (!pendingHorizon.size || !token("ic3")) return;
+  if (!pendingHorizon.size || !token(chatAud())) return;
   // Snapshot: the loop may re-queue an id it just took out.
   for (const [id, v] of Array.from(pendingHorizon)) {
     pendingHorizon.delete(id);

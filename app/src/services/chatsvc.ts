@@ -2,7 +2,7 @@
 // reads and writes. Every route and body below was captured from the native
 // client (Nov 2026). Returns raw payloads; normalizing is teamsData.ts' job.
 
-import { region } from "./auth";
+import { chatAud, region } from "./auth";
 import { call, type Res } from "./http";
 
 const base = (): string => `/api/chatsvc/${region("chatsvc")}/v1/users/ME/conversations`;
@@ -22,24 +22,24 @@ export interface MessagePage {
 export function getMessages(cid: string, pageSize = 30): Promise<Res<MessagePage>> {
   const n = Math.max(1, Math.min(pageSize, 200));
   return call<MessagePage>(
-    "ic3",
+    chatAud(),
     `${conv(cid)}/messages?view=msnp24Equivalent%7CsupportsMessageProperties&pageSize=${n}&startTime=1`,
   );
 }
 
 /** Follow a page's _metadata.backwardLink (absolute URL) to the next older page. */
 export function getMessagesByLink(link: string): Promise<Res<MessagePage>> {
-  return call<MessagePage>("ic3", link);
+  return call<MessagePage>(chatAud(), link);
 }
 
 /** Post a message. `payload` is the full native message body. */
 export function postMessage(cid: string, payload: Record<string, unknown>): Promise<Res> {
-  return call("ic3", `${conv(cid)}/messages`, { method: "POST", headers: WRITE, body: payload });
+  return call(chatAud(), `${conv(cid)}/messages`, { method: "POST", headers: WRITE, body: payload });
 }
 
 /** Replace a message's content (edit). */
 export function putMessage(cid: string, mid: string, content: string): Promise<Res> {
-  return call("ic3", msg(cid, mid), {
+  return call(chatAud(), msg(cid, mid), {
     method: "PUT",
     headers: WRITE,
     body: { content, messagetype: "RichText/Html", contenttype: "Text" },
@@ -48,7 +48,7 @@ export function putMessage(cid: string, mid: string, content: string): Promise<R
 
 /** Soft delete. The ?behavior=softDelete query is REQUIRED: bare DELETE hard-removes. */
 export function softDeleteMessage(cid: string, mid: string): Promise<Res> {
-  return call("ic3", `${msg(cid, mid)}?behavior=softDelete`, {
+  return call(chatAud(), `${msg(cid, mid)}?behavior=softDelete`, {
     method: "DELETE",
     headers: { ...WRITE, "content-type": "application/json" },
   });
@@ -56,7 +56,7 @@ export function softDeleteMessage(cid: string, mid: string): Promise<Res> {
 
 /** Undo a soft delete by clearing the deletetime property. */
 export function undoSoftDelete(cid: string, mid: string): Promise<Res> {
-  return call("ic3", `${msg(cid, mid)}/properties?name=deletetime`, {
+  return call(chatAud(), `${msg(cid, mid)}/properties?name=deletetime`, {
     method: "DELETE",
     headers: WRITE,
     body: { deletetime: null },
@@ -68,7 +68,7 @@ export function undoSoftDelete(cid: string, mid: string): Promise<Res> {
  * DELETE on the message route deletes the whole message.
  */
 export function putReaction(cid: string, mid: string, key: string, add: boolean): Promise<Res> {
-  return call("ic3", `${msg(cid, mid)}/properties?name=emotions`, {
+  return call(chatAud(), `${msg(cid, mid)}/properties?name=emotions`, {
     method: add ? "PUT" : "DELETE",
     headers: WRITE,
     body: add ? { emotions: { key, value: Date.now() } } : { emotions: { key } },
@@ -77,7 +77,7 @@ export function putReaction(cid: string, mid: string, key: string, add: boolean)
 
 /** Replace one message property, e.g. "files" (a JSON string, like Teams stores it). */
 export function putMessageProperty(cid: string, mid: string, name: string, value: string): Promise<Res> {
-  return call("ic3", `${msg(cid, mid)}/properties?name=${encodeURIComponent(name)}`, {
+  return call(chatAud(), `${msg(cid, mid)}/properties?name=${encodeURIComponent(name)}`, {
     method: "PUT",
     headers: WRITE,
     body: { [name]: value },
@@ -86,7 +86,7 @@ export function putMessageProperty(cid: string, mid: string, name: string, value
 
 /** Set one conversation property (consumptionhorizon, consumptionHorizonBookmark, …). */
 export function putConversationProperty(cid: string, name: string, value: string): Promise<Res> {
-  return call("ic3", `${conv(cid)}/properties?name=${encodeURIComponent(name)}`, {
+  return call(chatAud(), `${conv(cid)}/properties?name=${encodeURIComponent(name)}`, {
     method: "PUT",
     headers: WRITE,
     body: { [name]: value },

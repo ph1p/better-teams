@@ -25,7 +25,7 @@
 // window makes few backend calls of its own and, with tokens of its own, never
 // saw a chatsvc token and could not load messages.
 
-import { cdlToken } from "./cdl";
+import { cdlAccountOid, cdlConsumer, cdlSkypeToken, cdlToken } from "./cdl";
 
 export type Audience =
   | "ic3" // chatsvc / asyncgw (messages, conversations, AMS)
@@ -34,6 +34,7 @@ export type Audience =
   | "graph" // graph.microsoft.com
   | "chatsvcagg" // /api/csa (channel posts, tag cards)
   | "mt" // /api/mt (short profiles, team apps); aud api.spaces.skype.com
+  | "skype" // consumer chatsvc (teams.live.com); X-Skypetoken, not a JWT
   | "other";
 
 interface Entry {
@@ -45,7 +46,9 @@ interface Entry {
 
 interface Vault {
   tokens: Map<Audience, Entry>;
-  regions: { chatsvc?: string; mt?: string; ups?: string };
+  // Backend regions read off Teams' traffic; `mri` is the consumer account's
+  // MRI from its skype token (work accounts derive theirs from the oid).
+  regions: { chatsvc?: string; mt?: string; ups?: string; mri?: string };
   waiters: Set<() => void>;
   /** Which of this realm's request APIs are wrapped; never shared. */
   installed: { fetch?: boolean; xhr?: boolean };
@@ -141,6 +144,11 @@ function remember(authHeader: string, url: string): void {
   if (prev && prev.tok !== tok && prev.exp > exp && prev.exp - Date.now() > 60_000) return;
   v.tokens.set(kind, { tok, exp, at: Date.now(), aud });
   noteRegion(url);
+  notify();
+}
+
+function notify(): void {
+  const v = vault();
   for (const w of Array.from(v.waiters)) {
     // A waiter from a window that has since closed must not stop the others.
     try {
@@ -153,9 +161,10 @@ function remember(authHeader: string, url: string): void {
 
 function noteRegion(url: string): void {
   const v = vault();
-  const cs = /https:\/\/([a-z]{2,4})-prod\.asyncgw/.exec(url) || /\/api\/chatsvc\/([a-z]{2,4})\//.exec(url);
+  const cs = /https:\/\/([a-z]{2,4})-prod\.asyncgw/.exec(url) || /\/api\/chatsvc\/([a-z]{2,4}|consumer)\//.exec(url);
   if (cs) v.regions.chatsvc = cs[1];
-  const mt = /\/api\/mt\/([a-z]{2,4})\//.exec(url);
+  // Consumer mt has no region segment: /api/mt/beta/…
+  const mt = /\/api\/mt\/(?!beta\/)([a-z]{2,4})\//.exec(url);
   if (mt) v.regions.mt = mt[1];
   const ups = /\/ups\/([a-z]{2,4})\/v1\//.exec(url);
   if (ups) v.regions.ups = ups[1];
@@ -285,21 +294,38 @@ const RENEW_MS = 5 * 60_000;
 
 function refresh(aud: Audience): Promise<void> | null {
   const resource = RESOURCE[aud];
-  if (!resource) return null;
+  if (!resource && aud !== "skype") return null;
   const busy = asking.get(aud);
   if (busy) return busy;
   if (Date.now() - (failedAt.get(aud) || 0) < RETRY_MS) return null;
-  const p = cdlToken(resource)
-    .then((tok) => {
-      const c = tok ? claims(tok) : {};
-      const fresh = typeof c.exp === "number" && c.exp * 1000 - Date.now() > RENEW_MS;
-      if (tok && classify(String(c.aud || ""), "") === aud) remember("Bearer " + tok, "");
-      if (!fresh) failedAt.set(aud, Date.now());
-    })
+  const p = (resource ? refreshAad(aud, resource) : refreshSkype())
     .catch(() => void failedAt.set(aud, Date.now()))
     .finally(() => asking.delete(aud));
   asking.set(aud, p);
   return p;
+}
+
+function refreshAad(aud: Audience, resource: string): Promise<void> {
+  return cdlToken(resource).then((tok) => {
+    const c = tok ? claims(tok) : {};
+    const fresh = typeof c.exp === "number" && c.exp * 1000 - Date.now() > RENEW_MS;
+    if (tok && classify(String(c.aud || ""), "") === aud) remember("Bearer " + tok, "");
+    if (!fresh) failedAt.set(aud, Date.now());
+  });
+}
+
+// Consumer chatsvc takes the skype token Teams' worker gets from the page
+// (getSkypeTokens). It is opaque, so its lifetime comes with the reply.
+function refreshSkype(): Promise<void> {
+  return cdlSkypeToken().then((r) => {
+    // A missing or nearly expired token still blocks retries for RETRY_MS.
+    if (!r || (r.exp && r.exp - Date.now() <= RENEW_MS)) failedAt.set("skype", Date.now());
+    if (!r) return;
+    const v = vault();
+    v.tokens.set("skype", { tok: r.token, exp: r.exp, at: Date.now(), aud: "skype" });
+    if (r.mri) v.regions.mri = r.mri;
+    notify();
+  });
 }
 
 // --- Read side ----------------------------------------------------------------
@@ -350,9 +376,60 @@ export function invalidate(aud: Audience, tok: string): void {
   if (v.tokens.get(aud)?.tok === tok) v.tokens.delete(aud);
 }
 
+/** Personal (MSA) account on teams.live.com rather than a work/school tenant. */
+const consumerHost = ((): boolean => {
+  try {
+    return /(^|\.)teams\.live\.com$/.test(location.hostname);
+  } catch {
+    return false; // no location in this realm
+  }
+})();
+// A page never switches between work and personal; cache the answer once known.
+let consumer = consumerHost;
+export function isConsumer(): boolean {
+  return consumer || (consumer = cdlConsumer());
+}
+
+/** Audience for chatsvc calls: AAD ic3 bearer at work, skype token on consumer. */
+export function chatAud(): Audience {
+  return isConsumer() ? "skype" : "ic3";
+}
+
 export function region(kind: "chatsvc" | "mt" | "ups"): string {
   const r = vault().regions[kind];
-  return r || (kind === "chatsvc" ? "de" : "emea");
+  if (r) return r;
+  if (kind === "chatsvc") return isConsumer() ? "consumer" : "de";
+  return "emea";
+}
+
+/**
+ * Consumer account's own MRI ("8:<skype id>"), or "" at work / before known.
+ * Teams keeps it in clear next to its (encrypted) cached skype token, so it is
+ * readable before our first getSkypeTokens round trip.
+ */
+// Teams' own cached skype token is scanned once; after that only refreshSkype fills the mri.
+let mriScanned = false;
+export function consumerMri(): string {
+  if (!isConsumer()) return "";
+  const v = vault();
+  if (v.regions.mri) return v.regions.mri;
+  // Keys are tmp.auth.v1.<account id>.…; the account id is the MSA oid's tail.
+  if (mriScanned) return "";
+  mriScanned = true;
+  const account = cdlAccountOid().replace(/-/g, "").replace(/^0+/, "");
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i) || "";
+      if (!k.endsWith(".Discover.SKYPE-TOKEN") || (account && !k.includes(account))) continue;
+      type Cached = { item?: { userDetails?: { id?: unknown } } };
+      const id = (JSON.parse(localStorage.getItem(k) || "{}") as Cached).item?.userDetails?.id;
+      if (typeof id === "string" && id.startsWith("8:")) return (v.regions.mri = id);
+    }
+  } catch {
+    /* storage blocked or malformed */
+  }
+  void refresh("skype");
+  return "";
 }
 
 /** Signed-in user's object id, from the ic3 token (empty until captured). */

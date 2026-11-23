@@ -27,7 +27,10 @@ export * as substrate from "./substrate";
 export * as typing from "./typing";
 export {
   authStatus,
+  chatAud,
+  consumerMri,
   ingestAuthHeader,
+  isConsumer,
   installAuthCapture,
   myOid,
   region,

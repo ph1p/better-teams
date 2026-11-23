@@ -17,6 +17,7 @@ const ALLOWED_HOSTS: RegExp[] = [
   /^[a-z]{2,4}-prod\.asyncgw\.teams\.microsoft\.com$/, // AMS
   /^substrate\.office\.com$/,
   /^graph\.microsoft\.com$/,
+  /^([a-z0-9-]+\.)?teams\.live\.com$/, // personal (MSA) accounts and their presence
 ];
 
 export function allowedUrl(url: string): URL | null {
@@ -43,8 +44,10 @@ export interface CallOptions {
 const isRawBody = (b: unknown): b is BodyInit =>
   typeof b === "string" || b instanceof Blob || b instanceof ArrayBuffer || ArrayBuffer.isView(b);
 
-async function once(url: URL, tok: string, o: CallOptions): Promise<Response> {
-  const headers: Record<string, string> = { authorization: "Bearer " + tok, ...o.headers };
+async function once(url: URL, aud: Audience, tok: string, o: CallOptions): Promise<Response> {
+  // Consumer chatsvc authenticates with the skype token header, not a bearer.
+  const auth: Record<string, string> = aud === "skype" ? { "x-skypetoken": tok } : { authorization: "Bearer " + tok };
+  const headers: Record<string, string> = { ...auth, ...o.headers };
   let body: BodyInit | undefined;
   if (o.body !== undefined) {
     if (isRawBody(o.body)) body = o.body;
@@ -66,7 +69,7 @@ export async function call<T = unknown>(aud: Audience, url: string, o: CallOptio
   for (let attempt = 0; attempt < 2; attempt++) {
     let r: Response;
     try {
-      r = await once(u, tok, o);
+      r = await once(u, aud, tok, o);
     } catch {
       return { ok: false, status: 0, reason: "fetch-failed" };
     }

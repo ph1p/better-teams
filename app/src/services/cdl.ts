@@ -52,7 +52,7 @@ interface State {
   wrap?: number;
 }
 
-type AuthReply = { status?: string; response?: { data?: { token?: unknown } } };
+type AuthReply = { status?: string; response?: { data?: Record<string, unknown> } };
 
 type HostWin = Window & typeof globalThis & { [KEY]?: State };
 
@@ -181,9 +181,11 @@ export function cdlReady(): boolean {
 }
 
 /** Object id of the account this Teams window is signed in as, once learned. */
+type AuthUser = { profile?: { objectId?: unknown }; type?: unknown; cloud?: unknown };
+const authUser = (): AuthUser | undefined => state().ctx?.authenticationUser as AuthUser | undefined;
+
 export function cdlAccountOid(): string {
-  const au = state().ctx?.authenticationUser as { profile?: { objectId?: unknown } } | undefined;
-  const oid = au?.profile?.objectId;
+  const oid = authUser()?.profile?.objectId;
   return typeof oid === "string" ? oid : "";
 }
 
@@ -307,14 +309,16 @@ export async function cdl<T = Record<string, unknown>>(
  * The token stays in memory; the caller files it in the vault. Resolves "" on
  * failure or after `ms`. Never throws.
  */
-export async function cdlToken(resource: string, ms = 8_000): Promise<string> {
-  if (!(await whenCdl(Math.min(ms, 5_000)))) return "";
+// One request to the page auth handler Teams' worker uses (requestOperationtype
+// is the worker's own op name). Resolves with the reply, or null on timeout.
+async function authOp(op: string, context: Record<string, unknown>, ms: number): Promise<AuthReply | null> {
+  if (!(await whenCdl(Math.min(ms, 5_000)))) return null;
   installCdl();
   const s = state();
   const ctx = s.ctx!;
   const requestId = `${AUTH_ID}${++s.seq}`;
   s.auth ??= new Map();
-  const reply = await new Promise<AuthReply | null>((resolve) => {
+  return new Promise<AuthReply | null>((resolve) => {
     const t = setTimeout(() => {
       s.auth!.delete(requestId);
       resolve(null);
@@ -329,7 +333,7 @@ export async function cdlToken(resource: string, ms = 8_000): Promise<string> {
         windowId: ctx.windowId,
         requestId,
         type: "auth",
-        payload: { requestOperationtype: "aadGetToken", context: { resource, options: {} } },
+        payload: { requestOperationtype: op, context },
       };
       const W = hostWin() as HostWin;
       ctx.worker.dispatchEvent(new W.MessageEvent("message", { data: JSON.stringify(req) }));
@@ -339,8 +343,42 @@ export async function cdlToken(resource: string, ms = 8_000): Promise<string> {
       resolve(null);
     }
   });
+}
+
+export async function cdlToken(resource: string, ms = 8_000): Promise<string> {
+  const reply = await authOp("aadGetToken", { resource, options: {} }, ms);
   const tok = reply?.response?.data?.token;
   return typeof tok === "string" ? tok : "";
+}
+
+/** Personal (MSA, teams.live.com) account: chatsvc takes a skype token, not an AAD bearer. */
+export function cdlConsumer(): boolean {
+  const au = authUser();
+  return au?.type === "MsaLife" || au?.cloud === "life";
+}
+
+export interface SkypeToken {
+  token: string;
+  /** epoch ms; 0 = unknown */
+  exp: number;
+  /** signed-in user's MRI, e.g. "8:live:…" */
+  mri: string;
+}
+
+/**
+ * The skype token Teams' worker uses for consumer chatsvc (getSkypeTokens),
+ * with the account's MRI. null if Teams gave none.
+ */
+export async function cdlSkypeToken(ms = 8_000): Promise<SkypeToken | null> {
+  const reply = await authOp("getSkypeTokens", { resource: "", forceRenew: false, options: {} }, ms);
+  const d = reply?.response?.data;
+  if (!d || typeof d.skypeToken !== "string" || !d.skypeToken) return null;
+  const user = d.userDetails as { id?: unknown } | undefined;
+  return {
+    token: d.skypeToken,
+    exp: typeof d.expiration === "number" ? d.expiration : 0,
+    mri: typeof user?.id === "string" ? user.id : "",
+  };
 }
 
 /**
