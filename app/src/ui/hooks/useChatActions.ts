@@ -1,3 +1,4 @@
+import { useLatest } from "../lib/latest";
 import { useCallback, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import {
   addChannelMembers,
@@ -59,6 +60,7 @@ const toPick = (p: PeopleHit): PickPerson => ({
 // Chat-level actions that go through Teams: new chats, calls and meetings,
 // read state and hiding. Writes are optimistic and revert on failure.
 export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
+  const selRef = useLatest(sel);
   const [newChat, setNewChat] = useState<NewChatState>(null);
   // Add channel dialog: the channel whose team gets the new one; null = closed.
   const [newChannel, setNewChannel] = useState<Chat | null>(null);
@@ -69,17 +71,19 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   const pickWhenListed = useCallback(
     async (id: string | ((c: Chat) => boolean), ms = 12000): Promise<boolean> => {
       const match = typeof id === "string" ? (c: Chat) => c.id === id : id;
+      // Only auto-select if the user hasn't opened something else meanwhile.
+      const startSel = selRef.current;
       for (let t = 0; t <= ms; t += 300) {
         const hit = chatsRef.current.find(match);
         if (hit) {
-          pick(hit.id);
+          if (selRef.current === startSel) pick(hit.id);
           return true;
         }
         await new Promise((r) => setTimeout(r, 300));
       }
       return false;
     },
-    [pick, chatsRef],
+    [pick, chatsRef, selRef],
   );
 
   // Everyone in our chats with a cached profile, for the New chat dialog's

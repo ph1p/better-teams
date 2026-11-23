@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type MouseEvent } from "react";
 import { useChanged } from "./lib/changed";
+import { useLatest } from "./lib/latest";
 import { markRead } from "../teamsData";
 import { openNativeChat } from "../send";
 import { Sidebar } from "./sidebar/Sidebar";
@@ -60,6 +61,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
 
   const selChat = chats.find((c) => c.id === sel);
   const selIsChannel = !!selChat?.isChannel;
+  const selRef = useLatest(sel);
   const messages = useMessages(sel, selChat, flash);
   const cs = useComposerState(sel, selChat, messages, flash);
   // Refs pulled out, so reading the rest during render is plainly not a ref read.
@@ -204,17 +206,21 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
         return;
       }
       // Not loaded: page older up to a few times, then scroll.
-      let n = 0;
+      const startSel = selRef.current;
+      let misses = 0;
       const pump = async (): Promise<void> => {
-        if (n++ > 12 || noMore.current) return;
-        await loadOlder();
+        // Stop on a chat switch, at history's end, or after a few loads that
+        // brought nothing new (the message may simply not exist any more).
+        if (selRef.current !== startSel || noMore.current || misses > 3) return;
+        const added = await loadOlder();
+        if (!added) misses++;
         requestAnimationFrame(() => {
-          if (!tryScroll()) pump();
+          if (selRef.current === startSel && !tryScroll()) void pump();
         });
       };
-      pump();
+      void pump();
     },
-    [loadOlder, scroller, noMore],
+    [loadOlder, scroller, noMore, selRef],
   );
 
   // Open the right-click menu for a chat row.
