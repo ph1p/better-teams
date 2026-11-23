@@ -77,9 +77,10 @@ export const Message = memo(function Message({
   const { quoteHtml: origQuote, body: bodyHtml } = splitQuote(m.content);
   const bodyText = htmlToText(bodyHtml);
   // The editor works in the composer's markdown-lite so formatting survives.
-  const bodyMd = html ? htmlToMarkdown(bodyHtml) : bodyText;
+  // Only editing needs the Markdown form, so compute it on demand.
+  const editSource = (): string => (html ? htmlToMarkdown(bodyHtml) : bodyText);
   const startEdit = (): void => {
-    setDraft(bodyMd);
+    setDraft(editSource());
     setEditQuote(origQuote || null);
     setEditing(true);
   };
@@ -88,7 +89,7 @@ export const Message = memo(function Message({
     setEditing(false);
     const keptQuote = editQuote || "";
     // Save if the body changed, or the quote was removed.
-    if ((v && v !== bodyMd) || keptQuote !== (origQuote || "")) {
+    if ((v && v !== editSource()) || keptQuote !== (origQuote || "")) {
       if (v) onEdit(cid, m.id, v, keptQuote);
     }
   };
