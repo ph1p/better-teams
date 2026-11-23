@@ -18,6 +18,7 @@ export const chat: Messages["chat"] = {
   appNoteTitle: "App-Chat.",
   appNote: (title, dev) =>
     `${title} ist eine Teams-App${dev ? ` von ${dev}` : ""}, keine Person. Sie postet Updates und beantwortet Befehle; anrufen kannst du sie nicht.`,
+  statusNoteOf: (name) => `Status von ${name}:`,
   matches: (n) => `${n} Treffer`,
   closeSearch: "Suche schließen",
 

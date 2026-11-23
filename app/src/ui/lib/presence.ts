@@ -238,9 +238,52 @@ const streams: (() => void)[] = [];
 const BATCH = 50;
 const FLUSH_MS = 300;
 
+interface Note {
+  text: string;
+  until?: number;
+}
+const notes = new Map<string, Note>();
+
+const ENTITY: Record<string, string> = { lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", amp: "&" };
+function decode(s: string) {
+  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => {
+    if (e[0] === "#") {
+      const n = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+      return Number.isFinite(n) ? String.fromCodePoint(n) : m;
+    }
+    return ENTITY[e.toLowerCase()] ?? m;
+  });
+}
+const stripTags = (s: string) => s.replace(/<br\s*\/?>|<\/p>\s*<p[^>]*>/gi, "\n").replace(/<[^>]*>/g, "");
+
+// Note HTML -> plain text. Teams stores the text escaped twice inside <p>, plus
+// a <pinnednote> marker; notes set elsewhere may be escaped once. Never parsed
+// as DOM (Trusted Types), only stripped and decoded.
+export function noteText(message: string) {
+  return decode(stripTags(decode(stripTags(message))))
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
+}
+
+function setNote(mri: string, n: PresenceEvent["statusNote"]) {
+  const text = n && n.message ? noteText(n.message) : "";
+  const exp = n && n.expiry ? Date.parse(n.expiry) : NaN;
+  const prev = notes.get(mri);
+  if (!text) {
+    if (!prev) return false;
+    notes.delete(mri);
+    return true;
+  }
+  const until = Number.isFinite(exp) ? exp : undefined;
+  if (prev && prev.text === text && prev.until === until) return false;
+  notes.set(mri, { text, until });
+  return true;
+}
+
 function onBatch(batch: PresenceEvent[]): void {
   let changed = false;
   for (const e of batch) {
+    if (e.statusNote !== undefined && setNote(e.id, e.statusNote)) changed = true;
     const st = CDL_STATUS[e.availability];
     if (!st) continue;
     live.add(e.id);
@@ -275,6 +318,7 @@ function stopStreams(): void {
   queue = [];
   wanted.clear();
   live.clear();
+  notes.clear();
 }
 
 // Current status for an MRI (or self when mri omitted / matches self).
@@ -284,6 +328,14 @@ export function statusOf(mri: string | undefined): Status {
   // Own MRI: the me-control badge (selfStatus) is the freshest source.
   if (mri === myMri() && selfStatus !== "Unknown") return selfStatus;
   return cache.get(mri) || "Unknown";
+}
+
+export function noteOf(mri: string | undefined) {
+  if (!mri) return "";
+  want(mri);
+  const n = notes.get(mri);
+  if (!n || (n.until && n.until < Date.now())) return "";
+  return n.text;
 }
 
 export function selfPresence(): Status {
@@ -302,10 +354,10 @@ export function setSelfPresence(st: Status): void {
 // forces a re-render whenever presence changes; `statusOf`/`selfPresence` read
 // the fresh cache. Use once near the top of a tree and pass statuses down, or
 // call per-avatar — both are cheap (one shared observer).
-export function usePresence(): { statusOf: (mri: string | undefined) => Status; self: () => Status } {
+export function usePresence() {
   const [, setTick] = useState(0);
   useEffect(() => onPresence(() => setTick((n) => n + 1)), []);
-  return { statusOf, self: selfPresence };
+  return { statusOf, noteOf, self: selfPresence };
 }
 
 // Ring colour per status. Matches Teams' own palette closely.

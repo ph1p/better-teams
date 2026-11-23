@@ -94,6 +94,9 @@ export interface PresenceEvent {
   availability: string;
   activity?: string | null;
   isOutOfOffice?: boolean | null;
+  /** Status message. `message` is HTML, usually escaped twice (`&lt;p&gt;Lunch&lt;/p&gt;`)
+   * plus a `<pinnednote>` marker; `expiry` is an ISO date. Absent in a batch: unchanged. */
+  statusNote?: { message?: string | null; publishTime?: string | null; expiry?: string | null } | null;
 }
 
 /**

@@ -1,6 +1,6 @@
 import { t } from "../../i18n";
 import { useState, type JSX } from "react";
-import { BellOff, Blocks, Hash, Phone, Search, StickyNote, Video, X } from "lucide-react";
+import { BellOff, Blocks, Hash, MessageSquareText, Phone, Search, StickyNote, Video, X } from "lucide-react";
 import { profile, type PeopleHit } from "../../teamsData";
 import { isAppMri } from "../../apps";
 import { Avatar, GroupAvatar } from "../shared/Avatar";
@@ -91,7 +91,8 @@ export function ChatHeader({
   onLeave,
   onNewChannel,
 }: ChatHeaderProps): JSX.Element {
-  const { statusOf } = usePresence();
+  const { statusOf, noteOf } = usePresence();
+  const note = chat.kind === "chat" && !chat.group && !chat.app && chat.avatarMri ? noteOf(chat.avatarMri) : "";
   const [renaming, setRenaming] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   // Calls: 1:1 and group chats ring their members (Teams rings at most 20 in a
@@ -236,6 +237,14 @@ export function ChatHeader({
           <Blocks size={14} />
           <span>
             <b>{t().chat.appNoteTitle}</b> {t().chat.appNote(chat.title, profile(chat.avatarMri).developer || "")}
+          </span>
+        </div>
+      ) : null}
+      {note ? (
+        <div className="tc-app-note tc-status-note">
+          <MessageSquareText size={14} />
+          <span>
+            <b>{t().chat.statusNoteOf(chatTitle(chat))}</b> {note}
           </span>
         </div>
       ) : null}

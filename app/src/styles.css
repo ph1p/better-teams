@@ -334,6 +334,10 @@
   color: var(--tc-fg);
   font-weight: 600;
 }
+#tc-root .tc-status-note span {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
 #tc-root .tc-prev {
   @apply overflow-hidden whitespace-nowrap;
   font-size: 12.5px;
