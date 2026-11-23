@@ -49,6 +49,8 @@ export interface Chat {
   id: string;
   kind: ChatKind;
   title: string;
+  /** The title was built from member names (no topic), so the UI may re-format it. */
+  nameTitle?: boolean;
   team: string;
   isChannel: boolean;
   /** 1:1 partner MRI, set only for direct chats; "" otherwise. */
@@ -111,6 +113,9 @@ export interface Profile {
   officeLocation: string;
   /** Publisher of a Teams app (bot profiles only), e.g. "Atlassian.com". */
   developer?: string;
+  /** Directory given name / surname, when Teams' profile store has them. */
+  givenName?: string;
+  surname?: string;
 }
 
 /** A message being quote-replied to (composer chip + outgoing quote HTML). */

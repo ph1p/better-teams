@@ -4,6 +4,7 @@
 // directory search streams in after a short debounce (lib/peopleSearch).
 
 import { t } from "../../i18n";
+import { personName, useNameFormat } from "../../names";
 import { useRef, useState, type JSX } from "react";
 import { Trash2, UserPlus, X } from "lucide-react";
 import { myMri, profile, type PeopleHit } from "../../teamsData";
@@ -56,12 +57,13 @@ export function Person({
   onOpen: (mri: string) => void;
   onRemove?: () => void;
 }): JSX.Element {
+  useNameFormat();
   const p = profile(mri);
-  const shown = p.displayName || name || t().common.unknown;
+  const shown = personName(p, name || "", mri) || t().common.unknown;
   const job = p.jobTitle || sub;
   return (
     <li className="tc-member">
-      <Avatar name={shown} uri={avatarUri(mri)} mri={mri} small onOpen={onOpen} />
+      <Avatar name={p.displayName || name || shown} uri={avatarUri(mri)} mri={mri} small onOpen={onOpen} />
       <span className="tc-member-text">
         <span className="tc-member-name">
           {shown}

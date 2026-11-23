@@ -24,10 +24,12 @@ import { useChatActions } from "./hooks/useChatActions";
 import { useShortcuts } from "./hooks/useShortcuts";
 import { useFollowNative } from "./hooks/useFollowNative";
 import { t, useLang } from "../i18n";
+import { useNameFormat } from "../names";
 
 export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   // Re-render everything on a language switch; tag the overlay for screen readers.
   const uiLang = useLang();
+  useNameFormat();
   useEffect(() => {
     document.getElementById("tc-root")?.setAttribute("lang", uiLang);
   }, [uiLang]);
