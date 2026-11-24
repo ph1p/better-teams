@@ -5,7 +5,7 @@
 
 import { t } from "../../i18n";
 import { personName, useNameFormat } from "../../names";
-import { useRef, useState, type JSX } from "react";
+import { useMemo, useRef, useState, type JSX } from "react";
 import { Trash2, UserPlus, X } from "lucide-react";
 import { myMri, profile, type PeopleHit } from "../../teamsData";
 import { Avatar } from "../shared/Avatar";
@@ -14,6 +14,7 @@ import { avatarUri } from "../lib/format";
 import { useDismiss } from "../lib/dismiss";
 import { useArm } from "../lib/arm";
 import { usePeopleSearch } from "../lib/peopleSearch";
+import { scrollNear, usePickerKeys } from "../lib/pickerKeys";
 import type { Chat } from "../../types";
 
 /** Teams' "include chat history" choices, in its own day encoding. */
@@ -105,30 +106,45 @@ export function PeoplePicker({
   picked,
   setPicked,
   autoFocus,
+  team,
 }: {
   known: () => PeopleHit[];
   exclude: (mri: string) => boolean;
   picked: PeopleHit[];
   setPicked: (f: (s: PeopleHit[]) => PeopleHit[]) => void;
   autoFocus?: boolean;
+  /** A private channel's team: its members, and whether outsiders may join it on the way. */
+  team?: { members: PeopleHit[]; canAdd: boolean };
 }): JSX.Element {
   const [q, setQ] = useState("");
   // Known people, gathered once per open picker (the list barely changes meanwhile).
   const [people] = useState(known);
-  const hits = usePeopleSearch(q, people, 10);
+  const inTeam = useMemo(() => team && new Set(team.members.map((p) => p.mri.toLowerCase())), [team]);
+  const pool = useMemo(
+    () => (team && inTeam ? [...team.members, ...people.filter((p) => !inTeam.has(p.mri.toLowerCase()))] : people),
+    [people, team, inTeam],
+  );
+  const outsider = (mri: string): boolean => !!inTeam && !inTeam.has(mri.toLowerCase());
+  const hits = usePeopleSearch(q, pool, 10);
   const input = useRef<HTMLInputElement>(null);
   const me = myMri();
-  const shown = hits.filter((h) => h.mri !== me && !exclude(h.mri) && !picked.some((p) => p.mri === h.mri));
+  const open = hits.filter((h) => h.mri !== me && !exclude(h.mri) && !picked.some((p) => p.mri === h.mri));
+  // Outsiders the team can't take stay listed, greyed out, so it's clear why they can't be picked.
+  const shown = team?.canAdd ? open : open.filter((h) => !outsider(h.mri));
+  const blocked = team?.canAdd ? [] : open.filter((h) => outsider(h.mri));
   const pick = (p: PeopleHit): void => {
     setPicked((s) => [...s, p]);
     setQ("");
+    setHi(0);
     input.current?.focus();
   };
+  const { hi, setHi, onKey } = usePickerKeys(shown, pick, () => setQ(""));
   return (
     <>
       <div className="tc-newchat-to" onClick={() => input.current?.focus()}>
         {picked.map((p) => (
           <span key={p.mri} className="tc-chip">
+            <Avatar name={p.displayName} uri={avatarUri(p.mri)} mri={p.mri} small />
             <span className="tc-chip-name">{p.displayName}</span>
             <button
               onClick={() => setPicked((s) => s.filter((x) => x.mri !== p.mri))}
@@ -143,25 +159,53 @@ export function PeoplePicker({
           autoFocus={autoFocus}
           placeholder={picked.length ? t().chat.addMore : t().chat.addPlaceholder}
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setHi(0);
+          }}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && shown[0]) {
-              e.preventDefault();
-              pick(shown[0]);
-            } else if (e.key === "Backspace" && !q && picked.length) setPicked((s) => s.slice(0, -1));
+            // Escape with an empty box falls through, so the panel can close.
+            if (e.key === "Escape" && !q) return;
+            if (onKey(e)) {
+              e.stopPropagation();
+              return;
+            }
+            if (e.key === "Backspace" && !q && picked.length) setPicked((s) => s.slice(0, -1));
           }}
         />
       </div>
-      {shown.length ? (
+      {shown.length || blocked.length ? (
         <div className="tc-newchat-hits" role="listbox">
-          {shown.map((p) => (
-            <button key={p.mri} role="option" className="tc-at-opt" onClick={() => pick(p)}>
+          {shown.map((p, i) => (
+            <button
+              key={p.mri}
+              role="option"
+              aria-selected={i === hi}
+              className={"tc-at-opt" + (i === hi ? " on" : "")}
+              ref={i === hi ? scrollNear : undefined}
+              onMouseEnter={() => setHi(i)}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => pick(p)}
+            >
               <Avatar name={p.displayName} uri={avatarUri(p.mri)} mri={p.mri} small />
               <span className="tc-newchat-hit">
                 <span className="tc-at-name">{p.displayName}</span>
-                {p.jobTitle || p.email ? <small>{p.jobTitle || p.email}</small> : null}
+                {outsider(p.mri) ? (
+                  <small className="tc-hit-warn">{t().chat.joinsTeam}</small>
+                ) : p.jobTitle || p.email ? (
+                  <small>{p.jobTitle || p.email}</small>
+                ) : null}
               </span>
             </button>
+          ))}
+          {blocked.map((p) => (
+            <div key={p.mri} role="option" aria-disabled="true" aria-selected={false} className="tc-at-opt off">
+              <Avatar name={p.displayName} uri={avatarUri(p.mri)} mri={p.mri} small />
+              <span className="tc-newchat-hit">
+                <span className="tc-at-name">{p.displayName}</span>
+                <small>{t().chat.notInTeam}</small>
+              </span>
+            </div>
           ))}
         </div>
       ) : null}

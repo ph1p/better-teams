@@ -35,6 +35,7 @@ export const app = {
   muteFailed: (muted: boolean, reason: string) =>
     muted ? `Couldn't mute the chat (${reason})` : `Couldn't unmute the chat (${reason})`,
   addFailed: (reason: string) => `Couldn't add people (${reason})`,
+  notInTeam: "only members of the team can join a private channel",
   removeFailed: (reason: string) => `Couldn't remove them (${reason})`,
   leaveFailed: (reason: string) => `Couldn't leave the chat (${reason})`,
   leaveChannelFailed: (reason: string) => `Couldn't leave (${reason})`,

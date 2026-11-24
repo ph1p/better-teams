@@ -375,6 +375,16 @@
   @apply flex items-center gap-1.5;
   min-width: 0;
 }
+/* Team of a channel listed outside the Channels section (Favorites):
+   "General" alone says nothing. Truncates before the channel name does. */
+#tc-root .tc-row-team {
+  @apply overflow-hidden whitespace-nowrap;
+  flex: 0 1000 auto;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--tc-fg2);
+  text-overflow: ellipsis;
+}
 #tc-root .tc-row-title .tc-app-badge {
   flex: 0 0 auto;
   font-size: 9px;
@@ -441,9 +451,9 @@
 }
 /* Message column + composer centre at ~820px on wide windows (line length). */
 #tc-root .tc-msgs {
-  @apply flex-1 overflow-y-auto;
+  @apply flex-1 overflow-y-auto flex flex-col;
   overflow-anchor: none;
-  padding: 16px max(18px, calc((100% - 820px) / 2)) 14px;
+  padding: 16px max(18px, calc((100% - 820px) / 2)) 8px;
 }
 /* Vertical rhythm: continuations sit tight (3px); a new sender group gets a
    little air above it, so conversations read as turns. */
@@ -463,6 +473,11 @@
 }
 #tc-root .tc-day + .tc-msg.first {
   margin-top: 0;
+}
+/* A short conversation hugs the composer instead of leaving a hole above it;
+   status notes (loading, empty, no match) stay up top. */
+#tc-root .tc-msgs-inner:not(:has(> .tc-empty)) {
+  margin-top: auto;
 }
 /* Picked with the arrow keys: soft tint + faint ring; key hint sits on the
    top edge where the hover toolbar goes (and yields to it on hover). */
@@ -538,6 +553,7 @@
   color: var(--tc-fg2);
   opacity: 0;
   white-space: nowrap;
+  overflow: hidden;
   font-variant-numeric: tabular-nums;
 }
 #tc-root .tc-msg-gutter.sm {
@@ -877,8 +893,9 @@
 #tc-root .tc-ac-col {
   min-width: 0;
 }
-/* A column whose only image was dropped (untrusted avatar) takes no room. */
-#tc-root .tc-ac-col:empty {
+/* A column whose only image was dropped (untrusted avatar) takes no room.
+   Columns authored empty are indent spacers (Jira) and keep their width. */
+#tc-root .tc-ac-col:empty:not(.spacer) {
   display: none;
 }
 #tc-root .tc-ac-box.box,
@@ -890,6 +907,10 @@
 #tc-root .tc-ac-box.accent,
 #tc-root .tc-ac-col.accent {
   background: var(--tc-accent-soft);
+}
+/* No line box around a lone image, so it centers with its neighbours. */
+#tc-root .tc-ac-imgwrap {
+  line-height: 0;
 }
 #tc-root .tc-ac-img {
   display: inline-block;
@@ -973,7 +994,21 @@
 }
 #tc-root .tc-ac-btn.positive {
   border-color: var(--tc-accent);
-  color: var(--tc-accent);
+  background: var(--tc-accent);
+  color: #fff;
+}
+#tc-root .tc-ac-btn.positive:hover:not(:disabled) {
+  border-color: var(--tc-accent);
+  background: color-mix(in srgb, var(--tc-accent) 85%, #000);
+}
+#tc-root .tc-ac-btn.icon {
+  justify-content: center;
+  min-width: 28px;
+  padding: 3px 6px;
+}
+/* An ActionSet element is spaced like any element, not like card actions. */
+#tc-root .tc-ac-el > .tc-ac-actions {
+  margin-top: 0;
 }
 #tc-root .tc-ac-btn.destructive {
   color: #d1404a;
@@ -1311,6 +1346,23 @@
 #tc-root .tc-at-name {
   @apply truncate;
 }
+/* Channel / team entries: a glyph in the avatar's place, a hint on the right. */
+#tc-root .tc-at-glyph {
+  @apply grid place-items-center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--tc-accent-soft);
+  color: var(--tc-accent);
+}
+#tc-root .tc-at-kind {
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--tc-fg2);
+  font-size: 11px;
+  white-space: nowrap;
+}
 
 /* Sidebar header icon button (New chat) */
 #tc-root .tc-side-btn {
@@ -1439,9 +1491,22 @@
   border: 0;
   background: transparent;
   color: var(--tc-fg2);
+  flex: none;
   width: 18px;
   height: 18px;
+  padding: 0;
   border-radius: 999px;
+}
+#tc-root .tc-chip > :first-child:not(.tc-chip-name) {
+  flex: none;
+}
+#tc-root .tc-chip .tc-av.sm {
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
+}
+#tc-root .tc-chip-name:first-child {
+  padding-left: 8px;
 }
 #tc-root .tc-chip button:hover {
   background: var(--tc-hover);
@@ -1454,6 +1519,14 @@
 }
 #tc-root .tc-newchat-hits .tc-at-opt.on {
   background: var(--tc-hover);
+}
+#tc-root .tc-newchat-hits .tc-at-opt.off {
+  cursor: default;
+  opacity: 0.5;
+  background: transparent;
+}
+#tc-root .tc-newchat-hit small.tc-hit-warn {
+  color: var(--tc-accent);
 }
 #tc-root .tc-newchat-hit {
   @apply flex flex-col min-w-0;
@@ -1657,10 +1730,6 @@
   font-size: 16px;
   border-radius: 8px;
 }
-#tc-root .tc-team {
-  color: var(--tc-fg2);
-  font-weight: 600;
-}
 #tc-root .tc-note {
   font-size: 12.5px;
   color: var(--tc-fg2);
@@ -1755,6 +1824,24 @@
   height: 34px;
   background: linear-gradient(var(--tc-bg) 55%, transparent);
 }
+/* Bottom twin of the day-pill fade: newer messages slide under the composer.
+   Only while scrolled up, so the newest message is never dimmed. */
+#tc-root .tc-msgs-wrap::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 28px;
+  z-index: 8;
+  pointer-events: none;
+  background: linear-gradient(transparent, var(--tc-bg) 80%);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+#tc-root .tc-msgs-wrap.scrolled-up::after {
+  opacity: 1;
+}
 #tc-root .tc-day-sticky span {
   position: relative;
   font-size: 11.5px;
@@ -1824,6 +1911,10 @@
   font-size: 12px;
   color: var(--tc-fg2);
   padding: 4px 0 2px 4px;
+}
+/* The newest post sits right above the composer, not a full gap away. */
+#tc-root .tc-thread:last-child {
+  margin-bottom: 0;
 }
 #tc-root .tc-thread > .tc-msg.first {
   margin-top: 0;
@@ -2177,6 +2268,59 @@
 #tc-root .tc-react.mine {
   border-color: var(--tc-accent);
   background: color-mix(in srgb, var(--tc-accent) 16%, transparent);
+}
+/* Who reacted: hover card over a reaction pill; each person opens their profile. */
+#tc-root .tc-reactors {
+  @apply fixed;
+  z-index: 30;
+  padding: 4px;
+  background: var(--tc-bg);
+  border: 1px solid var(--tc-line);
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.22);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  animation: tc-reactors-in 0.12s ease-out;
+}
+@keyframes tc-reactors-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+#tc-root .tc-reactors-head {
+  @apply flex items-center gap-2;
+  padding: 4px 8px 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--tc-fg2);
+}
+#tc-root .tc-reactors-glyph {
+  font-size: 18px;
+  line-height: 1;
+}
+#tc-root .tc-reactor {
+  @apply flex items-center gap-2 w-full cursor-pointer text-left;
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--tc-fg);
+  font: inherit;
+  font-size: 13px;
+}
+#tc-root .tc-reactor:hover,
+#tc-root .tc-reactor:focus-visible {
+  background: var(--tc-hover);
+  outline: none;
+}
+#tc-root .tc-reactor-name {
+  @apply truncate;
+}
+#tc-root .tc-reactors-more {
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--tc-fg2);
 }
 /* Slack-style hover toolbar, pinned top-right of a message. */
 #tc-root .tc-tools {
@@ -3173,6 +3317,9 @@
   border: 1px solid var(--tc-line);
   border-radius: 10px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.22);
+  /* menuPos sets max-height to the room left; a taller menu scrolls. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 #tc-root .tc-menu-item {
   @apply flex items-center gap-2 w-full cursor-pointer text-left;
@@ -3363,8 +3510,11 @@
 
 /* Team label's channel list: show or hide each channel. */
 #tc-root .tc-team-menu {
+  @apply flex flex-col;
   width: 270px;
   padding: 4px;
+  /* The channel list scrolls, the head and hint stay put. */
+  overflow: hidden;
 }
 #tc-root .tc-team-menu-head {
   @apply truncate;
@@ -3374,7 +3524,8 @@
   padding: 6px 10px 4px;
 }
 #tc-root .tc-team-menu-list {
-  max-height: min(360px, 60vh);
+  max-height: 360px;
+  min-height: 0;
   overflow-y: auto;
 }
 #tc-root .tc-team-chan {

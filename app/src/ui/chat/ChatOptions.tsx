@@ -1,12 +1,14 @@
-// The "…" menu in the chat header: rename, members, mute and leave for chats;
-// the notification preset, rename, leave and delete for channels (ChannelItems.tsx). Leave arms on the first click and
-// acts on the second, like removing a file (lib/arm.ts).
+// The "…" menu in the chat header. Chats: favorite; rename and members; mute;
+// leave. Channels: favorite, the notification preset, then the channel and team
+// items of ChannelItems.tsx. Leave arms on the first click and acts on the
+// second, like removing a file (lib/arm.ts).
 
 import { t } from "../../i18n";
 import { useState, type JSX } from "react";
-import { Bell, BellOff, LogOut, MoreHorizontal, Pencil, Users } from "lucide-react";
+import { Bell, BellOff, LogOut, MoreHorizontal, Pencil, Star, StarOff, Users } from "lucide-react";
 import { ChannelLeaveItem, ChannelPresets } from "./ChannelItems";
 import { useDismiss } from "../lib/dismiss";
+import { MENU_MARGIN } from "../lib/menuPos";
 import { useArm } from "../lib/arm";
 import type { Flash } from "../lib/toast";
 import type { Chat } from "../../types";
@@ -17,6 +19,7 @@ interface ChatOptionsProps {
   onRename: () => void;
   onMembers: () => void;
   onSetMuted: (chat: Chat, muted: boolean) => void;
+  onSetFavorite: (chat: Chat, favorite: boolean) => void;
   onLeave: (chat: Chat, what?: "channel" | "team" | "delete") => void;
   onNewChannel: (chat: Chat) => void;
 }
@@ -27,6 +30,7 @@ export function ChatOptions({
   onRename,
   onMembers,
   onSetMuted,
+  onSetFavorite,
   onLeave,
   onNewChannel,
 }: ChatOptionsProps): JSX.Element | null {
@@ -64,8 +68,17 @@ export function ChatOptions({
         <div
           className="tc-menu tc-opts-menu"
           role="menu"
-          style={{ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) }}
+          style={{
+            top: r.bottom + 6,
+            right: Math.max(MENU_MARGIN, window.innerWidth - r.right),
+            maxHeight: window.innerHeight - r.bottom - 6 - MENU_MARGIN,
+          }}
         >
+          <button className="tc-menu-item" role="menuitem" onClick={act(() => onSetFavorite(chat, !chat.favorite))}>
+            {chat.favorite ? <StarOff size={14} /> : <Star size={14} />}{" "}
+            {chat.favorite ? t().sidebar.removeFavorite : t().sidebar.addFavorite}
+          </button>
+          <div className="tc-menu-sep" />
           {chat.isChannel ? (
             <>
               <ChannelPresets chat={chat} flash={flash} onDone={close} />
@@ -89,6 +102,7 @@ export function ChatOptions({
                     <Users size={14} /> <span className="tc-menu-grow">{t().chat.members}</span>
                     <span className="tc-menu-count">{chat.members.length + 1}</span>
                   </button>
+                  <div className="tc-menu-sep" />
                 </>
               ) : null}
               <button className="tc-menu-item" role="menuitem" onClick={act(() => onSetMuted(chat, !chat.muted))}>

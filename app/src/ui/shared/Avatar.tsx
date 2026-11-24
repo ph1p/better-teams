@@ -1,5 +1,5 @@
 import { useState, type JSX, type CSSProperties } from "react";
-import { CalendarDays, Hash, NotebookPen } from "lucide-react";
+import { CalendarDays, Hash, Lock, NotebookPen, Share2 } from "lucide-react";
 import { avatarUri, hue, initials } from "../lib/format";
 import { profile } from "../../teamsData";
 import { STATUS_COLOR, statusLabel, statusOf, type Status } from "../lib/presence";
@@ -109,8 +109,13 @@ export function ChatIcon({
   size: number;
   onOpen?: (mri: string) => void;
 }): JSX.Element {
+  // Channels: a lock marks a private one, as in Teams; shared ones get their own glyph.
   const Glyph = chat.isChannel
-    ? Hash
+    ? chat.channelType === "private"
+      ? Lock
+      : chat.channelType === "shared"
+        ? Share2
+        : Hash
     : chat.kind === "meeting"
       ? CalendarDays
       : chat.kind === "notes"
@@ -118,7 +123,10 @@ export function ChatIcon({
         : null;
   if (Glyph)
     return (
-      <div className={"tc-av tc-hash" + (small ? " sm" : "")}>
+      <div
+        className={"tc-av tc-hash" + (small ? " sm" : "")}
+        title={chat.channelType ? t().common.channelType[chat.channelType] : undefined}
+      >
         <Glyph size={size} />
       </div>
     );

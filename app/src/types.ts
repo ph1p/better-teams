@@ -18,6 +18,8 @@ export interface Reaction {
   count: number;
   /** True when the current user is among them. */
   mine: boolean;
+  /** Who reacted (MRIs, in reaction order), when Teams sent the list. */
+  users?: string[];
 }
 
 /** A file/attachment reference extracted from a message. */
@@ -73,6 +75,8 @@ export interface Chat {
    * Teams keeps listed (in italics).
    */
   channelHidden?: boolean;
+  /** Channels: a private or shared channel (own roster); unset for standard ones. */
+  channelType?: "private" | "shared";
   /** Notifications muted (Teams' "Mute"). Chats only; channels have presets. */
   muted: boolean;
   /** A group chat (not 1:1): can be renamed, has a roster you can change and leave. */

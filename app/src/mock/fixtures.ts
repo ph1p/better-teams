@@ -157,66 +157,147 @@ const card = (content: Record<string, unknown>): string =>
     ),
   )}"/></URIObject>`;
 
-// An issue-tracker notification shaped like the Adaptive Cards such bots send:
-// who changed what, a link to the issue, old -> new value, actions, a footer.
+// An issue-tracker notification laid out like Jira's Teams cards: fixed-width
+// spacer columns indent each row under the avatar, an issue-type icon sits
+// beside the link, old -> new value in nested columns, an emoji-only button.
 const trackerCard = (key: string, title: string, field: string, from: string, to: string): string =>
   card({
     type: "AdaptiveCard",
     version: "1.5",
     body: [
       {
+        type: "Container",
+        items: [
+          {
+            type: "ColumnSet",
+            columns: [
+              {
+                width: "25px",
+                verticalContentAlignment: "center",
+                items: [
+                  {
+                    type: "Image",
+                    url: "https://tracker.example.com/bot.png",
+                    style: "person",
+                    size: "small",
+                    width: "24px",
+                    height: "24px",
+                  },
+                ],
+              },
+              {
+                width: "stretch",
+                verticalContentAlignment: "center",
+                items: [{ type: "TextBlock", text: `Tracker Bot updated the **${field}** on this issue:`, wrap: true }],
+              },
+            ],
+          },
+          {
+            type: "ColumnSet",
+            spacing: "Small",
+            columns: [
+              { width: "10px", items: [] },
+              {
+                width: "32px",
+                verticalContentAlignment: "center",
+                items: [
+                  {
+                    type: "Image",
+                    url: "https://tracker.example.com/task.png",
+                    horizontalAlignment: "right",
+                    width: "16px",
+                    height: "16px",
+                  },
+                ],
+              },
+              {
+                width: "80",
+                verticalContentAlignment: "center",
+                items: [
+                  {
+                    type: "TextBlock",
+                    text: `[${key} ${title}](https://tracker.example.com/browse/${key})`,
+                    wrap: true,
+                    maxLines: 2,
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            type: "ColumnSet",
+            spacing: "Small",
+            columns: [
+              { width: "25px", items: [] },
+              {
+                width: "stretch",
+                items: [
+                  {
+                    type: "ColumnSet",
+                    columns: [
+                      { width: "35px", items: [{ type: "TextBlock", text: "From" }] },
+                      { width: "auto", items: [{ type: "TextBlock", text: `**${from}**`, wrap: true }] },
+                      { width: "15px", items: [{ type: "TextBlock", text: "to" }] },
+                      { width: "stretch", items: [{ type: "TextBlock", text: `**${to}**`, wrap: true }] },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        type: "ColumnSet",
+        columns: [
+          { width: "22px", items: [] },
+          {
+            items: [
+              {
+                type: "ActionSet",
+                actions: [
+                  { type: "Action.Submit", title: "\u2728 Do I need to do anything?", style: "positive" },
+                  {
+                    type: "Action.ShowCard",
+                    title: "Details",
+                    card: {
+                      type: "AdaptiveCard",
+                      body: [
+                        {
+                          type: "FactSet",
+                          facts: [
+                            { title: "Status", value: "In Progress" },
+                            { title: "Priority", value: "High" },
+                            { title: "Assignee", value: "You" },
+                          ],
+                        },
+                      ],
+                    },
+                  },
+                  { type: "Action.OpenUrl", title: "Open issue", url: `https://tracker.example.com/browse/${key}` },
+                  { type: "Action.Submit", title: "Unwatch", mode: "secondary" },
+                  { type: "Action.Submit", title: "\ud83d\udd15" },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
         type: "ColumnSet",
         columns: [
           {
-            width: "auto",
-            items: [{ type: "Image", url: "https://tracker.example.com/bot.png", style: "Person", size: "Small" }],
-          },
-          {
             width: "stretch",
-            verticalContentAlignment: "Center",
-            items: [{ type: "TextBlock", text: `Tracker Bot updated the **${field}** on this issue:`, wrap: true }],
+            items: [
+              {
+                type: "TextBlock",
+                text: "_You received this message because you are assignee of this issue._",
+                isSubtle: true,
+                size: "small",
+              },
+            ],
           },
         ],
-      },
-      {
-        type: "TextBlock",
-        text: `[${key} ${title}](https://tracker.example.com/browse/${key})`,
-        wrap: true,
-        weight: "Bolder",
-      },
-      { type: "TextBlock", text: `From **${from}** to **${to}**`, wrap: true },
-      {
-        type: "ActionSet",
-        actions: [
-          { type: "Action.Submit", title: "Do I need to do anything?", style: "positive" },
-          {
-            type: "Action.ShowCard",
-            title: "Details",
-            card: {
-              type: "AdaptiveCard",
-              body: [
-                {
-                  type: "FactSet",
-                  facts: [
-                    { title: "Status", value: "In Progress" },
-                    { title: "Priority", value: "High" },
-                    { title: "Assignee", value: "You" },
-                  ],
-                },
-              ],
-            },
-          },
-          { type: "Action.OpenUrl", title: "Open issue", url: `https://tracker.example.com/browse/${key}` },
-          { type: "Action.Submit", title: "Mute this issue", mode: "secondary" },
-        ],
-      },
-      {
-        type: "TextBlock",
-        text: "_You received this message because you are assignee of this issue._",
-        isSubtle: true,
-        size: "Small",
-        wrap: true,
-        spacing: "Medium",
       },
     ],
   });
@@ -428,6 +509,16 @@ export const CHATS: SeedChat[] = [
     channelHidden: true,
     members: [maya.mri, jonas.mri, tom.mri],
     messages: [{ from: jonas.mri, ago: 2 * D, html: p("Anyone up for lunch on Friday?") }],
+  },
+  {
+    id: "19:platform-private-oncall@thread.tacv2",
+    kind: "channel",
+    topic: "on-call",
+    team: "Platform",
+    favorite: true,
+    members: [maya.mri, tom.mri],
+    readAgo: 0,
+    messages: [{ from: tom.mri, ago: 7 * H, html: p("Pager handover: nothing open, quiet night.") }],
   },
   {
     id: "19:design-general@thread.tacv2",

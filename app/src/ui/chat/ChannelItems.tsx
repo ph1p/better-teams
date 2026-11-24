@@ -67,10 +67,10 @@ export function ChannelPresets({ chat, flash, onDone }: { chat: Chat; flash: Fla
 type Departure = "channel" | "team" | "delete";
 
 /**
- * Add a channel to the team, show its members (when `onMembers` is given),
- * rename the channel (when `onRename` is given),
- * leave or hide it, leave its team, delete it; the last three arm on the first
- * click. Nothing shows while Teams is asked or when none is possible.
+ * The channel's own items (members and rename when their handlers are given,
+ * hide), then leaving or deleting it, then its team under the team's name (add
+ * a channel, leave the team). Leave and delete arm on the first click. Nothing
+ * shows while Teams is asked or when none is possible.
  */
 export function ChannelLeaveItem({
   chat,
@@ -99,78 +99,73 @@ export function ChannelLeaveItem({
       onLeave(chat, what);
     });
   const hide = acts.channel === "hide";
+  const leave = acts.channel === "leave";
+  // Three groups, each under its own separator: this channel, the ways to
+  // drop this channel, then the team it belongs to.
+  const channel = members || rename || hide;
+  const drop = leave || acts.delete;
+  const team = acts.create || acts.team;
+  const item = (icon: JSX.Element, label: string, fn: () => void): JSX.Element => (
+    <button
+      className="tc-menu-item"
+      role="menuitem"
+      onClick={() => {
+        onDone();
+        fn();
+      }}
+    >
+      {icon} {label}
+    </button>
+  );
   return (
     <>
-      <div className="tc-menu-sep" />
-      {acts.create ? (
-        <button
-          className="tc-menu-item"
-          role="menuitem"
-          onClick={() => {
-            onDone();
-            onNewChannel(chat);
-          }}
-        >
-          <Plus size={14} /> {t().chat.newChannel}
-        </button>
+      {channel ? (
+        <>
+          <div className="tc-menu-sep" />
+          {members ? item(<Users size={14} />, t().chat.channelMembers, onMembers!) : null}
+          {rename ? item(<Pencil size={14} />, t().chat.renameChannel, onRename!) : null}
+          {/* Hiding is undone from the team's channel list, so it needs no second click. */}
+          {hide ? item(<EyeOff size={14} />, t().chat.hideChannel, () => onLeave(chat, "channel")) : null}
+        </>
       ) : null}
-      {members ? (
-        <button
-          className="tc-menu-item"
-          role="menuitem"
-          onClick={() => {
-            onDone();
-            onMembers!();
-          }}
-        >
-          <Users size={14} /> {t().chat.channelMembers}
-        </button>
+      {drop ? (
+        <>
+          <div className="tc-menu-sep" />
+          {leave ? (
+            <button
+              className={"tc-menu-item danger" + (armed === "channel" ? " armed" : "")}
+              role="menuitem"
+              onClick={() => run("channel")}
+            >
+              <LogOut size={14} /> {armed === "channel" ? t().chat.leaveConfirm : t().chat.leaveChannel}
+            </button>
+          ) : null}
+          {acts.delete ? (
+            <button
+              className={"tc-menu-item danger" + (armed === "delete" ? " armed" : "")}
+              role="menuitem"
+              onClick={() => run("delete")}
+            >
+              <Trash2 size={14} /> {armed === "delete" ? t().chat.deleteConfirm : t().chat.deleteChannel}
+            </button>
+          ) : null}
+        </>
       ) : null}
-      {rename ? (
-        <button
-          className="tc-menu-item"
-          role="menuitem"
-          onClick={() => {
-            onDone();
-            onRename!();
-          }}
-        >
-          <Pencil size={14} /> {t().chat.renameChannel}
-        </button>
-      ) : null}
-      {acts.channel ? (
-        <button
-          className={"tc-menu-item danger" + (armed === "channel" ? " armed" : "")}
-          role="menuitem"
-          onClick={() => run("channel")}
-        >
-          {hide ? <EyeOff size={14} /> : <LogOut size={14} />}{" "}
-          {armed === "channel"
-            ? hide
-              ? t().chat.hideConfirm
-              : t().chat.leaveConfirm
-            : hide
-              ? t().chat.hideChannel
-              : t().chat.leaveChannel}
-        </button>
-      ) : null}
-      {acts.team ? (
-        <button
-          className={"tc-menu-item danger" + (armed === "team" ? " armed" : "")}
-          role="menuitem"
-          onClick={() => run("team")}
-        >
-          <LogOut size={14} /> {armed === "team" ? t().chat.leaveConfirm : t().chat.leaveTeam(chat.team)}
-        </button>
-      ) : null}
-      {acts.delete ? (
-        <button
-          className={"tc-menu-item danger" + (armed === "delete" ? " armed" : "")}
-          role="menuitem"
-          onClick={() => run("delete")}
-        >
-          <Trash2 size={14} /> {armed === "delete" ? t().chat.deleteConfirm : t().chat.deleteChannel}
-        </button>
+      {team ? (
+        <>
+          <div className="tc-menu-sep" />
+          <div className="tc-menu-label">{chat.team || t().sidebar.otherTeam}</div>
+          {acts.create ? item(<Plus size={14} />, t().chat.newChannel, () => onNewChannel(chat)) : null}
+          {acts.team ? (
+            <button
+              className={"tc-menu-item danger" + (armed === "team" ? " armed" : "")}
+              role="menuitem"
+              onClick={() => run("team")}
+            >
+              <LogOut size={14} /> {armed === "team" ? t().chat.leaveConfirm : t().chat.leaveTeam}
+            </button>
+          ) : null}
+        </>
       ) : null}
     </>
   );

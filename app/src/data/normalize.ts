@@ -104,13 +104,17 @@ function reactionsOf(m: Dict): Reaction[] {
   const em = obj(get(m.annotationsSummary, "emotions"));
   const detail = parsed(get(m.properties, "emotions"));
   const me = myMri();
-  const mineOf = (key: string): boolean => {
+  const usersOf = (key: string): string[] => {
     const row = Array.isArray(detail) ? detail.find((d) => get(d, "key") === key) : null;
-    const users = arr(get(row, "users") || get(row, "mris"));
-    return users.some((u) => (str(get(u, "mri")) || str(get(u, "id")) || u) === me);
+    return arr(get(row, "users") || get(row, "mris"))
+      .map((u) => str(get(u, "mri")) || str(get(u, "id")) || str(u))
+      .filter(Boolean);
   };
   return Object.entries(em)
-    .map(([k, v]): Reaction => ({ key: k, count: Number(v) || 0, mine: mineOf(k) }))
+    .map(([k, v]): Reaction => {
+      const users = usersOf(k);
+      return { key: k, count: Number(v) || 0, mine: users.includes(me), users };
+    })
     .filter((r) => r.count > 0);
 }
 
@@ -256,11 +260,14 @@ export function normCdlMessage(raw: unknown, channel = false): Message | null {
   const reactions = arr(m.emotions)
     .map((e): Reaction => {
       const key = str(get(e, "key"));
-      const users = arr(get(e, "users"));
+      const users = arr(get(e, "users"))
+        .map((u) => str(get(u, "userId")) || str(get(u, "id")))
+        .filter(Boolean);
       return {
         key,
         count: users.length || counts.get(key) || 0,
-        mine: users.some((u) => (str(get(u, "userId")) || str(get(u, "id"))) === me),
+        mine: users.includes(me),
+        users,
       };
     })
     .filter((r) => r.key && r.count > 0);

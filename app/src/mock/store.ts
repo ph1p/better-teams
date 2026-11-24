@@ -59,7 +59,7 @@ function reactionsOf(id: string): Reaction[] {
   if (!byKey) return [];
   const out: Reaction[] = [];
   for (const [key, users] of byKey) {
-    if (users.size) out.push({ key, count: users.size, mine: users.has(ME) });
+    if (users.size) out.push({ key, count: users.size, mine: users.has(ME), users: [...users] });
   }
   return out;
 }
@@ -258,6 +258,8 @@ export function listChats(): Chat[] {
             teamId: teamIdOf(seed.team || ""),
             ...(general ? { general } : {}),
             ...(c.channelHidden ? { channelHidden: true } : {}),
+            // Mock ids with "private" act as private channels (see teamsData).
+            ...(/private/.test(seed.id) ? { channelType: "private" as const } : {}),
           }
         : {}),
       ...(c.request ? { request: true, inviter: others[0] } : {}),

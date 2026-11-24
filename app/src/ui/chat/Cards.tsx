@@ -183,7 +183,7 @@ function Columns({ e, ctx }: { e: Dict; ctx: Ctx }): JSX.Element {
         if (v === "center") style.alignSelf = "center";
         if (v === "bottom") style.alignSelf = "flex-end";
         return (
-          <div key={i} className={"tc-ac-col" + boxCls(col)} style={style}>
+          <div key={i} className={"tc-ac-col" + (list(col.items).length ? "" : " spacer") + boxCls(col)} style={style}>
             <Items items={col.items} ctx={ctx} />
           </div>
         );
@@ -344,7 +344,12 @@ function Actions({ actions, ctx }: { actions: unknown; ctx: Ctx }): JSX.Element 
     const i = all.indexOf(a);
     const title = str(a.title) || str(a.tooltip);
     const style = str(a.style).toLowerCase();
-    const cls = "tc-ac-btn" + (style === "positive" ? " positive" : style === "destructive" ? " destructive" : "");
+    // Emoji-only titles (Jira's "🔕") get a square button, not a wide pill.
+    const glyph = !!title && [...title].length <= 2 && !/[\p{L}\p{N}]/u.test(title);
+    const cls =
+      "tc-ac-btn" +
+      (glyph ? " icon" : "") +
+      (style === "positive" ? " positive" : style === "destructive" ? " destructive" : "");
     const icon =
       a.iconUrl && isTrustedImgHost(safeImgSrc(str(a.iconUrl))) ? (
         <img className="tc-ac-btn-icon" src={safeImgSrc(str(a.iconUrl))} alt="" />
@@ -412,7 +417,12 @@ function Actions({ actions, ctx }: { actions: unknown; ctx: Ctx }): JSX.Element 
       <div className="tc-ac-actions">
         {visible.map(button)}
         {secondary.length && !more ? (
-          <button type="button" className="tc-ac-btn" title={t().chat.cardMoreActions} onClick={() => setMore(true)}>
+          <button
+            type="button"
+            className="tc-ac-btn icon"
+            title={t().chat.cardMoreActions}
+            onClick={() => setMore(true)}
+          >
             <MoreHorizontal size={14} />
           </button>
         ) : null}

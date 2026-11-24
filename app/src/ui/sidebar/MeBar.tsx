@@ -160,6 +160,10 @@ export function MeBar({ compact, onCompact, onSwitchToTeams, onError }: MeBarPro
               {status === st ? <Check size={14} /> : null}
             </button>
           ))}
+          <button className="tc-menu-item" role="menuitem" onClick={() => choose("Reset")}>
+            <RotateCcw size={14} />
+            <span className="tc-me-menu-label">{s.resetStatus}</span>
+          </button>
           <div className="tc-menu-sep" />
           {noteOpen ? (
             <form
@@ -212,6 +216,7 @@ export function MeBar({ compact, onCompact, onSwitchToTeams, onError }: MeBarPro
           ) : (
             <button
               className="tc-menu-item"
+              role="menuitem"
               onClick={() => {
                 setDraft(note?.text || "");
                 setNoteOpen(true);
@@ -221,13 +226,10 @@ export function MeBar({ compact, onCompact, onSwitchToTeams, onError }: MeBarPro
               <span className="tc-me-menu-label">{note ? s.editStatusMessage : s.setStatusMessage}</span>
             </button>
           )}
-          <button className="tc-menu-item" onClick={() => choose("Reset")}>
-            <RotateCcw size={14} />
-            <span className="tc-me-menu-label">{s.resetStatus}</span>
-          </button>
           <div className="tc-menu-sep" />
           <button
             className="tc-menu-item"
+            role="menuitem"
             onClick={() => {
               setOpen(false);
               setSettingsOpen(true);
@@ -238,6 +240,7 @@ export function MeBar({ compact, onCompact, onSwitchToTeams, onError }: MeBarPro
           </button>
           <button
             className="tc-menu-item"
+            role="menuitem"
             onClick={() => {
               setOpen(false);
               onSwitchToTeams?.();

@@ -27,6 +27,7 @@ interface ChatHeaderProps {
   knownPeople: () => PeopleHit[];
   onRename: (chat: Chat, title: string) => Promise<boolean>;
   onSetMuted: (chat: Chat, muted: boolean) => void;
+  onSetFavorite: (chat: Chat, favorite: boolean) => void;
   onAddMembers: (chat: Chat, people: PeopleHit[], shareHistoryDays: number) => Promise<boolean>;
   onRemoveMember: (chat: Chat, mri: string) => Promise<boolean>;
   onLeave: (chat: Chat, what?: "channel" | "team" | "delete") => void;
@@ -86,6 +87,7 @@ export function ChatHeader({
   knownPeople,
   onRename,
   onSetMuted,
+  onSetFavorite,
   onAddMembers,
   onRemoveMember,
   onLeave,
@@ -200,6 +202,7 @@ export function ChatHeader({
           onRename={() => setRenaming(true)}
           onMembers={() => setMembersOpen(true)}
           onSetMuted={onSetMuted}
+          onSetFavorite={onSetFavorite}
           onLeave={onLeave}
           onNewChannel={onNewChannel}
         />

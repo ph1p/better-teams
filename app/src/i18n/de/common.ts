@@ -12,6 +12,7 @@ export const common: Messages["common"] = {
   muted: "Stummgeschaltet",
   app: "App",
   notes: "Notizen",
+  channelType: { private: "Privater Kanal", shared: "Geteilter Kanal" },
   send: "Senden",
   audioCall: "Audioanruf",
   videoCall: "Videoanruf",

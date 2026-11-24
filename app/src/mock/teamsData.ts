@@ -242,6 +242,7 @@ export async function getChannelActions(channelId: string): Promise<ChannelActio
           members: channel === "leave" ? "channel" : "team",
           addMembers: true,
           removeMembers: true,
+          addTeamMembers: true,
         }
       : null,
   );
@@ -295,7 +296,12 @@ export async function leaveTeam(a: ChannelActions): Promise<WriteResult> {
 }
 
 export async function listChannelMembers(a: ChannelActions): Promise<ChannelMember[] | null> {
-  const ms = store.channelMembers(a.channelId);
+  // A private channel's team: everyone but the external freelancer, so the
+  // picker shows the team-members-only restriction.
+  const ms =
+    a.members === "team" && /private/.test(a.channelId)
+      ? PEOPLE.filter((p) => p.department !== "External").map((p) => p.mri)
+      : store.channelMembers(a.channelId);
   return later(
     ms &&
       ms
@@ -312,7 +318,11 @@ export async function listChannelMembers(a: ChannelActions): Promise<ChannelMemb
   );
 }
 
-export async function addChannelMembers(a: ChannelActions, mris: string[]): Promise<WriteResult> {
+export async function addChannelMembers(
+  a: ChannelActions,
+  mris: string[],
+  _outsideTeam: string[] = [],
+): Promise<WriteResult> {
   if (!a.addMembers) return later(fail("can't add members here"));
   return later(store.channelMembers(a.channelId, mris) ? ok : fail("not a channel"), 400);
 }

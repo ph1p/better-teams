@@ -47,6 +47,7 @@ export const app: Messages["app"] = {
       ? `Chat konnte nicht stummgeschaltet werden (${reason})`
       : `Stummschaltung konnte nicht aufgehoben werden (${reason})`,
   addFailed: (reason) => `Personen konnten nicht hinzugefügt werden (${reason})`,
+  notInTeam: "nur Mitglieder des Teams können einem privaten Kanal beitreten",
   removeFailed: (reason) => `Person konnte nicht entfernt werden (${reason})`,
   leaveFailed: (reason) => `Chat konnte nicht verlassen werden (${reason})`,
   leaveChannelFailed: (reason) => `Verlassen fehlgeschlagen (${reason})`,

@@ -48,6 +48,7 @@ function formatters(loc: string) {
   return {
     loc,
     clock: new Intl.DateTimeFormat(loc, { hour: "2-digit", minute: "2-digit" }),
+    gutter: new Intl.DateTimeFormat(loc, { hour: "numeric", minute: "2-digit" }),
     weekday: new Intl.DateTimeFormat(loc, { weekday: "short" }),
     dayMonth: new Intl.DateTimeFormat(loc, { day: "2-digit", month: "2-digit" }),
     long: new Intl.DateTimeFormat(loc, { weekday: "long", day: "numeric", month: "long" }),
@@ -71,6 +72,16 @@ export function fmtTime(ts: number): string {
 }
 
 export const fmtClock = (ts: number): string => (ts ? fmt().clock.format(ts) : "");
+// The narrow avatar gutter of follow-up messages has no room for "AM"/"PM":
+// "4:58" instead of "04:58 PM". The header above already shows the full time.
+export const fmtGutterClock = (ts: number): string =>
+  ts
+    ? fmt()
+        .gutter.formatToParts(ts)
+        .filter((p) => p.type === "hour" || p.type === "minute" || (p.type === "literal" && p.value.trim()))
+        .map((p) => p.value)
+        .join("")
+    : "";
 
 /** Short date + time ("23.11.26, 19:32"), as Teams shows on forwarded messages. */
 export const fmtStamp = (ts: number): string => (ts ? fmt().stamp.format(ts) : "");

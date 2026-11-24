@@ -233,7 +233,20 @@ function envelope(
   };
 }
 
-export type CdlRes<T> = { ok: true; data: T } | { ok: false; reason: string };
+/** `errors`: GraphQL errors that came back next to partial data. */
+export type CdlRes<T> = { ok: true; data: T; errors?: unknown[] } | { ok: false; reason: string };
+
+/** Short reason from a GraphQL error (resolver rejections carry extraInfo/serverResponse). */
+export function errorReason(e: unknown): string {
+  if (!e || typeof e !== "object") return String(e ?? "");
+  const o = e as Record<string, unknown>;
+  const ext = (o.extensions ?? {}) as Record<string, unknown>;
+  const info = (o.extraInfo ?? ext.extraInfo ?? {}) as Record<string, unknown>;
+  const res = (o.serverResponse ?? ext.serverResponse ?? {}) as Record<string, unknown>;
+  const code = info.errorType ?? ext.errorType ?? ext.code ?? o.code;
+  const parts = [code, res.status, o.message].filter((x) => x != null && x !== "").map(String);
+  return parts.length ? [...new Set(parts)].join(" · ").slice(0, 200) : JSON.stringify(e).slice(0, 200);
+}
 
 /**
  * Pick one mutation/query result field. A missing field, or one whose
@@ -245,7 +258,7 @@ export function check<T>(r: CdlRes<Record<string, unknown>>, field: string, bad?
     | { __typename?: string; errorCode?: string; errorType?: string; errorMessage?: string }
     | null
     | undefined;
-  if (!v) return { ok: false, reason: `no ${field}` };
+  if (!v) return { ok: false, reason: r.errors?.length ? errorReason(r.errors[0]) : `no ${field}` };
   if (bad && v.__typename && bad.test(v.__typename)) {
     const code = v.errorCode || v.errorType;
     return {
@@ -294,9 +307,10 @@ export async function cdl<T = Record<string, unknown>>(
   if (!reply) return { ok: false, reason: "timeout" };
   const errs = reply.response?.errors || reply.errors;
   if (reply.status !== "success" || !reply.response?.data) {
-    return { ok: false, reason: errs?.length ? JSON.stringify(errs[0]).slice(0, 200) : reply.status || "no data" };
+    return { ok: false, reason: errs?.length ? errorReason(errs[0]) : reply.status || "no data" };
   }
-  return { ok: true, data: reply.response.data as T };
+  if (errs?.length) console.warn(`[cdl] ${operationName}`, errs);
+  return { ok: true, data: reply.response.data as T, ...(errs?.length ? { errors: errs } : {}) };
 }
 
 /**

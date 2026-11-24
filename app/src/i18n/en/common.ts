@@ -11,6 +11,7 @@ export const common = {
   muted: "Muted",
   app: "App",
   notes: "Notes",
+  channelType: { private: "Private channel", shared: "Shared channel" },
   send: "Send",
   audioCall: "Audio call",
   videoCall: "Video call",

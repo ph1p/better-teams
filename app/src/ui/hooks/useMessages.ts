@@ -4,6 +4,7 @@ import {
   editMessage,
   fetchOlderRemote,
   listMessages,
+  myMri,
   primeRemote,
   removeFiles,
   resetPaging,
@@ -18,7 +19,7 @@ import { useChanged } from "../lib/changed";
 import { isIdle, onTeamsChange } from "../lib/live";
 import { INITIAL_REMOTE, POLL_MS } from "../lib/constants";
 import type { Flash } from "../lib/toast";
-import type { Chat, Message as Msg } from "../../types";
+import type { Chat, Message as Msg, Reaction } from "../../types";
 import { t } from "../../i18n";
 import type { MentionPick } from "../../mentions";
 import { editedContent, msgSig, prunePending, reuseUnchanged, type Pending } from "./messageSync";
@@ -358,26 +359,26 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
   async function react(cid: string, messageId: string, key: string, add: boolean): Promise<void> {
     const patch = (m: Msg): Msg => {
       if (m.id !== messageId) return m;
+      const me = myMri();
       const rs = m.reactions.map((r) => ({ ...r }));
+      const drop = (r: Reaction): void => {
+        r.count = Math.max(0, r.count - 1);
+        r.mine = false;
+        if (r.users) r.users = r.users.filter((u) => u !== me);
+      };
       if (add) {
-        for (const r of rs)
-          if (r.mine && r.key !== key) {
-            r.count = Math.max(0, r.count - 1);
-            r.mine = false;
-          }
+        for (const r of rs) if (r.mine && r.key !== key) drop(r);
         const hit = rs.find((r) => r.key === key);
         if (hit) {
           if (!hit.mine) {
             hit.count += 1;
             hit.mine = true;
+            if (hit.users) hit.users = [...hit.users, me];
           }
-        } else rs.push({ key, count: 1, mine: true });
+        } else rs.push({ key, count: 1, mine: true, users: [me] });
       } else {
         const hit = rs.find((r) => r.key === key);
-        if (hit) {
-          hit.count = Math.max(0, hit.count - 1);
-          hit.mine = false;
-        }
+        if (hit) drop(hit);
       }
       return { ...m, reactions: rs.filter((r) => r.count > 0) };
     };

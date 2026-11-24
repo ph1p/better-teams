@@ -13,6 +13,7 @@ import { useNow } from "../lib/now";
 import type { Pending } from "../hooks/useMessages";
 import type { Chat, Message as Msg } from "../../types";
 import type { MentionPick } from "../../mentions";
+import type { TeamsLink } from "../../teamsLinks";
 
 interface TimelineProps {
   /** Messages to render (already filtered by the in-chat search). */
@@ -52,6 +53,7 @@ interface TimelineProps {
   onQuote: (m: Msg) => void;
   onJumpTo: (mid: string) => void;
   onOpenMessage: (cid: string, mid: string) => void;
+  onOpenTeamsLink: (link: TeamsLink) => boolean;
   onThreadReply: (m: Msg) => void;
   onForward: (m: Msg) => void;
   onJoinCall: (rootId: string) => void;
@@ -122,6 +124,7 @@ export function Timeline(p: TimelineProps): JSX.Element {
       onQuote={p.onQuote}
       onJumpTo={p.onJumpTo}
       onOpenMessage={p.onOpenMessage}
+      onOpenTeamsLink={p.onOpenTeamsLink}
       onThreadReply={channel ? p.onThreadReply : undefined}
       onForward={p.onForward}
       onOpenInTeams={p.onOpenInTeams}

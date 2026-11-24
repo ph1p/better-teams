@@ -15,7 +15,7 @@
 export interface MentionPick {
   mri: string;
   name: string;
-  /** "person" for a user, "channel"/"tag" for others. Composer only inserts "person". */
+  /** "person" for a user, "channel"/"team"/"tag" for others; mri is then the thread id. */
   mentionType: string;
 }
 

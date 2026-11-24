@@ -20,6 +20,7 @@ import { chatTitle, messageText } from "./lib/format";
 import { usePref } from "./lib/prefs";
 import { useToast } from "./lib/toast";
 import type { Activity, Chat, Message as Msg } from "../types";
+import type { TeamsLink } from "../teamsLinks";
 import { useChatList } from "./hooks/useChatList";
 import { useMessages } from "./hooks/useMessages";
 import { useActivity } from "./hooks/useActivity";
@@ -309,6 +310,16 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     },
     [selRef, chatsRef, onJumpTo, jumpToMessage, flash],
   );
+  // A Teams deep link inside a message: open it here when we have that chat,
+  // else let the browser follow it.
+  const openTeamsLink = useCallback(
+    (link: TeamsLink): boolean => {
+      if (link.cid !== selRef.current && !chatsRef.current.some((c) => c.id === link.cid)) return false;
+      openMessage(link.cid, link.mid);
+      return true;
+    },
+    [selRef, chatsRef, openMessage],
+  );
   useEffect(() => {
     const j = pendingJump.current;
     if (!j || !m.ready || sel !== j.cid) return;
@@ -397,6 +408,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
               knownPeople={a.knownPeople}
               onRename={a.rename}
               onSetMuted={a.setMuted}
+              onSetFavorite={(chat, favorite) => void a.setFavorite(chat, favorite)}
               onAddMembers={a.addMembers}
               onRemoveMember={a.removeMember}
               onLeave={a.leave}
@@ -410,7 +422,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                 onClose={closeMsgSearch}
               />
             ) : null}
-            <div className="tc-msgs-wrap">
+            <div className={"tc-msgs-wrap" + (m.atBottom ? "" : " scrolled-up")}>
               {m.stickyDay && !mq ? (
                 <div className="tc-day-sticky">
                   <span>{m.stickyDay}</span>
@@ -454,6 +466,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                     onQuote={cs.onQuote}
                     onJumpTo={onJumpTo}
                     onOpenMessage={openMessage}
+                    onOpenTeamsLink={openTeamsLink}
                     onThreadReply={cs.onThreadReply}
                     onForward={onForward}
                     onJoinCall={(rootId) => void a.joinCall(rootId)}

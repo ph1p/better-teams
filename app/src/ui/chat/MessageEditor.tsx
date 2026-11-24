@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX, type ReactNode, type RefObject } from "react";
-import { Smile, SquareCode } from "lucide-react";
-import { myMri, profile, searchPeople } from "../../teamsData";
+import { Hash, Smile, SquareCode, Users } from "lucide-react";
+import { getChannelActions, listChannelMembers, myMri, profile, searchPeople } from "../../teamsData";
 import { typing } from "../../services";
 import { EmojiPicker } from "../shared/EmojiPicker";
 import { Avatar } from "../shared/Avatar";
@@ -16,15 +16,32 @@ import { inOpenFence } from "../../markdown";
 import type { Chat } from "../../types";
 import type { MentionPick } from "../../mentions";
 import { t } from "../../i18n";
+import { scrollNear } from "../lib/pickerKeys";
 
 const NO_PICKS: MentionPick[] = [];
+
+// A channel's people for @mentions: its own roster (private/shared) or the
+// team's (standard). Fetched on the first "@" per channel, then reused.
+const rosters = new Map<string, Promise<MentionPick[]>>();
+function channelRoster(channelId: string): Promise<MentionPick[]> {
+  let r = rosters.get(channelId);
+  if (!r) {
+    r = getChannelActions(channelId)
+      .then((a) => (a ? listChannelMembers(a) : null))
+      .then((ms) => (ms ?? []).map((m) => ({ mri: m.mri, name: m.displayName, mentionType: "person" })))
+      .catch(() => NO_PICKS);
+    // A failed or empty load is retried on the next "@".
+    void r.then((x) => x.length || rosters.delete(channelId));
+    rosters.set(channelId, r);
+  }
+  return r;
+}
 
 // "@query" and ":name" being typed before the caret, and a finished ":name:" (auto-replaced).
 const AT_Q = /(?:^|\s)@([^\s@]{0,40})$/;
 const EMOJI_Q = /(?:^|[\s(]):([a-z0-9_+-]{2,30})$/i;
 const EMOJI_DONE = /(?:^|[\s(]):([a-z0-9_+-]{2,30}):$/i;
 // Keeps the arrow-selected popup row visible.
-const scrollNear = (el: HTMLElement | null): void => el?.scrollIntoView({ block: "nearest" });
 // The end-anchored popup regexes only need the text just before the caret.
 const tail = (upto: string): string => upto.slice(-48);
 // Caret inside a code fence or an open `code span` on its line: no emoji there.
@@ -34,7 +51,7 @@ const plainEnter = (e: React.KeyboardEvent): boolean => e.key === "Enter" && !e.
 
 export interface MessageEditorProps {
   /** Where the text goes: members feed the @mention picker, id the typing signal. */
-  chat: Pick<Chat, "id" | "isChannel" | "members">;
+  chat: Pick<Chat, "id" | "isChannel" | "members"> & Partial<Pick<Chat, "title" | "team" | "teamId" | "channelType">>;
   value: string;
   onChange: (v: string) => void;
   inputRef: RefObject<HTMLTextAreaElement | null>;
@@ -75,6 +92,9 @@ export function MessageEditor(p: MessageEditorProps): JSX.Element {
   // Kept with the query they answer; shown only while that query is current.
   const [org, setOrg] = useState<{ q: string; hits: MentionPick[] }>({ q: "", hits: NO_PICKS });
   const atOrg = atOpen && org.q === atQuery.trim() ? org.hits : NO_PICKS;
+  // Channels: the roster, loaded once the @-picker first opens there.
+  const [roster, setRoster] = useState<{ id: string; picks: MentionPick[] }>({ id: "", picks: NO_PICKS });
+  const atRoster = roster.id === chat.id ? roster.picks : NO_PICKS;
   const [emojiOpen, setEmojiOpen] = useState(false);
   // Code block dialog: the draft range it writes over (the fence the caret is
   // in, else the selection) and the block to start from.
@@ -110,30 +130,41 @@ export function MessageEditor(p: MessageEditorProps): JSX.Element {
     else splice(el.selectionStart ?? draft.length, el.selectionEnd ?? draft.length, ins);
   };
 
-  // Resolved, filtered @mention candidates: the chat's members (minus me) whose
-  // display name matches the text typed after the "@", then org-directory hits.
+  // Resolved, filtered @mention candidates whose name matches the text typed
+  // after the "@": in a channel the channel itself and its team (as Teams
+  // offers them; a private or shared channel can't mention the whole team),
+  // then the chat's members or channel roster (minus me), then org-directory hits.
   const myself = myMri();
   const atCandidates = useMemo<MentionPick[]>(() => {
     if (!atOpen) return NO_PICKS;
     const q = atQuery.trim().toLowerCase();
+    const hit = (name: string): boolean => !!name && (!q || name.toLowerCase().includes(q));
+    const groups: MentionPick[] = [];
+    if (chat.isChannel) {
+      if (chat.title && hit(chat.title)) groups.push({ mri: chat.id, name: chat.title, mentionType: "channel" });
+      if (chat.teamId && chat.team && !chat.channelType && hit(chat.team))
+        groups.push({ mri: chat.teamId, name: chat.team, mentionType: "team" });
+    }
     const seen = new Set<string>();
     const out: MentionPick[] = [];
-    for (const mri of chat.members) {
-      if (!mri || mri === myself || seen.has(mri)) continue;
-      seen.add(mri);
-      const name = profile(mri).displayName || "";
-      if (!name) continue;
-      if (q && !name.toLowerCase().includes(q)) continue;
-      out.push({ mri, name, mentionType: "person" });
+    const people = [
+      ...chat.members.map((mri) => ({ mri, name: profile(mri).displayName || "", mentionType: "person" })),
+      ...atRoster,
+    ];
+    for (const x of people) {
+      if (!x.mri || x.mri === myself || seen.has(x.mri)) continue;
+      seen.add(x.mri);
+      if (hit(x.name)) out.push(x);
     }
     out.sort((a, b) => a.name.localeCompare(b.name));
+    out.unshift(...groups);
     for (const x of atOrg) {
       if (!x.mri || x.mri === myself || seen.has(x.mri)) continue;
       seen.add(x.mri);
       out.push(x);
     }
     return out.slice(0, 8);
-  }, [chat, atOpen, atQuery, myself, atOrg]);
+  }, [chat, atOpen, atQuery, myself, atOrg, atRoster]);
 
   // Track an "@word" or ":word" the caret sits at the end of; any other edit
   // closes its popup. A finished ":name:" becomes its emoji, like Slack.
@@ -214,6 +245,17 @@ export function MessageEditor(p: MessageEditorProps): JSX.Element {
     setEmojiOpen(false);
   }
 
+  useEffect(() => {
+    if (!atOpen || !chat.isChannel || roster.id === chat.id) return;
+    let live = true;
+    void channelRoster(chat.id).then((picks) => {
+      if (live) setRoster({ id: chat.id, picks });
+    });
+    return () => {
+      live = false;
+    };
+  }, [atOpen, chat.isChannel, chat.id, roster.id]);
+
   // Debounced org-directory search while the @-picker is open. Local members
   // show at once; org hits stream in ~250ms after typing stops. The `live`
   // guard drops stale responses so an older query can't overwrite a newer one.
@@ -237,13 +279,29 @@ export function MessageEditor(p: MessageEditorProps): JSX.Element {
   }, [atOpen, atQuery]);
 
   // Auto-grow up to the CSS max-height, then scroll; keep the backdrop aligned.
-  useLayoutEffect(() => {
+  // Grow the box to its text. While the app is hidden (switched to Teams) the
+  // box has no layout and measures 0, so wait until it shows again.
+  const fit = (): void => {
     const el = inputRef.current;
-    if (!el) return;
+    if (!el || !el.getClientRects().length) return;
     el.style.height = "auto";
     el.style.height = el.scrollHeight + "px";
     if (hlRef.current) hlRef.current.scrollTop = el.scrollTop;
-  }, [draft, chat.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  };
+  useLayoutEffect(fit, [draft, chat.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Coming back into view, or a new width, changes the wrapping: measure again.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let width = -1;
+    const ro = new ResizeObserver(([e]) => {
+      if (e.contentRect.width === width) return;
+      width = e.contentRect.width;
+      fit();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const el = inputRef.current;
@@ -318,8 +376,19 @@ export function MessageEditor(p: MessageEditorProps): JSX.Element {
         <div className="tc-at-pop" onMouseDown={(e) => e.preventDefault()}>
           {atCandidates.map((c, i) => (
             <button key={c.mri} {...optProps(i)}>
-              <Avatar name={c.name} uri={avatarUri(c.mri)} mri={c.mri} small />
+              {c.mentionType === "person" ? (
+                <Avatar name={c.name} uri={avatarUri(c.mri)} mri={c.mri} small />
+              ) : (
+                <span className="tc-at-glyph" aria-hidden>
+                  {c.mentionType === "team" ? <Users size={14} /> : <Hash size={14} />}
+                </span>
+              )}
               <span className="tc-at-name">{c.name}</span>
+              {c.mentionType === "person" ? null : (
+                <small className="tc-at-kind">
+                  {c.mentionType === "team" ? t().chat.mentionTeam : t().chat.mentionChannel}
+                </small>
+              )}
             </button>
           ))}
         </div>

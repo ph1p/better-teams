@@ -40,6 +40,9 @@ export function Row({
   // Subscribed so the avatar's presence ring stays live.
   usePresence();
   const prev = preview(chat);
+  // Outside the team-grouped Channels section a channel needs its team:
+  // "General" alone does not say which one.
+  const team = showTeam && chat.isChannel && chat.team ? chat.team : "";
   const icon = <ChatIcon chat={chat} small={compact} size={compact ? 13 : 16} onOpen={onOpenProfile} />;
   return (
     <div
@@ -52,7 +55,7 @@ export function Row({
       }
       onClick={onClick}
       onContextMenu={onMenu ? (e) => onMenu(e, chat) : undefined}
-      title={compact ? chatTitle(chat) + "\n" + prev : undefined}
+      title={compact ? chatTitle(chat) + (team ? " · " + team : "") + "\n" + prev : undefined}
       data-id={chat.id}
     >
       {icon}
@@ -60,17 +63,13 @@ export function Row({
         <div className="tc-row-top">
           <span className="tc-row-title">
             <span className="tc-name">{chatTitle(chat)}</span>
+            {team ? <span className="tc-row-team">{team}</span> : null}
             {chat.muted ? <BellOff size={12} className="tc-row-muted" aria-label={t().common.muted} /> : null}
             {chat.app ? <span className="tc-app-badge">{t().common.app}</span> : null}
           </span>
           <span className="tc-time">{fmtTime(chat.time)}</span>
         </div>
-        {compact ? null : (
-          <div className="tc-prev">
-            {showTeam && chat.isChannel && chat.team ? <span className="tc-team">{chat.team} · </span> : null}
-            {prev}
-          </div>
-        )}
+        {compact ? null : <div className="tc-prev">{prev}</div>}
       </div>
       {chat.liveCall ? (
         <span className="tc-row-live" title={t().sidebar.liveCall} aria-label={t().sidebar.liveCall}>

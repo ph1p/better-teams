@@ -22,13 +22,25 @@ import { Attachments } from "./Attachments";
 import { Cards } from "./Cards";
 import { isAppMri } from "../../apps";
 import { Linkified } from "../shared/Linkified";
-import { avatarUri, fmtClock, fmtFull, fmtStamp, htmlToText, isHtmlMsg, messageText, oneLine } from "../lib/format";
+import {
+  avatarUri,
+  fmtClock,
+  fmtFull,
+  fmtGutterClock,
+  fmtStamp,
+  htmlToText,
+  isHtmlMsg,
+  messageText,
+  oneLine,
+} from "../lib/format";
 import { useEditRequest } from "../lib/editRequest";
 import { MessageEditor } from "./MessageEditor";
+import { Reactions } from "./Reactions";
+import { parseTeamsLink, type TeamsLink } from "../../teamsLinks";
 import { editMentions, type MentionPick } from "../../mentions";
 import { htmlToMarkdown } from "../lib/htmlToMarkdown";
 import { usePresence } from "../lib/presence";
-import { glyphFor, PICKER } from "../lib/reactions";
+import { PICKER } from "../lib/reactions";
 import { imageItem, openViewer } from "../lib/files";
 import { useCopied } from "../lib/clipboard";
 import type { Chat, Message as Msg } from "../../types";
@@ -120,6 +132,8 @@ interface MessageProps {
   onJumpTo?: (mid: string) => void;
   /** Open a message in its conversation (a forward's original). */
   onOpenMessage?: (cid: string, mid: string) => void;
+  /** A Teams deep link was clicked; true when it was opened here. */
+  onOpenTeamsLink?: (link: TeamsLink) => boolean;
   /** Channels only: answer in this message's thread. */
   onThreadReply?: (m: Msg) => void;
   /** Forward this message to another chat or channel. */
@@ -151,6 +165,7 @@ export const Message = memo(function Message({
   onForward,
   onOpenInTeams,
   onOpenMessage,
+  onOpenTeamsLink,
 }: MessageProps): JSX.Element {
   useNameFormat();
   const { statusOf } = usePresence();
@@ -249,7 +264,9 @@ export const Message = memo(function Message({
         />
       ) : (
         // Continuation: the avatar column shows the time on hover instead.
-        <span className={"tc-msg-gutter" + (m.isReply && channel ? " sm" : "")}>{fmtClock(m.time)}</span>
+        <span className={"tc-msg-gutter" + (m.isReply && channel ? " sm" : "")} title={fmtFull(m.time)}>
+          {fmtGutterClock(m.time)}
+        </span>
       )}
       <div className="tc-msg-body">
         {first && (
@@ -327,6 +344,16 @@ export const Message = memo(function Message({
           <div
             className={"tc-msg-content" + (html ? " rich" : "")}
             onClick={(e) => {
+              // A Teams link to a chat or message we have opens here, not in
+              // a new Teams tab. Modified clicks keep the browser's behaviour.
+              const a = (e.target as Element).closest?.("a[href]");
+              if (a && onOpenTeamsLink && e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+                const link = parseTeamsLink((a as HTMLAnchorElement).href);
+                if (link && onOpenTeamsLink(link)) {
+                  e.preventDefault();
+                  return;
+                }
+              }
               // Click a quoted reply's blockquote to jump to the original.
               const bq = (e.target as Element).closest?.("blockquote.tc-reply");
               if (bq) {
@@ -373,18 +400,11 @@ export const Message = memo(function Message({
           />
         ) : null}
         {!m.deleted && m.reactions.length ? (
-          <div className="tc-reacts">
-            {m.reactions.map((r) => (
-              <button
-                key={r.key}
-                className={"tc-react" + (r.mine ? " mine" : "")}
-                title={r.mine ? t().chat.removeReaction(r.key) : t().chat.react(r.key)}
-                onClick={() => onReact(cid, m.id, r.key, !r.mine)}
-              >
-                {glyphFor(r.key)} {r.count}
-              </button>
-            ))}
-          </div>
+          <Reactions
+            reactions={m.reactions}
+            onReact={(key, add) => onReact(cid, m.id, key, add)}
+            onOpenProfile={onOpenProfile}
+          />
         ) : null}
       </div>
       {!m.deleted && !editing ? (

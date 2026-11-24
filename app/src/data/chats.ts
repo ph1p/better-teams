@@ -187,6 +187,15 @@ export async function listChats(): Promise<Chat[]> {
     // sidebar (sections.ts listed) but stay in the list, so the team's
     // show/hide menu can bring them back.
     const general = kind === "channel" && c.id === teamKey;
+    // Private and shared channels are their own Space row (General is the
+    // team's); the sub-type (PrivateChannel / SharedChannel) tells them apart.
+    const subType = str(tp.threadSubType) || str(tp.threadsubtype) || str(c.threadSubType);
+    const channelType =
+      kind === "channel" && c.type === "Space" && !general
+        ? /shared/i.test(subType)
+          ? ("shared" as const)
+          : ("private" as const)
+        : undefined;
     const channelHidden =
       kind === "channel" &&
       !effectiveShown(str(c.id), props.favorite == null || String(props.favorite).toLowerCase() === "true");
@@ -212,7 +221,12 @@ export async function listChats(): Promise<Chat[]> {
         team: teamName,
         isChannel: kind === "channel",
         ...(kind === "channel"
-          ? { teamId: teamKey, ...(general ? { general } : {}), ...(channelHidden ? { channelHidden } : {}) }
+          ? {
+              teamId: teamKey,
+              ...(general ? { general } : {}),
+              ...(channelHidden ? { channelHidden } : {}),
+              ...(channelType ? { channelType } : {}),
+            }
           : {}),
         // 1:1 chats get the other person's photo.
         avatarMri: kind === "chat" && others.length === 1 ? others[0] : "",

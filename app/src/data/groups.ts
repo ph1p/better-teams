@@ -8,6 +8,7 @@ import { groups } from "../services";
 import { setChatHidden } from "./readState";
 import { isChannelId } from "./state";
 import { toWrite } from "./raw";
+import { t } from "../i18n";
 import type { ChannelNotifications, ChannelPreset, ThreadMember } from "../services/groups";
 
 export type { ChannelNotifications, ChannelPreset };
@@ -38,6 +39,9 @@ export interface ChannelActions {
   /** We may add people to that roster, or remove them (owners only). */
   addMembers: boolean;
   removeMembers: boolean;
+  /** We may add people to the team itself (team owners); a private channel
+   * takes only team members, so outsiders join the team first. */
+  addTeamMembers: boolean;
 }
 
 const OVERRIDE_MS = 60_000;
@@ -214,8 +218,10 @@ export async function getChannelActions(channelId: string): Promise<ChannelActio
     members: null,
     addMembers: false,
     removeMembers: false,
+    addTeamMembers: false,
   };
   const teamOwner = i.teamRole === "ADMIN";
+  v.addTeamMembers = teamOwner && i.canAddTeamMember && !!i.teamId && !!i.groupId;
   if (i.channelType === "STANDARD" || i.isGeneral) {
     if (i.teamId)
       Object.assign(v, {
@@ -289,17 +295,40 @@ export async function listChannelMembers(a: ChannelActions): Promise<ChannelMemb
 }
 
 /** Add people to the roster `a.members` names. */
-export async function addChannelMembers(a: ChannelActions, mris: string[]): Promise<WriteResult> {
+/**
+ * Adds people to the roster `a` shows. For a private channel, `outsideTeam`
+ * (a subset of `mris`) join the team first: Teams refuses anyone else.
+ */
+export async function addChannelMembers(
+  a: ChannelActions,
+  mris: string[],
+  outsideTeam: string[] = [],
+): Promise<WriteResult> {
   if (!a.addMembers || !a.members) return { ok: false, reason: "can't add members here" };
   if (!mris.length) return { ok: true };
-  const r = await groups.addThreadMembers(
-    { teamId: a.teamId, groupId: a.groupId },
-    a.members === "channel" ? a.channelId : null,
-    mris,
-  );
-  if (!r.ok) return toWrite(r, "cdl");
-  if (r.data.length) return { ok: false, reason: [...new Set(r.data.map((e) => e.error))].join(", ") };
-  return { ok: true, via: "cdl" };
+  const team = { teamId: a.teamId, groupId: a.groupId };
+  const failed = (r: { ok: true; data: { error: string }[] }): WriteResult | null =>
+    r.data.length ? { ok: false, reason: [...new Set(r.data.map((e) => e.error))].join(", ") } : null;
+  if (a.members === "channel" && outsideTeam.length) {
+    if (!a.addTeamMembers) return { ok: false, reason: t().app.notInTeam };
+    const r = await groups.addThreadMembers(team, null, outsideTeam);
+    if (!r.ok) return toWrite(r, "cdl");
+    const f = failed(r);
+    if (f) return f;
+  }
+  // Teams answers 400 (RequireStatusFailed) for anyone not in the team yet;
+  // fresh team members can take a moment to count, so retry a few times then.
+  const tries = a.members === "channel" && outsideTeam.length ? 4 : 1;
+  for (let i = 0; ; i++) {
+    const r = await groups.addThreadMembers(team, a.members === "channel" ? a.channelId : null, mris);
+    if (r.ok) return failed(r) ?? { ok: true, via: "cdl" };
+    const notInTeam = a.members === "channel" && /RequireStatusFailed/.test(r.reason);
+    if (notInTeam && i + 1 < tries) {
+      await new Promise((res) => setTimeout(res, 2_000 * (i + 1)));
+      continue;
+    }
+    return notInTeam ? { ok: false, reason: t().app.notInTeam } : toWrite(r, "cdl");
+  }
 }
 
 /** Remove someone from the roster `a.members` names. */

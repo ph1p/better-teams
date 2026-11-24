@@ -5,7 +5,7 @@
 // list first, with a badge, as do guests.
 
 import { t } from "../../i18n";
-import { useEffect, useState, type JSX } from "react";
+import { useEffect, useMemo, useState, type JSX } from "react";
 import { UserPlus, X } from "lucide-react";
 import {
   addChannelMembers,
@@ -47,6 +47,8 @@ export function ChannelMembersPanel({
   const [acts, setActs] = useState<ChannelActions | null | undefined>(undefined);
   const [members, setMembers] = useState<ChannelMember[] | null | undefined>(undefined);
   const [picked, setPicked] = useState<PeopleHit[]>([]);
+  // A private channel takes only members of its team; null: roster unknown, don't restrict.
+  const [teamPool, setTeamPool] = useState<PeopleHit[] | null>(null);
   const [busy, setBusy] = useState(false);
   const { armed, tryArm } = useArm<string>();
   const me = myMri();
@@ -58,8 +60,16 @@ export function ChannelMembersPanel({
       const a = await getChannelActions(chat.id);
       if (!live) return;
       setActs(a);
-      const ms = a ? await listChannelMembers(a) : null;
-      if (live) setMembers(ms && [...ms].sort(byRole));
+      const [ms, team] = await Promise.all([
+        a ? listChannelMembers(a) : null,
+        a?.members === "channel" && a.addMembers ? listChannelMembers({ ...a, members: "team" }) : null,
+      ]);
+      if (!live) return;
+      setMembers(ms && [...ms].sort(byRole));
+      setTeamPool(
+        team &&
+          team.map((m): PeopleHit => ({ mri: m.mri, displayName: m.displayName, jobTitle: m.jobTitle, email: "" })),
+      );
     })();
     return () => {
       live = false;
@@ -67,6 +77,10 @@ export function ChannelMembersPanel({
   }, [chat.id]);
 
   const has = (mri: string): boolean => !!members?.some((m) => m.mri === mri);
+  const teamPick = useMemo(
+    () => (teamPool && acts ? { members: teamPool, canAdd: acts.addTeamMembers } : null),
+    [teamPool, acts],
+  );
 
   // Optimistic: the roster shows the change at once, and takes it back on failure.
   const add = async (): Promise<void> => {
@@ -92,6 +106,9 @@ export function ChannelMembersPanel({
     const r = await addChannelMembers(
       acts,
       people.map((p) => p.mri),
+      people
+        .filter((p) => teamPick && !teamPick.members.some((m) => m.mri.toLowerCase() === p.mri.toLowerCase()))
+        .map((p) => p.mri),
     );
     setBusy(false);
     if (r.ok) {
@@ -134,7 +151,14 @@ export function ChannelMembersPanel({
 
       {acts?.addMembers && members ? (
         <div className="tc-members-add">
-          <PeoplePicker known={known} exclude={has} picked={picked} setPicked={setPicked} autoFocus />
+          <PeoplePicker
+            known={known}
+            exclude={has}
+            picked={picked}
+            setPicked={setPicked}
+            team={teamPick ?? undefined}
+            autoFocus
+          />
           {picked.length ? (
             <div className="tc-members-go end">
               <button className="tc-newchat-go" disabled={busy} onClick={() => void add()}>

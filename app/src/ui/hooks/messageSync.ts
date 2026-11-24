@@ -30,7 +30,7 @@ function hash(s: string): number {
 
 // Cheap change signature so polling doesn't re-render (and jump) when idle.
 const itemSig = (m: Msg): string =>
-  `${m.id}:${m.time}:${m.edited}:${m.deleted}:${hash(m.content)}:${m.files.map((f) => f.name).join("/")}:${m.reactions.map((r) => r.key + r.count + (r.mine ? "*" : "")).join()}`;
+  `${m.id}:${m.time}:${m.edited}:${m.deleted}:${hash(m.content)}:${m.files.map((f) => f.name).join("/")}:${m.reactions.map((r) => r.key + r.count + (r.mine ? "*" : "") + hash(r.users?.join() ?? "")).join()}`;
 
 export const msgSig = (list: Msg[]): string => list.map(itemSig).join("|");
 
