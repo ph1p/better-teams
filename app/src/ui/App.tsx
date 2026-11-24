@@ -357,9 +357,10 @@ export default function App({ onHide }: { onHide?: () => void }) {
         query={query}
         onQuery={setQuery}
         searchRef={search}
-        onSearchEnter={() => {
-          if (!flat[0]) return;
-          pick(flat[0].id);
+        onSearchEnter={(id) => {
+          const target = id ?? flat[0]?.id;
+          if (!target) return;
+          pick(target);
           setQuery("");
           cs.composer.current?.focus();
         }}

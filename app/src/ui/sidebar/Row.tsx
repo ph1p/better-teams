@@ -1,4 +1,4 @@
-import type { MouseEvent } from "react";
+import { useEffect, useRef, type MouseEvent } from "react";
 import { BellOff, Video } from "lucide-react";
 import { ChatIcon } from "../shared/Avatar";
 import { chatTitle, fmtTime, oneLine } from "../lib/format";
@@ -10,6 +10,7 @@ import { cardSummary, parseCards } from "../../cards";
 interface RowProps {
   chat: Chat;
   selected: boolean;
+  active?: boolean;
   compact: boolean;
   // Prefix channel previews with the team (off when the section groups by team).
   showTeam?: boolean;
@@ -25,9 +26,22 @@ const preview = (chat: Chat) => {
   return (chat.last.from ? chat.last.from + ": " : "") + (text.slice(0, 120) || "…");
 };
 
-export function Row({ chat, selected, compact, showTeam = true, onClick, onOpenProfile, onMenu }: RowProps) {
+export function Row({
+  chat,
+  selected,
+  active = false,
+  compact,
+  showTeam = true,
+  onClick,
+  onOpenProfile,
+  onMenu,
+}: RowProps) {
   // Subscribed so the avatar's presence ring stays live.
   usePresence();
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (active) ref.current?.scrollIntoView({ block: "nearest" });
+  }, [active]);
   const prev = preview(chat);
   // Outside the team-grouped Channels section a channel needs its team:
   // "General" alone does not say which one.
@@ -35,10 +49,13 @@ export function Row({ chat, selected, compact, showTeam = true, onClick, onOpenP
   const icon = <ChatIcon chat={chat} small={compact} size={compact ? 13 : 16} onOpen={onOpenProfile} />;
   return (
     <div
+      ref={ref}
+      id={"tc-row-" + chat.id}
       className={
         "tc-row" +
         (compact ? " compact" : "") +
         (selected ? " sel" : "") +
+        (active ? " kb" : "") +
         (chat.unread ? " unread" : "") +
         (chat.channelHidden ? " ghost" : "")
       }

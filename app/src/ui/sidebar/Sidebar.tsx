@@ -1,4 +1,4 @@
-import type { MouseEvent, RefObject } from "react";
+import { useState, type MouseEvent, type RefObject } from "react";
 import { SideResize } from "./SideResize";
 import { Bell, CheckCheck, Search, SquarePen, X } from "lucide-react";
 import { Section } from "./Section";
@@ -26,8 +26,8 @@ interface SidebarProps {
   query: string;
   onQuery: (q: string) => void;
   searchRef: RefObject<HTMLInputElement | null>;
-  /** Enter in search: open the top hit. */
-  onSearchEnter: () => void;
+  /** Enter in search: open the arrow-key hit, else the top one. */
+  onSearchEnter: (id?: string) => void;
   unreadOnly: boolean;
   unreadCount: number;
   onUnreadFilter: (on: boolean) => void;
@@ -72,6 +72,11 @@ export function Sidebar(p: SidebarProps) {
   } = p;
   const s = t().sidebar;
   const showActivity = unreadOnly && inboxTab === "activity";
+  // Arrow keys walk the search hits; a new query starts again at the top.
+  const hits = query.trim() ? (sections.find((x) => x.id === "search")?.rows ?? []) : [];
+  const [kb, setKb] = useState({ q: query, i: 0 });
+  const kbIndex = kb.q === query ? Math.min(kb.i, hits.length - 1) : 0;
+  const active = hits[kbIndex]?.id ?? null;
   return (
     <aside className="tc-side">
       <div className="tc-side-head">
@@ -119,12 +124,17 @@ export function Sidebar(p: SidebarProps) {
               placeholder={s.search}
               value={query}
               onChange={(e) => onQuery(e.target.value)}
+              aria-activedescendant={active ? "tc-row-" + active : undefined}
               onKeyDown={(e) => {
-                if (e.key === "Escape") {
+                if ((e.key === "ArrowDown" || e.key === "ArrowUp") && hits.length) {
+                  e.preventDefault();
+                  const step = e.key === "ArrowDown" ? 1 : -1;
+                  setKb({ q: query, i: (kbIndex + step + hits.length) % hits.length });
+                } else if (e.key === "Escape") {
                   onQuery("");
                   e.currentTarget.blur();
                 } else if (e.key === "Enter") {
-                  onSearchEnter();
+                  onSearchEnter(active ?? undefined);
                 }
               }}
             />
@@ -167,6 +177,7 @@ export function Sidebar(p: SidebarProps) {
             title={sec.id === "search" || sec.id === "unread" ? "" : s.sections[sec.id]}
             rows={sec.rows}
             sel={sel}
+            active={active}
             compact={compact}
             capped={sec.capped}
             groupByTeam={sec.groupByTeam}

@@ -13,6 +13,8 @@ interface SectionProps {
   title: string;
   rows: Chat[];
   sel: string | null;
+  // Keyboard-highlighted row (search arrow keys).
+  active?: string | null;
   compact: boolean;
   // false: list every row (Unread filter, search results), no "Show more".
   capped?: boolean;
@@ -39,6 +41,7 @@ export function Section({
   title,
   rows,
   sel,
+  active = null,
   compact,
   capped = true,
   defaultCollapsed = false,
@@ -101,6 +104,7 @@ export function Section({
         compact={compact}
         showTeam={!groupByTeam}
         selected={c.id === sel}
+        active={c.id === active}
         onClick={() => onPick(c.id)}
         onOpenProfile={onOpenProfile}
         onMenu={onMenu}
