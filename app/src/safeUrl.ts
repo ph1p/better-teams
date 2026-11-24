@@ -22,7 +22,8 @@ export function safeImgSrc(url: string): string {
 }
 
 // Hosts whose images load without asking: Microsoft's own services, which
-// already see that you are online. Anything else waits for a click.
+// already see that you are online, and Giphy, which Teams' own GIF picker
+// uses. Anything else waits for a click.
 const TRUSTED_IMG_HOSTS = [
   "teams.microsoft.com",
   "microsoft.com",
@@ -31,9 +32,10 @@ const TRUSTED_IMG_HOSTS = [
   "office.com",
   "office.net",
   "live.com",
+  "giphy.com",
 ];
 
-/** True when an https image URL is served by a Microsoft host (exact or subdomain). */
+/** True when an https image URL is served by a trusted host (exact or subdomain). */
 export function isTrustedImgHost(url: string): boolean {
   try {
     const host = new URL(url).hostname.toLowerCase();
@@ -49,5 +51,17 @@ export function hostOf(url: string): string {
     return new URL(url).hostname;
   } catch {
     return "";
+  }
+}
+
+const IMG_EXT = /\.(gif|png|jpe?g|webp|avif)$/i;
+
+/** True when an https URL points straight at an image file (by its path). */
+export function isImageUrl(url: string): boolean {
+  if (!safeImgSrc(url)) return false;
+  try {
+    return IMG_EXT.test(new URL(url).pathname);
+  } catch {
+    return false;
   }
 }

@@ -373,7 +373,7 @@ export const Message = memo(function Message({
               if (img) {
                 const all = [...e.currentTarget.querySelectorAll<HTMLImageElement>("img.tc-inline-img")];
                 openViewer(
-                  all.map((el) => imageItem(el.currentSrc || el.src, el.alt)),
+                  all.map((el) => imageItem(el.currentSrc || el.src, el.alt, el.dataset.link)),
                   all.indexOf(img as HTMLImageElement),
                 );
               }

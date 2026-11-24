@@ -29,11 +29,30 @@ describe("RichHtml images", () => {
   });
 
   it("gates external https images behind a button", () => {
-    const out = render('<p><img src="https://media.giphy.com/media/x/giphy.gif" alt="cat"></p>');
+    const out = render('<p><img src="https://i.imgur.com/x.gif" alt="cat"></p>');
     expect(out).not.toContain("<img");
     expect(out).toContain("tc-img-gate");
-    expect(out).toContain("giphy.com");
+    expect(out).toContain("imgur.com");
     expect(out).toContain("cat");
+  });
+
+  it("loads Giphy images directly", () => {
+    expect(render('<p><img src="https://media.giphy.com/media/x/giphy.gif" alt="cat"></p>')).toContain("<img");
+  });
+
+  it("shows a link to an image as the picture, not the URL text", () => {
+    const url = "https://media.giphy.com/media/v1.abc/84BjZMVEX3aRG/giphy.gif";
+    const out = render(`<p><a href="${url}">${url}</a></p>`);
+    expect(out).toContain(`<img class="tc-inline-img" src="${url}" alt=""`);
+    expect(out).toContain(`data-link="${url}"`);
+    expect(out).not.toContain("<a");
+    expect(out).not.toContain(`>${url}<`);
+  });
+
+  it("gates a link to an untrusted image without showing the URL text", () => {
+    const out = render('<p><a href="https://i.imgur.com/x.gif">https://i.imgur.com/x.gif</a></p>');
+    expect(out).toContain("tc-img-gate");
+    expect(out).not.toContain("<a");
   });
 
   it("renders http images as alt text", () => {

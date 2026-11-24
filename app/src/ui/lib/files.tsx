@@ -38,7 +38,10 @@ const KINDS: [FileKind, RegExp][] = [
   ["word", /^(docx?|odt|rtf)$/],
   ["excel", /^(xlsx?|xlsm|csv|ods)$/],
   ["powerpoint", /^(pptx?|odp|key)$/],
-  ["code", /^(js|jsx|ts|tsx|json|ya?ml|xml|html?|css|sh|py|rb|go|rs|java|kt|swift|c|cc|cpp|h|cs|sql|toml|ini)$/],
+  [
+    "code",
+    /^(js|jsx|ts|tsx|json|ya?ml|xml|html?|css|sh|py|rb|go|rs|java|kt|swift|c|cc|cpp|h|cs|sql|toml|ini)$/,
+  ],
   ["archive", /^(zip|tar|gz|tgz|7z|rar)$/],
   ["text", /^(txt|md|log)$/],
 ];
@@ -94,7 +97,8 @@ function set(next: ViewerState | null): void {
 }
 
 export function openViewer(items: ViewerItem[], index = 0): void {
-  if (items.length) set({ items, index: Math.max(0, Math.min(index, items.length - 1)) });
+  if (items.length)
+    set({ items, index: Math.max(0, Math.min(index, items.length - 1)) });
 }
 
 export function closeViewer(): void {
@@ -129,7 +133,8 @@ export async function saveImage(item: ViewerItem): Promise<boolean> {
     const blob = await r.blob();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    const ext = item.ext || (blob.type.split("/")[1] || "png").replace("jpeg", "jpg");
+    const ext =
+      item.ext || (blob.type.split("/")[1] || "png").replace("jpeg", "jpg");
     a.download = /\.\w+$/.test(item.name) ? item.name : `${item.name}.${ext}`;
     document.body.appendChild(a);
     a.click();
@@ -172,10 +177,18 @@ export function fileItem(f: FileRef): ViewerItem {
 }
 
 /** An inline message image: show Teams' original size (/views/imgo) rather than a thumbnail view. */
-export function imageItem(src: string, alt: string): ViewerItem {
+export function imageItem(src: string, alt: string, link?: string): ViewerItem {
   const full = src.replace(/\/views\/imgt\w*(?=$|[?#])/, "/views/imgo");
-  // No `url`: AMS needs Teams' cookies, an external browser would get a 401.
-  return { name: alt && !/^image$/i.test(alt) ? alt : t().app.image, ext: "", kind: "image", image: full };
+  // No `url` for AMS images: they need Teams' cookies, an external browser
+  // would get a 401. A pasted image link (`link`) is public, so it gets one.
+  const item: ViewerItem = {
+    name: alt && !/^image$/i.test(alt) ? alt : t().app.image,
+    ext: "",
+    kind: "image",
+    image: full,
+  };
+  if (link) item.url = link;
+  return item;
 }
 
 /** The type icon on its kind-colored tile. */
