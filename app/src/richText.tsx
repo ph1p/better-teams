@@ -33,7 +33,7 @@ const ENTITIES: Record<string, string> = {
   copy: "©",
   reg: "®",
 };
-export function decodeEntities(s: string): string {
+export function decodeEntities(s: string) {
   return String(s)
     .replace(/&#x([0-9a-f]+);/gi, (_, h: string) => String.fromCodePoint(parseInt(h, 16)))
     .replace(/&#(\d+);/g, (_, d: string) => String.fromCodePoint(parseInt(d, 10)))
@@ -41,7 +41,6 @@ export function decodeEntities(s: string): string {
 }
 
 type Attrs = Record<string, string>;
-// Parsed node: either a text string or an element with children.
 export interface ElNode {
   tag: string;
   attrs: Attrs;
@@ -49,11 +48,9 @@ export interface ElNode {
 }
 export type Node = string | ElNode;
 
-// Which React tag + className we render an HTML tag as.
 // null tag = render children only (drop the wrapper).
 type TagMap = [tag: keyof JSX.IntrinsicElements | null, cls: string | null];
 
-// Map an opening HTML tag to the React tag + className we render it as.
 function mapTag(name: string, attrs: Attrs): TagMap {
   switch (name) {
     case "p":
@@ -95,24 +92,21 @@ function mapTag(name: string, attrs: Attrs): TagMap {
     case "h6":
       return ["div", "tc-h"];
     case "span":
-      // @mention spans get a pill; everything else is a transparent wrapper.
       return /Mention/i.test(attrs.itemtype || "") ? ["span", "tc-mention"] : [null, null];
     case "a":
       return ["a", null];
     case "img":
       return ["img", null];
     default:
-      return [null, null]; // unknown wrapper: keep its text children
+      return [null, null];
   }
 }
 
 const VOID = new Set(["br", "img", "hr"]);
-// Elements whose inner content is noise in a chat bubble (scripts, styles, and
-// Teams' hidden editor scaffolding).
 const DROP = /^(script|style)$/i;
 
 const attrRe = /([a-z0-9:_-]+)(?:\s*=\s*"([^"]*)"|\s*=\s*'([^']*)')?/gi;
-function parseAttrs(s: string): Attrs {
+function parseAttrs(s: string) {
   const out: Attrs = {};
   let m: RegExpExecArray | null;
   while ((m = attrRe.exec(s))) out[m[1].toLowerCase()] = m[2] ?? m[3] ?? "";
@@ -121,16 +115,15 @@ function parseAttrs(s: string): Attrs {
 
 const tokenRe = /<\/?([a-z][a-z0-9]*)((?:[^>"']|"[^"]*"|'[^']*')*?)\/?>/gi;
 
-// Parse an HTML fragment into a tree of {tag, attrs, children} / strings.
-export function parse(html: string): ElNode {
+export function parse(html: string) {
   const root: ElNode = { tag: "#root", attrs: {}, children: [] };
   const stack: ElNode[] = [root];
   let last = 0;
   let m: RegExpExecArray | null;
-  const push = (node: Node): void => {
+  const push = (node: Node) => {
     stack[stack.length - 1].children.push(node);
   };
-  const text = (raw: string): void => {
+  const text = (raw: string) => {
     if (!raw) return;
     const t = decodeEntities(raw);
     if (t) push(t);
@@ -141,7 +134,6 @@ export function parse(html: string): ElNode {
     const closing = m[0][1] === "/";
     const name = m[1].toLowerCase();
     if (closing) {
-      // Pop to the matching open tag if there is one.
       for (let i = stack.length - 1; i > 0; i--) {
         if (stack[i].tag === name) {
           stack.length = i;
@@ -154,7 +146,6 @@ export function parse(html: string): ElNode {
     const node: ElNode = { tag: name, attrs, children: [] };
     const selfClose = VOID.has(name) || m[0].endsWith("/>");
     if (DROP.test(name)) {
-      // Skip the element and, for non-void, its contents until the close tag.
       if (!selfClose) {
         const close = new RegExp("</" + name + "\\s*>", "i");
         close.lastIndex = last;
@@ -175,12 +166,12 @@ export function parse(html: string): ElNode {
 
 // Teams' AMS/preview image src already points at de-prod.asyncgw.* /views/imgo,
 // which 200s with the page's cookies, so we keep it as-is — https only.
-function imgSrc(attrs: Attrs): string {
+function imgSrc(attrs: Attrs) {
   return safeImgSrc(attrs.src || "");
 }
 
 const isBr = (n: Node | undefined): n is ElNode => !!n && typeof n === "object" && n.tag === "br";
-const isBlank = (n: Node | undefined): boolean => typeof n === "string" && !n.trim();
+const isBlank = (n: Node | undefined) => typeof n === "string" && !n.trim();
 // Block-ish tags that already introduce their own vertical spacing, so a <br>
 // right inside them (or an empty one) is just dead air.
 const BLOCK = new Set(["p", "div", "li", "blockquote", "quote", "ul", "ol", "pre", "h1", "h2", "h3", "h4", "h5", "h6"]);
@@ -194,7 +185,6 @@ function prune(node: Node): Node | null {
   // next line's indentation, and <br> runs are blank lines. Leave them alone.
   if (node.tag === "pre") return textOf(node).trim() ? node : null;
   const kids = node.children.map(prune).filter((k): k is Node => k !== null);
-  // Collapse consecutive <br> and blank text between them to a single <br>.
   const out: Node[] = [];
   for (const k of kids) {
     const prev = out[out.length - 1];
@@ -202,10 +192,8 @@ function prune(node: Node): Node | null {
     if (isBlank(k) && (isBr(prev) || prev === undefined)) continue;
     out.push(k);
   }
-  // Trim trailing <br>/blank.
   while (out.length && (isBr(out[out.length - 1]) || isBlank(out[out.length - 1]))) out.pop();
   node.children = out;
-  // Drop a block element that ended up with no visible content.
   if (BLOCK.has(node.tag) && node.tag !== "#root") {
     const hasContent = out.some((k) => (typeof k === "string" ? k.trim() : true));
     if (!hasContent) return null;
@@ -213,16 +201,14 @@ function prune(node: Node): Node | null {
   return node;
 }
 
-// Flatten a parsed node to its raw text (code blocks need the source string).
 export function textOf(node: Node): string {
   if (typeof node === "string") return node;
   if (node.tag === "br") return "\n";
   return node.children.map(textOf).join("");
 }
 
-// Pull a language hint off a <pre>/<code> class (`language-js`, `lang-ts`) or a
-// Teams `data-*` attribute; "" when none is recognised.
-function langHint(node: Node): string {
+// From a <pre>/<code> class (`language-js`, `lang-ts`) or a Teams `data-*` attribute.
+function langHint(node: Node) {
   const probe = (n: Node): string => {
     if (typeof n === "string") return "";
     const a = n.attrs || {};
@@ -240,13 +226,12 @@ function langHint(node: Node): string {
   return probe(node);
 }
 
-// A fenced code block highlighted by Shiki. Falls back to plain text until the
-// highlighter has loaded (or forever, if the language is unknown), and
-// re-renders when it becomes ready. No innerHTML: tokens become React spans.
-// Longer blocks start collapsed to COLLAPSED_LINES (CSS sets the height).
+// Plain text until the highlighter has loaded (or forever, if the language is
+// unknown). No innerHTML: tokens become React spans. Longer blocks start
+// collapsed (CSS sets the height).
 const COLLAPSE_OVER = 15;
 
-function CodeBlock({ code, lang }: { code: string; lang: string }): JSX.Element {
+function CodeBlock({ code, lang }: { code: string; lang: string }) {
   const [ready, bump] = useState(0);
   const [open, setOpen] = useState(false);
   const [copied, copy] = useCopied();
@@ -262,7 +247,7 @@ function CodeBlock({ code, lang }: { code: string; lang: string }): JSX.Element 
   const long = count > COLLAPSE_OVER;
   const c = t().chat;
   // Clicks here stay in the block (the message row has its own click handling).
-  const stop = (e: React.MouseEvent): void => e.stopPropagation();
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
   return (
     <div className={"tc-pre tc-codeblock" + (lines ? " tc-shiki" : "") + (long && !open ? " folded" : "")}>
       <div className="tc-code-head">
@@ -316,7 +301,7 @@ function CodeBlock({ code, lang }: { code: string; lang: string }): JSX.Element 
 // Images from non-Microsoft hosts can be tracking pixels: show a button and
 // load the image only when the user asks. State is per rendered image, so a
 // re-mount (chat switch, reload) asks again. That is intended.
-export function GatedImg({ src, alt, link }: { src: string; alt: string; link?: boolean }): JSX.Element {
+export function GatedImg({ src, alt, link }: { src: string; alt: string; link?: boolean }) {
   const [shown, setShown] = useState(false);
   if (shown) return <InlineImg src={src} alt={alt} link={link} />;
   return (
@@ -327,9 +312,9 @@ export function GatedImg({ src, alt, link }: { src: string; alt: string; link?: 
   );
 }
 
-/** An inline picture. `link`: it stands in for a link to itself (a pasted
- *  image URL), so the viewer offers "copy link" / "open in browser" for it. */
-export function InlineImg({ src, alt, link }: { src: string; alt: string; link?: boolean }): JSX.Element {
+/** `link`: it stands in for a link to itself (a pasted image URL), so the
+ *  viewer offers "copy link" / "open in browser" for it. */
+export function InlineImg({ src, alt, link }: { src: string; alt: string; link?: boolean }) {
   return (
     <img
       className="tc-inline-img"
@@ -342,8 +327,8 @@ export function InlineImg({ src, alt, link }: { src: string; alt: string; link?:
   );
 }
 
-/** A link straight to a picture, shown as the picture (gated when untrusted). */
-export function ImageLink({ href, alt }: { href: string; alt: string }): JSX.Element {
+/** Gated when untrusted. */
+export function ImageLink({ href, alt }: { href: string; alt: string }) {
   return isTrustedImgHost(href) ? <InlineImg src={href} alt={alt} link /> : <GatedImg src={href} alt={alt} link />;
 }
 
@@ -392,7 +377,6 @@ function toReact(node: Node, seq: { n: number }): ReactNode {
   if (node.tag === "br") return <br key={key} />;
 
   if (tag === null) {
-    // Transparent wrapper: emit children directly.
     return kids.length ? <Fragment key={key}>{kids}</Fragment> : null;
   }
   const T = tag;
@@ -417,8 +401,7 @@ function toReact(node: Node, seq: { n: number }): ReactNode {
   );
 }
 
-// Render a Teams HTML content string as safe React nodes.
-export function RichHtml({ html }: { html: string }): JSX.Element | null {
+export function RichHtml({ html }: { html: string }) {
   // Parsing is the costly part, so skip it while the HTML is unchanged.
   const nodes = useMemo(() => {
     if (!html) return null;

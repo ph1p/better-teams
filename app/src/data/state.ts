@@ -1,4 +1,3 @@
-// Session-local caches shared by the readers (chats, messages) and the writers.
 import type { Message } from "../types";
 import type { chat } from "../services";
 
@@ -13,7 +12,7 @@ export const deletedHere = new Set<string>();
 export const msgRefs = new Map<string, { clientMessageId: string; time: number }>();
 const MAX_REFS = 5000;
 
-export function rememberRef(id: string, clientMessageId: string, time: number): void {
+export function rememberRef(id: string, clientMessageId: string, time: number) {
   if (!id || !time) return;
   msgRefs.delete(id);
   msgRefs.set(id, { clientMessageId, time });
@@ -25,11 +24,11 @@ export const lastByConv = new Map<string, chat.MsgRef>();
 
 // Channel posts carry reply-chain state the CDL layer does not model yet; they
 // stay on the chatsvc REST path.
-export const isChannelId = (id: string): boolean => /@thread\.(tacv2|skype)$/.test(id);
+export const isChannelId = (id: string) => /@thread\.(tacv2|skype)$/.test(id);
 
 // 1:1 chats live under "<a>_<b>@unq.gbl.spaces" (or are threads flagged
 // uniquerosterthread, see listChats).
-export const isOneToOneId = (id: string): boolean => id.endsWith("@unq.gbl.spaces");
+export const isOneToOneId = (id: string) => id.endsWith("@unq.gbl.spaces");
 
 // Uncached chats poll every few seconds but their IndexedDB stays empty, so
 // cache the remote result briefly to avoid hammering chatsvc on every tick.

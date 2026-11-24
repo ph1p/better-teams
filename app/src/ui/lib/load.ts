@@ -1,6 +1,5 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
-/** Ask Teams once per id; undefined while loading. The setter patches the loaded value. */
 export function useLoad<T>(
   id: string,
   load: (id: string) => Promise<T>,

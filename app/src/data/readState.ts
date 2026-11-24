@@ -1,5 +1,3 @@
-// Read state and visibility: mark read/unread, hide, plus the local overrides
-// that bridge the gap until Teams' IndexedDB catches up with a write.
 import type { WriteResult } from "../types";
 import { chat, chatAud, chatsvc, token } from "../services";
 import { toWrite, type Dict } from "./raw";
@@ -12,7 +10,7 @@ import { isChannelId, lastByConv } from "./state";
 // override is dropped once IDB moves off that value (synced, or changed natively).
 const horizonOverride = new Map<string, { ms: number; base?: number }>();
 
-export function effectiveHorizon(conversationId: string, idbHorizon: number): number {
+export function effectiveHorizon(conversationId: string, idbHorizon: number) {
   const ov = horizonOverride.get(conversationId);
   if (!ov) return idbHorizon;
   if (ov.base === undefined) ov.base = idbHorizon;
@@ -29,7 +27,7 @@ export function effectiveHorizon(conversationId: string, idbHorizon: number): nu
 // marked unread when field 0 is set and the bookmark is newer than the horizon
 // write (field 1 of each); a later native read moves the horizon past it.
 // Seen live on 48:notes, 2026-11-19.
-function isMarkedUnread(props: Dict): boolean {
+function isMarkedUnread(props: Dict) {
   const bm = String(props.consumptionHorizonBookmark ?? "").split(";");
   if (!(Number(bm[0]) > 0)) return false;
   const chSetAt = Number(String(props.consumptionhorizon ?? "").split(";")[1]) || 0;
@@ -40,7 +38,7 @@ function isMarkedUnread(props: Dict): boolean {
 // when first applied; dropped once IDB moves off that value (worker synced).
 const markOverride = new Map<string, { marked: boolean; base?: string }>();
 
-export function effectiveMarked(conversationId: string, props: Dict): boolean {
+export function effectiveMarked(conversationId: string, props: Dict) {
   const idb = isMarkedUnread(props);
   const ov = markOverride.get(conversationId);
   if (!ov) return idb;
@@ -57,14 +55,14 @@ export function effectiveMarked(conversationId: string, props: Dict): boolean {
 // (the worker writes it a moment after the mutation answers).
 const hiddenOverride = new Map<string, boolean>();
 
-export function effectiveHidden(conversationId: string, idbHidden: boolean): boolean {
+export function effectiveHidden(conversationId: string, idbHidden: boolean) {
   const ov = hiddenOverride.get(conversationId);
   if (ov === undefined) return idbHidden;
   if (ov === idbHidden) hiddenOverride.delete(conversationId);
   return ov;
 }
 
-/** Hide or unhide a chat in Teams (syncs to all clients). Chats only. */
+// Syncs to all clients. Chats only.
 export async function setChatHidden(conversationId: string, hidden: boolean): Promise<WriteResult> {
   if (isChannelId(conversationId)) return { ok: false, reason: "channels cannot be hidden" };
   const r = await chat.setChatHidden(conversationId, hidden);
@@ -74,7 +72,7 @@ export async function setChatHidden(conversationId: string, hidden: boolean): Pr
 }
 
 // PUT one conversation property through chatsvc, same ic3 bearer as send.
-async function putConversationProperty(conversationId: string, name: string, value: string): Promise<WriteResult> {
+async function putConversationProperty(conversationId: string, name: string, value: string) {
   return toWrite(await chatsvc.putConversationProperty(conversationId, name, value));
 }
 
@@ -85,7 +83,7 @@ async function putConversationProperty(conversationId: string, name: string, val
 // (a backward PUT returns 200 but is ignored), so mark-unread lands only in the
 // bookmark and Teams' own isRead stays true; the overlay keeps it via the override.
 // Real server write that syncs to all the user's devices; nothing is sent/deleted.
-async function writeHorizon(conversationId: string, v: number): Promise<WriteResult> {
+async function writeHorizon(conversationId: string, v: number) {
   const a = await putConversationProperty(conversationId, "consumptionhorizon", `${v};${v};${v}`);
   if (!a.ok) return a;
   return putConversationProperty(conversationId, "consumptionHorizonBookmark", `0;${v};0`);
@@ -109,7 +107,7 @@ async function setConsumptionHorizon(conversationId: string, ms: number): Promis
   return res;
 }
 
-export async function flushPendingHorizons(): Promise<void> {
+export async function flushPendingHorizons() {
   if (!pendingHorizon.size || !token(chatAud())) return;
   // Snapshot: the loop may re-queue an id it just took out.
   for (const [id, v] of Array.from(pendingHorizon)) {
@@ -147,8 +145,7 @@ export async function markRead(conversationId: string, lastMessageMs?: number): 
   return res;
 }
 
-// Mark unread: pull the pointer to just before the newest message so it counts
-// as unread again. Needs the last message's time; falls back to now - 1s.
+// Mark unread: pull the pointer to just before the newest message.
 export async function markUnread(conversationId: string, lastMessageMs?: number): Promise<WriteResult> {
   const ms = (lastMessageMs || Date.now()) - 1000;
   const last = lastByConv.get(conversationId);

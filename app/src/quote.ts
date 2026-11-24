@@ -1,14 +1,8 @@
-// Native Teams quote-reply markup: build the Skype Reply blockquote for an
-// outgoing reply, and split it back off a stored message for editing. Pure
-// string helpers, shared by the live data layer and the mock.
 import type { Quote } from "./types";
 
-// HTML-escape text for element content (used in quote preview/sender name).
-const esc2 = (s: string): string => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const esc2 = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-// Build the native Skype Reply blockquote for a quote-reply. `quote` is
-// { id, from, text, fromMri }; returns "" when there is nothing to quote.
-export function buildQuoteHtml(quote: Quote | null): string {
+export function buildQuoteHtml(quote: Quote | null) {
   if (!quote || !quote.id) return "";
   const qid = String(quote.id).replace(/"/g, "&quot;");
   const qmri = String(quote.fromMri || "").replace(/"/g, "&quot;");
@@ -23,10 +17,8 @@ export function buildQuoteHtml(quote: Quote | null): string {
   );
 }
 
-// Split a message's stored HTML into { quoteHtml, body }: the leading Skype
-// Reply blockquote (kept verbatim so an edit can preserve it) and the rest.
-// No quote → { quoteHtml: "", body: content }.
-export function splitQuote(content: string): { quoteHtml: string; body: string } {
+// The leading Skype Reply blockquote is kept verbatim so an edit can preserve it.
+export function splitQuote(content: string) {
   const m = /^\s*(<blockquote[^>]*itemtype="http:\/\/schema\.skype\.com\/Reply"[\s\S]*?<\/blockquote>)\s*/i.exec(
     content || "",
   );
@@ -34,11 +26,10 @@ export function splitQuote(content: string): { quoteHtml: string; body: string }
   return { quoteHtml: m[1], body: (content || "").slice(m[0].length) };
 }
 
-// Split a forwarded message into the forwarder's comment (outside the block)
-// and the original body (inside the Skype Forward blockquote). Greedy to the
-// last </blockquote> so a quote nested in the original stays inside.
-// Not a forward → null.
-export function splitForward(content: string): { comment: string; body: string } | null {
+// Forwarder's comment sits outside the Skype Forward blockquote, the original
+// inside. Greedy to the last </blockquote> so a quote nested in the original
+// stays inside.
+export function splitForward(content: string) {
   const m = /<blockquote[^>]*itemtype="http:\/\/schema\.skype\.com\/Forward"[^>]*>([\s\S]*)<\/blockquote>/i.exec(
     content || "",
   );

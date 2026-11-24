@@ -1,11 +1,9 @@
-// A channel's members, under the chat header. A standard channel (General
-// too) shows its team's roster, a private one its own (getChannelActions
-// decides). Adding people and removing them show only where Teams lets us:
-// team owners for a team, the private channel's owners for removal. Owners
-// list first, with a badge, as do guests.
+// A standard channel (General too) shows its team's roster, a private one its
+// own (getChannelActions decides). Adding and removing show only where Teams
+// lets us: team owners for a team, the private channel's owners for removal.
 
 import { t } from "../../i18n";
-import { useEffect, useMemo, useState, type JSX } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { UserPlus, X } from "lucide-react";
 import {
   addChannelMembers,
@@ -31,18 +29,12 @@ interface ChannelMembersPanelProps {
   onOpenProfile: (mri: string) => void;
 }
 
-const isOwner = (m: ChannelMember): boolean => m.role.toLowerCase() === "admin";
-const isGuest = (m: ChannelMember): boolean => m.role.toLowerCase() === "guest" || m.mri.includes("#EXT#");
-const byRole = (a: ChannelMember, b: ChannelMember): number =>
+const isOwner = (m: ChannelMember) => m.role.toLowerCase() === "admin";
+const isGuest = (m: ChannelMember) => m.role.toLowerCase() === "guest" || m.mri.includes("#EXT#");
+const byRole = (a: ChannelMember, b: ChannelMember) =>
   Number(isOwner(b)) - Number(isOwner(a)) || a.displayName.localeCompare(b.displayName);
 
-export function ChannelMembersPanel({
-  chat,
-  known,
-  flash,
-  onClose,
-  onOpenProfile,
-}: ChannelMembersPanelProps): JSX.Element {
+export function ChannelMembersPanel({ chat, known, flash, onClose, onOpenProfile }: ChannelMembersPanelProps) {
   // undefined while Teams is asked; null when it didn't answer.
   const [acts, setActs] = useState<ChannelActions | null | undefined>(undefined);
   const [members, setMembers] = useState<ChannelMember[] | null | undefined>(undefined);
@@ -76,14 +68,14 @@ export function ChannelMembersPanel({
     };
   }, [chat.id]);
 
-  const has = (mri: string): boolean => !!members?.some((m) => m.mri === mri);
+  const has = (mri: string) => !!members?.some((m) => m.mri === mri);
   const teamPick = useMemo(
     () => (teamPool && acts ? { members: teamPool, canAdd: acts.addTeamMembers } : null),
     [teamPool, acts],
   );
 
   // Optimistic: the roster shows the change at once, and takes it back on failure.
-  const add = async (): Promise<void> => {
+  const add = async () => {
     if (!acts) return;
     const people = picked.filter((p) => !has(p.mri));
     setBusy(true);
@@ -116,7 +108,7 @@ export function ChannelMembersPanel({
       flash(t().app.addFailed(r.reason), 5000);
     }
   };
-  const remove = (m: ChannelMember): void =>
+  const remove = (m: ChannelMember) =>
     tryArm(
       m.mri,
       () =>

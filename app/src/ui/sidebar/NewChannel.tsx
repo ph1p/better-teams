@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type JSX } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { t } from "../../i18n";
 import type { PeopleHit } from "../../teamsData";
@@ -24,11 +24,9 @@ interface NewChannelProps {
   onClose: () => void;
 }
 
-// "Add channel" dialog, as Teams' own: a name, an optional description,
-// standard or private access and the layout (threads, Teams' default, or
-// posts). A private channel can get its first members right away. Shared
-// channels are left to Teams.
-export function NewChannel({ team, known, onCreate, onClose }: NewChannelProps): JSX.Element {
+// "Add channel" dialog, as Teams' own (threads is Teams' default layout).
+// Shared channels are left to Teams.
+export function NewChannel({ team, known, onCreate, onClose }: NewChannelProps) {
   const { closing, close } = useModalExit(onClose);
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
@@ -42,7 +40,7 @@ export function NewChannel({ team, known, onCreate, onClose }: NewChannelProps):
     input.current?.focus();
   }, []);
 
-  const submit = async (): Promise<void> => {
+  const submit = async () => {
     if (!name.trim() || busy) return;
     setBusy(true);
     setError(null);
@@ -50,7 +48,7 @@ export function NewChannel({ team, known, onCreate, onClose }: NewChannelProps):
     setBusy(false);
     if (err) setError(err);
   };
-  const onKey = (e: { key: string; shiftKey?: boolean; preventDefault: () => void }): void => {
+  const onKey = (e: { key: string; shiftKey?: boolean; preventDefault: () => void }) => {
     if (e.key === "Escape") {
       e.preventDefault();
       close();

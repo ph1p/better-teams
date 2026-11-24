@@ -12,7 +12,7 @@ const LAST_CHAT = "lastChat";
 const PROFILES_TTL_MS = 30_000;
 
 // Cheap change signature so polling doesn't re-render (and jump) when idle.
-const chatSig = (list: Chat[]): string =>
+const chatSig = (list: Chat[]) =>
   list
     .map(
       (c) =>
@@ -42,7 +42,7 @@ export function useChatList(): ChatList {
     let alive = true;
     let profilesAt = 0;
     let reloadProfiles = true;
-    const run = async (force?: boolean): Promise<void> => {
+    const run = async (force?: boolean) => {
       if (!force && isIdle()) return;
       try {
         if (reloadProfiles || Date.now() - profilesAt >= PROFILES_TTL_MS) {
@@ -94,7 +94,7 @@ export function useChatList(): ChatList {
     tick(true);
     const t = setInterval(tick, POLL_MS);
     const offLive = onTeamsChange(() => tick());
-    const onVis = (): void => {
+    const onVis = () => {
       tick();
     };
     document.addEventListener("visibilitychange", onVis);

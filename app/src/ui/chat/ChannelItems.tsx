@@ -1,9 +1,7 @@
-// Channel entries shared by the header "…" menu and the sidebar's right-click
-// menu: the notification preset (Teams' "Channel notifications", whose "Off"
-// is the channel's mute), then members, rename, leave or hide, and delete. As in Teams,
-// a private or shared channel is left on its own, a standard one hidden,
+// Teams' "Channel notifications" preset "Off" is the channel's mute. As in
+// Teams, a private or shared channel is left on its own, a standard one hidden,
 // General neither; the team can be left from any of its channels. Rename,
-// delete and adding a channel to the team show only where Teams allows them
+// delete and adding a channel show only where Teams allows them
 // (data/groups.ts getChannelActions).
 
 import { t } from "../../i18n";
@@ -35,10 +33,10 @@ const PRESETS: Preset[] = [
   { id: "MUTE", label: () => t().chat.presetOff, icon: <BellOff size={14} /> },
 ];
 
-export function ChannelPresets({ chat, flash, onDone }: { chat: Chat; flash: Flash; onDone: () => void }): JSX.Element {
+export function ChannelPresets({ chat, flash, onDone }: { chat: Chat; flash: Flash; onDone: () => void }) {
   // null: Teams didn't answer (the choice still works).
   const [cur] = useLoad<ChannelNotifications | null>(chat.id, getChannelNotifications);
-  const pick = async (preset: Preset): Promise<void> => {
+  const pick = async (preset: Preset) => {
     onDone();
     const res = await setChannelNotifications(chat.id, preset.id, cur);
     flash(res.ok ? t().chat.presetSet(preset.label()) : t().chat.presetFailed(res.reason), 3000);
@@ -67,12 +65,6 @@ export function ChannelPresets({ chat, flash, onDone }: { chat: Chat; flash: Fla
 
 type Departure = "channel" | "team" | "delete";
 
-/**
- * The channel's own items (members and rename when their handlers are given,
- * hide), then leaving or deleting it, then its team under the team's name (add
- * a channel, leave the team). Leave and delete arm on the first click. Nothing
- * shows while Teams is asked or when none is possible.
- */
 export function ChannelLeaveItem({
   chat,
   onLeave,
@@ -87,32 +79,29 @@ export function ChannelLeaveItem({
   onRename?: () => void;
   onMembers?: () => void;
   onDone: () => void;
-}): JSX.Element | null {
+}) {
   const [acts] = useLoad<ChannelActions | null>(chat.id, getChannelActions);
   const { armed, tryArm } = useArm<Departure>();
   if (!acts || chat.left) return null;
   const rename = acts.rename && !!onRename;
   const members = !!acts.members && !!onMembers;
   if (!acts.channel && !acts.team && !acts.delete && !acts.create && !rename && !members) return null;
-  const run = (what: Departure): void =>
+  const run = (what: Departure) =>
     tryArm(what, () => {
       onDone();
       onLeave(chat, what);
     });
   const hide = acts.channel === "hide";
   const leave = acts.channel === "leave";
-  // Three groups, each under its own separator: this channel, the ways to
-  // drop this channel, then the team it belongs to.
   const channel = members || rename || hide;
   const drop = leave || acts.delete;
   const team = acts.create || acts.team;
-  const item = (icon: JSX.Element, label: string, fn: () => void): JSX.Element => (
+  const item = (icon: JSX.Element, label: string, fn: () => void) => (
     <MenuItem icon={icon} close={onDone} onPick={fn}>
       {label}
     </MenuItem>
   );
-  // Leave and delete arm on the first click and act on the second.
-  const danger = (what: Departure, icon: JSX.Element, label: string, confirm: string): JSX.Element => (
+  const danger = (what: Departure, icon: JSX.Element, label: string, confirm: string) => (
     <MenuItem icon={icon} danger armed={armed === what} onPick={() => run(what)}>
       {armed === what ? confirm : label}
     </MenuItem>

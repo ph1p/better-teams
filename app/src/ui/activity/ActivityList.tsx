@@ -1,4 +1,4 @@
-import { useState, type JSX } from "react";
+import { useState } from "react";
 import { AtSign, Bell, Reply, SmilePlus } from "lucide-react";
 import { profile } from "../../teamsData";
 import { Avatar } from "../shared/Avatar";
@@ -16,7 +16,7 @@ interface ActivityListProps {
 
 const KIND_ICON = { mention: AtSign, reaction: SmilePlus, reply: Reply, other: Bell } as const;
 
-function label(a: Activity): string {
+function label(a: Activity) {
   const s = t().sidebar;
   switch (a.kind) {
     case "mention":
@@ -30,9 +30,7 @@ function label(a: Activity): string {
   }
 }
 
-// Teams' activity feed in the sidebar: who mentioned, replied or reacted, and
-// where. Clicking an item opens that chat at the message.
-export function ActivityList({ items, chats, onOpen, onOpenProfile }: ActivityListProps): JSX.Element {
+export function ActivityList({ items, chats, onOpen, onOpenProfile }: ActivityListProps) {
   const s = t().sidebar;
   // The feed is marked read as soon as it shows, so remember what was new on
   // arrival and keep highlighting it while the list stays open.

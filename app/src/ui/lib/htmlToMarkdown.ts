@@ -7,7 +7,7 @@ import { decodeEntities, parse, textOf, type ElNode, type Node } from "../../ric
 
 const isEl = (n: Node | undefined): n is ElNode => !!n && typeof n !== "string";
 
-function lang(pre: ElNode): string {
+function lang(pre: ElNode) {
   const probe = (n: Node): string => {
     if (!isEl(n)) return "";
     const m = /language-([\w#+.-]+)/i.exec(n.attrs.class || "");
@@ -25,7 +25,7 @@ function inline(nodes: Node[]): string {
   return nodes.map(inlineOne).join("");
 }
 
-function wrap(mark: string, inner: string): string {
+function wrap(mark: string, inner: string) {
   // Markers must hug the text: move edge whitespace outside them.
   const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(inner)!;
   return m[2] ? m[1] + mark + m[2] + mark + m[3] : inner;
@@ -126,7 +126,7 @@ function block(n: Node, out: string[]): void {
       const hasBlock = n.children.some((c) => isEl(c) && BLOCKS.has(c.tag));
       if (hasBlock) {
         let run: Node[] = [];
-        const flushRun = (): void => {
+        const flushRun = () => {
           const t = inline(run).trim();
           if (t) out.push(t);
           run = [];
@@ -176,7 +176,7 @@ const BLOCKS = new Set([
 let mentionMark: ((itemid: number, text: string) => string) | null = null;
 
 /** `mention` rewrites each @mention span's text, e.g. to "@Name" (see mentions.ts editMentions). */
-export function htmlToMarkdown(html: string, mention?: (itemid: number, text: string) => string): string {
+export function htmlToMarkdown(html: string, mention?: (itemid: number, text: string) => string) {
   if (!html) return "";
   mentionMark = mention ?? null;
   try {
@@ -186,7 +186,7 @@ export function htmlToMarkdown(html: string, mention?: (itemid: number, text: st
   }
 }
 
-function toMarkdown(html: string): string {
+function toMarkdown(html: string) {
   const root = parse(html);
   // Drop the CodeBlockEditor marker paragraph that precedes each <pre>.
   root.children = root.children.filter((c) => !(isEl(c) && /CodeBlockEditor/i.test(c.attrs.itemtype || "")));

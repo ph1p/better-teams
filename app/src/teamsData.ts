@@ -1,5 +1,3 @@
-// Read/write layer for Better Teams.
-//
 // Teams v2 keeps every chat, message and profile in IndexedDB, synced live by
 // its own background worker. We read that same local store directly — no auth
 // tokens, no network, no decryption. This is the robust way to get exactly the

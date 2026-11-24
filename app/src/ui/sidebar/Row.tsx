@@ -1,4 +1,4 @@
-import type { JSX, MouseEvent } from "react";
+import type { MouseEvent } from "react";
 import { BellOff, Video } from "lucide-react";
 import { ChatIcon } from "../shared/Avatar";
 import { chatTitle, fmtTime, oneLine } from "../lib/format";
@@ -10,7 +10,6 @@ import { cardSummary, parseCards } from "../../cards";
 interface RowProps {
   chat: Chat;
   selected: boolean;
-  // Single line (name only) instead of name + last-message preview.
   compact: boolean;
   // Prefix channel previews with the team (off when the section groups by team).
   showTeam?: boolean;
@@ -19,24 +18,14 @@ interface RowProps {
   onMenu?: (e: MouseEvent, chat: Chat) => void;
 }
 
-const preview = (chat: Chat): string => {
+const preview = (chat: Chat) => {
   const text = /Media_Card/i.test(chat.last.type)
     ? cardSummary(parseCards(chat.last.content)) || t().sidebar.card
     : oneLine(chat.last.content);
   return (chat.last.from ? chat.last.from + ": " : "") + (text.slice(0, 120) || "…");
 };
 
-// One conversation row in the sidebar. Compact: icon/avatar + name, the time
-// only on hover, the last message as a tooltip. Detailed: adds a preview line.
-export function Row({
-  chat,
-  selected,
-  compact,
-  showTeam = true,
-  onClick,
-  onOpenProfile,
-  onMenu,
-}: RowProps): JSX.Element {
+export function Row({ chat, selected, compact, showTeam = true, onClick, onOpenProfile, onMenu }: RowProps) {
   // Subscribed so the avatar's presence ring stays live.
   usePresence();
   const prev = preview(chat);

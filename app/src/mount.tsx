@@ -11,7 +11,7 @@ const ROOT_ID = "tc-root";
 const STYLE_ID = "tc-style";
 const PILL_ID = "tc-pill";
 
-function ensureStyle(): void {
+function ensureStyle() {
   let s = document.getElementById(STYLE_ID);
   if (!s) {
     s = document.createElement("style");
@@ -34,7 +34,7 @@ const CALL_TIDS = [
   '[data-tid="call-duration"]',
   '[data-tid="ubar-toolbar-wrapper"]',
 ].join(",");
-function isCallWindow(): boolean {
+function isCallWindow() {
   return !!document.querySelector(CALL_TIDS);
 }
 
@@ -86,7 +86,7 @@ function mount(): NonNullable<Window["__betterTeamsApp"]> {
     whiteSpace: "nowrap",
   } as Partial<CSSStyleDeclaration>);
   pill.style.setProperty("-webkit-app-region", "no-drag");
-  const placePill = (): void => {
+  const placePill = () => {
     const t = document.querySelector<HTMLElement>('[data-tid="me-control-avatar-trigger"]');
     const r = t && t.getBoundingClientRect();
     if (r && r.width) {
@@ -100,7 +100,7 @@ function mount(): NonNullable<Window["__betterTeamsApp"]> {
 
   let visible = true;
   let suppressed = false; // true while a call fills this window (see guard below)
-  const hide = (): void => {
+  const hide = () => {
     el.style.display = "none";
     visible = false;
     if (!pill.isConnected) document.body.appendChild(pill);
@@ -110,7 +110,7 @@ function mount(): NonNullable<Window["__betterTeamsApp"]> {
     pill.title = t().app.pillTitle;
     pill.style.display = "block";
   };
-  const show = (): void => {
+  const show = () => {
     ensureStyle();
     el.style.display = "grid";
     visible = true;
@@ -118,7 +118,7 @@ function mount(): NonNullable<Window["__betterTeamsApp"]> {
   };
   pill.addEventListener("click", () => show());
   window.addEventListener("resize", placePill);
-  const toggle = (): void => {
+  const toggle = () => {
     if (suppressed) return;
     if (visible) hide();
     else show();
@@ -127,8 +127,7 @@ function mount(): NonNullable<Window["__betterTeamsApp"]> {
   const root = createRoot(el);
   root.render(<App onHide={hide} />);
 
-  // Option+Cmd+T toggles the overlay.
-  const onKey = (e: KeyboardEvent): void => {
+  const onKey = (e: KeyboardEvent) => {
     if (e.altKey && e.metaKey && (e.key === "t" || e.key === "T" || e.code === "KeyT")) {
       e.preventDefault();
       e.stopImmediatePropagation();
@@ -144,7 +143,7 @@ function mount(): NonNullable<Window["__betterTeamsApp"]> {
   // while suppressed. Poll (not just a MutationObserver) because Teams can mutate
   // the calling screen in place without a childList change we'd otherwise catch.
   let wasVisible = true;
-  const applyGuard = (): void => {
+  const applyGuard = () => {
     const inCall = isCallWindow();
     if (inCall === suppressed) return;
     if (inCall) {
@@ -161,7 +160,7 @@ function mount(): NonNullable<Window["__betterTeamsApp"]> {
   applyGuard();
   const guardPoll = setInterval(applyGuard, 500);
 
-  const destroy = (): void => {
+  const destroy = () => {
     clearInterval(guardPoll);
     window.removeEventListener("keydown", onKey, true);
     window.removeEventListener("resize", placePill);

@@ -1,11 +1,6 @@
-// A group chat's members, under the chat header: everyone in the chat, a
-// remove button per person (first click arms, second removes), and a search
-// box to add people. Local matches from known chats show at once; the
-// directory search streams in after a short debounce (lib/peopleSearch).
-
 import { t } from "../../i18n";
 import { personName, useNameFormat } from "../../names";
-import { useMemo, useRef, useState, type JSX } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Trash2, UserPlus, X } from "lucide-react";
 import { myMri, profile, type PeopleHit } from "../../teamsData";
 import { Avatar } from "../shared/Avatar";
@@ -34,10 +29,6 @@ interface MembersPanelProps {
   onRemove: (chat: Chat, mri: string) => Promise<boolean>;
 }
 
-/**
- * One row: avatar, name and job title (from the cached profile unless given),
- * an optional badge, and a remove button that arms on the first click.
- */
 export function Person({
   mri,
   name,
@@ -58,7 +49,7 @@ export function Person({
   removeTitle?: string;
   onOpen: (mri: string) => void;
   onRemove?: () => void;
-}): JSX.Element {
+}) {
   useNameFormat();
   const p = profile(mri);
   const shown = personName(p, name || "", mri) || t().common.unknown;
@@ -94,12 +85,6 @@ export function Person({
   );
 }
 
-/**
- * Chips for the people picked so far, a search box, and its matches: local
- * ones at once, the directory's after a short debounce. Enter picks the top
- * match, Backspace in an empty box drops the last chip. `exclude` hides people
- * who are in already.
- */
 export function PeoplePicker({
   known,
   exclude,
@@ -115,7 +100,7 @@ export function PeoplePicker({
   autoFocus?: boolean;
   /** A private channel's team: its members, and whether outsiders may join it on the way. */
   team?: { members: PeopleHit[]; canAdd: boolean };
-}): JSX.Element {
+}) {
   const [q, setQ] = useState("");
   // Known people, gathered once per open picker (the list barely changes meanwhile).
   const [people] = useState(known);
@@ -124,7 +109,7 @@ export function PeoplePicker({
     () => (team && inTeam ? [...team.members, ...people.filter((p) => !inTeam.has(p.mri.toLowerCase()))] : people),
     [people, team, inTeam],
   );
-  const outsider = (mri: string): boolean => !!inTeam && !inTeam.has(mri.toLowerCase());
+  const outsider = (mri: string) => !!inTeam && !inTeam.has(mri.toLowerCase());
   const hits = usePeopleSearch(q, pool, 10);
   const input = useRef<HTMLInputElement>(null);
   const me = myMri();
@@ -132,7 +117,7 @@ export function PeoplePicker({
   // Outsiders the team can't take stay listed, greyed out, so it's clear why they can't be picked.
   const blocked = team?.canAdd ? [] : open.filter((h) => outsider(h.mri));
   const shown = blocked.length ? open.filter((h) => !blocked.includes(h)) : open;
-  const pick = (p: PeopleHit): void => {
+  const pick = (p: PeopleHit) => {
     setPicked((s) => [...s, p]);
     setQ("");
     setHi(0);
@@ -213,11 +198,10 @@ export function PeoplePicker({
   );
 }
 
-/** "Add Anna" / "Add 3 people", for the picker's go button. */
-export const addLabel = (picked: PeopleHit[]): string =>
+export const addLabel = (picked: PeopleHit[]) =>
   picked.length === 1 ? t().chat.addOne(picked[0].displayName.split(" ")[0]) : t().chat.addMany(picked.length);
 
-export function MembersPanel({ chat, known, onClose, onOpenProfile, onAdd, onRemove }: MembersPanelProps): JSX.Element {
+export function MembersPanel({ chat, known, onClose, onOpenProfile, onAdd, onRemove }: MembersPanelProps) {
   const [picked, setPicked] = useState<PeopleHit[]>([]);
   const [history, setHistory] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -225,13 +209,13 @@ export function MembersPanel({ chat, known, onClose, onOpenProfile, onAdd, onRem
   const me = myMri();
   useDismiss(true, "#tc-root .tc-members, #tc-root .tc-opts-menu", onClose);
 
-  const add = async (): Promise<void> => {
+  const add = async () => {
     setBusy(true);
     const ok = await onAdd(chat, picked, history);
     setBusy(false);
     if (ok) setPicked([]);
   };
-  const remove = (mri: string): void => tryArm(mri, () => void onRemove(chat, mri));
+  const remove = (mri: string) => tryArm(mri, () => void onRemove(chat, mri));
 
   return (
     <div className="tc-members" role="dialog" aria-label={t().chat.membersOf(chat.title)}>

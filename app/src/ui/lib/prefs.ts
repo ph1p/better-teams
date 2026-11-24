@@ -7,7 +7,7 @@ export const PREFIX = "better-teams:";
 // Keys saved before the app was renamed from Teams Calm; read as a fallback.
 const OLD_PREFIX = "teams-calm:";
 
-export function read<T>(key: string, fallback: T): T {
+export function read<T>(key: string, fallback: T) {
   try {
     const raw = localStorage.getItem(PREFIX + key) ?? localStorage.getItem(OLD_PREFIX + key);
     return raw === null ? fallback : (JSON.parse(raw) as T);
@@ -16,7 +16,7 @@ export function read<T>(key: string, fallback: T): T {
   }
 }
 
-export function write<T>(key: string, value: T): void {
+export function write<T>(key: string, value: T) {
   try {
     localStorage.setItem(PREFIX + key, JSON.stringify(value));
   } catch {
@@ -24,11 +24,10 @@ export function write<T>(key: string, value: T): void {
   }
 }
 
-// useState that survives reloads. The setter takes a value or an updater.
 export function usePref<T>(key: string, fallback: T): [T, (v: T | ((cur: T) => T)) => void] {
-  const [val, setVal] = useState<T>(() => read(key, fallback));
+  const [val, setVal] = useState(() => read(key, fallback));
   const set = useCallback(
-    (v: T | ((cur: T) => T)): void => {
+    (v: T | ((cur: T) => T)) => {
       setVal((cur) => {
         const next = typeof v === "function" ? (v as (c: T) => T)(cur) : v;
         write(key, next);

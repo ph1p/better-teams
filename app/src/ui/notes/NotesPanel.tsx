@@ -1,4 +1,4 @@
-import { useEffect, useRef, type JSX } from "react";
+import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { PREFIX, usePref } from "../lib/prefs";
 import { t } from "../../i18n";
@@ -10,12 +10,11 @@ interface NotesPanelProps {
 // Pref key of the sheet text (stored as "better-teams:notes").
 const KEY = "notes";
 
-// Right-hand scratchpad drawer. Plain text, saved to localStorage on every
-// keystroke and never sent anywhere. Other Teams windows share the same
-// storage, so a write there (storage event) replaces the text here unless this
-// window is the one being typed in.
-export function NotesPanel({ onClose }: NotesPanelProps): JSX.Element {
-  const [text, setText] = usePref<string>(KEY, "");
+// Never sent anywhere. Other Teams windows share the same storage, so a write
+// there (storage event) replaces the text here unless this window is the one
+// being typed in.
+export function NotesPanel({ onClose }: NotesPanelProps) {
+  const [text, setText] = usePref(KEY, "");
   const area = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -23,7 +22,7 @@ export function NotesPanel({ onClose }: NotesPanelProps): JSX.Element {
   }, []);
 
   useEffect(() => {
-    const onStorage = (e: StorageEvent): void => {
+    const onStorage = (e: StorageEvent) => {
       if (e.key !== PREFIX + KEY || e.newValue === null) return;
       if (document.activeElement === area.current) return;
       try {

@@ -1,10 +1,5 @@
-// The "…" menu in the chat header. Chats: favorite; rename and members; mute;
-// leave. Channels: favorite, the notification preset, then the channel and team
-// items of ChannelItems.tsx. Leave arms on the first click and acts on the
-// second, like removing a file (lib/arm.ts).
-
 import { t } from "../../i18n";
-import { useState, type JSX } from "react";
+import { useState } from "react";
 import { Bell, BellOff, LogOut, MoreHorizontal, Pencil, Star, StarOff, Users } from "lucide-react";
 import { ChannelLeaveItem, ChannelPresets } from "./ChannelItems";
 import { useDismiss } from "../lib/dismiss";
@@ -34,19 +29,17 @@ export function ChatOptions({
   onSetFavorite,
   onLeave,
   onNewChannel,
-}: ChatOptionsProps): JSX.Element | null {
-  // Button rect while the menu is open (null = closed); anchors the menu.
+}: ChatOptionsProps) {
   const [r, setR] = useState<DOMRect | null>(null);
   const open = !!r;
   const { armed, tryArm, disarm } = useArm<"leave">();
-  const close = (): void => {
+  const close = () => {
     setR(null);
     disarm();
   };
   useDismiss(open, "#tc-root .tc-opts-menu, #tc-root .tc-opts-btn", close);
 
   if (chat.kind === "notes" || chat.app) return null;
-  // Rename, members and leave only make sense in a group chat we're still in.
   const manage = chat.group && !chat.left;
 
   return (

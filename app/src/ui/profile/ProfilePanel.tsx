@@ -1,4 +1,4 @@
-import { type ComponentType, type JSX } from "react";
+import type { ComponentType } from "react";
 import {
   X,
   Mail as MailIcon,
@@ -35,8 +35,7 @@ interface ProfilePanelProps {
 
 type IconComp = ComponentType<{ size?: number }>;
 
-// One detail line; a copy button shows on hover.
-function DetailRow({ icon: Icon, value }: { icon: IconComp; value: string }): JSX.Element {
+function DetailRow({ icon: Icon, value }: { icon: IconComp; value: string }) {
   const [copied, copy] = useCopied();
   return (
     <div className="tc-profile-detail">
@@ -53,12 +52,9 @@ function DetailRow({ icon: Icon, value }: { icon: IconComp; value: string }): JS
   );
 }
 
-// Right-hand profile drawer (Slack-style). Shows the person's details and every
-// chat the current user shares with them. Details come from the loaded profile
-// row; fields Teams didn't cache simply don't render.
-export function ProfilePanel({ mri, chats, sel, onPick, onClose, onMessage, onCall }: ProfilePanelProps): JSX.Element {
+// Details come from the loaded profile row; fields Teams didn't cache simply don't render.
+export function ProfilePanel({ mri, chats, sel, onPick, onClose, onMessage, onCall }: ProfilePanelProps) {
   const { statusOf } = usePresence();
-  // Clicking anywhere outside the drawer (or Escape) closes it.
   useDismiss(true, "#tc-root .tc-profile", onClose);
   const status = statusOf(mri);
   const ring = status !== "Unknown";
@@ -67,7 +63,7 @@ export function ProfilePanel({ mri, chats, sel, onPick, onClose, onMessage, onCa
   // the full "First Last" name, whatever the name format setting says.
   const rawName = p.displayName || t().common.unknown;
   const name = fullName(p, mri) || rawName;
-  const rows: Array<[IconComp, string]> = (
+  const rows = (
     [
       [MailIcon, p.email],
       [Briefcase, p.jobTitle],
@@ -138,11 +134,10 @@ export function ProfilePanel({ mri, chats, sel, onPick, onClose, onMessage, onCa
       {/* One scroll container for every group, so the panel scrolls as a whole. */}
       <div className="tc-profile-scroll">
         {(() => {
-          // Group the remaining shared chats: multi-person group chats, then
-          // channels. The 1:1 DM is excluded (it's the button above).
+          // The 1:1 DM is excluded: it's the button above.
           const groups = chats.filter((c) => c.group);
           const channels = chats.filter((c) => c.isChannel);
-          const sections: Array<[string, IconComp, Chat[]]> = (
+          const sections = (
             [
               [t().app.groupChats, Users, groups],
               [t().app.channels, Hash, channels],

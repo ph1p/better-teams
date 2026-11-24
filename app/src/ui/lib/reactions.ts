@@ -439,10 +439,9 @@ const SHORTCODE_EXTRA: Record<string, string> = {
   "100": "💯",
 };
 
-const SHORTCODES: Record<string, string> = { ...REACTION, ...SHORTCODE_EXTRA };
+const SHORTCODES = { ...REACTION, ...SHORTCODE_EXTRA };
 const SORTED = Object.entries(SHORTCODES).sort(([a], [b]) => (a < b ? -1 : 1));
 
-/** Glyph of an exact shortcode (`smile` → 😄), or undefined. */
 export function shortcodeGlyph(name: string): string | undefined {
   return SHORTCODES[name.toLowerCase()];
 }
@@ -451,7 +450,7 @@ export function shortcodeGlyph(name: string): string | undefined {
  * Shortcodes for a half-typed `:query`: names starting with it first, then
  * names containing it; one row per glyph, so aliases don't crowd the list.
  */
-export function searchShortcodes(query: string, limit = 8): Array<{ name: string; glyph: string }> {
+export function searchShortcodes(query: string, limit = 8) {
   const q = query.toLowerCase();
   if (!q) return [];
   const out: Array<{ name: string; glyph: string }> = [];

@@ -59,7 +59,7 @@ const rico = person("Rico Stern", "Freelancer", "External", "Vienna");
 export const PEOPLE: Person[] = [me, maya, jonas, priya, lukas, sofia, tom, elena, aiko, noah, ben, clara, david, rico];
 
 // Teams apps (bots) sit in the 28: MRI space and carry a square app icon.
-const appIcon = (letter: string, color: string): string =>
+const appIcon = (letter: string, color: string) =>
   "data:image/svg+xml," +
   encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="${color}"/>` +
@@ -138,16 +138,16 @@ export interface SeedChat {
 
 const H = 60;
 const D = 24 * H;
-const p = (s: string): string => `<p>${s}</p>`;
-const mention = (who: Person, i = 0): string =>
+const p = (s: string) => `<p>${s}</p>`;
+const mention = (who: Person, i = 0) =>
   `<span itemtype="http://schema.skype.com/Mention" itemscope itemid="${i}">${who.displayName}</span>`;
-const quote = (who: Person, text: string): string =>
+const quote = (who: Person, text: string) =>
   `<blockquote itemscope="" itemtype="http://schema.skype.com/Reply" itemid="0">` +
   `<strong itemprop="mri" itemid="${who.mri}">${who.displayName}</strong>` +
   `<p itemprop="preview">${text}</p></blockquote>`;
 
 // A bot card as Teams stores it: Swift JSON, base64 in a URIObject.
-const card = (content: Record<string, unknown>): string =>
+const card = (content: Record<string, unknown>) =>
   `<URIObject type="SWIFT.1"><Swift b64="${btoa(
     String.fromCharCode(
       ...new TextEncoder().encode(
@@ -162,7 +162,7 @@ const card = (content: Record<string, unknown>): string =>
 // An issue-tracker notification laid out like Jira's Teams cards: fixed-width
 // spacer columns indent each row under the avatar, an issue-type icon sits
 // beside the link, old -> new value in nested columns, an emoji-only button.
-const trackerCard = (key: string, title: string, field: string, from: string, to: string): string =>
+const trackerCard = (key: string, title: string, field: string, from: string, to: string) =>
   card({
     type: "AdaptiveCard",
     version: "1.5",

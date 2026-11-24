@@ -16,12 +16,12 @@ const SKIP_TYPES = /ThreadActivity|Control|Event\//i;
 // ends. Keep both (as short meeting lines): without the root every meeting
 // thread renders as replies to a missing post, and the end marks it not live.
 const CALL = /^Event\/Call$/i;
-const isCallEnd = (content: string): boolean => /<callEventType>\s*callEnded/i.test(content);
-const keepCall = (type: string, id: string, root: string | null, content: string): boolean =>
+const isCallEnd = (content: string) => /<callEventType>\s*callEnded/i.test(content);
+const keepCall = (type: string, id: string, root: string | null, content: string) =>
   CALL.test(type) && !!root && (id === root || isCallEnd(content));
-export const skipType = (type: string, id: string, root: string | null, content: string): boolean =>
+export const skipType = (type: string, id: string, root: string | null, content: string) =>
   SKIP_TYPES.test(type) && !keepCall(type, id, root, content);
-function fmtCallDuration(sec: number): string {
+function fmtCallDuration(sec: number) {
   const m = Math.round(sec / 60);
   return m < 60 ? `${Math.max(1, m)} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
 }
@@ -51,8 +51,8 @@ export function asCallRoot(n: Message, raw: Record<string, unknown>): Message {
   };
 }
 
-/** The https site URL when it is on SharePoint Online, else "". */
-function sharePointSite(url: string): string {
+// The https site URL when it is on SharePoint Online, else "".
+function sharePointSite(url: string) {
   try {
     const u = new URL(url);
     return u.protocol === "https:" && u.hostname.endsWith(".sharepoint.com") ? u.href.replace(/\/?$/, "/") : "";
@@ -61,7 +61,7 @@ function sharePointSite(url: string): string {
   }
 }
 
-/** properties.files (a JSON string of Teams file chiclets) -> FileRef[]. See docs/file-send-flow.md. */
+// properties.files: a JSON string of Teams file chiclets. See docs/file-send-flow.md.
 function parseFiles(raw: unknown): FileRef[] {
   if (!raw) return [];
   try {
@@ -100,16 +100,16 @@ function parseFiles(raw: unknown): FileRef[] {
 // Teams keeps "follow this post" (channels) in the same emotions list as the
 // reactions. It is a subscription, not a reaction: never show it as one.
 const NOT_REACTIONS = new Set(["follow"]);
-const isReaction = (r: Reaction): boolean => !!r.key && r.count > 0 && !NOT_REACTIONS.has(r.key);
+const isReaction = (r: Reaction) => !!r.key && r.count > 0 && !NOT_REACTIONS.has(r.key);
 
-function reactionsOf(m: Dict): Reaction[] {
+function reactionsOf(m: Dict) {
   // Counts live in annotationsSummary.emotions ({key:count}); the per-user list
   // (needed to know if *I* reacted) lives in properties.emotions
   // ([{key, users:[{mri,...}]}]). Merge both into {key, count, mine}.
   const em = obj(get(m.annotationsSummary, "emotions"));
   const detail = parsed(get(m.properties, "emotions"));
   const me = myMri();
-  const usersOf = (key: string): string[] => {
+  const usersOf = (key: string) => {
     const row = Array.isArray(detail) ? detail.find((d) => get(d, "key") === key) : null;
     return arr(get(row, "users") || get(row, "mris"))
       .map((u) => str(get(u, "mri")) || str(get(u, "id")) || str(u))
@@ -125,7 +125,7 @@ function reactionsOf(m: Dict): Reaction[] {
 
 // A soft-deleted message stays visible (as an Undo stub) only while Teams holds
 // undo state for it, or it was deleted from this overlay (see deletedHere).
-export const hiddenDeleted = (m: Dict, n: Message): boolean => n.deleted && !m.deletionInfo && !deletedHere.has(n.id);
+export const hiddenDeleted = (m: Dict, n: Message) => n.deleted && !m.deletionInfo && !deletedHere.has(n.id);
 
 // Bot cards ride in the Swift content or a cards list; only set when present.
 function withCards(content: string, raw: unknown): { cards?: Card[] } {
@@ -206,7 +206,7 @@ export function normMessage(raw: unknown, rc: ChainCtx | null): Message {
 
 // Shared message ordering. Channels: by thread root time, root before replies,
 // then message time. Chats: one flat timeline by message time.
-export function sortMessages(msgs: Message[], channel: boolean): void {
+export function sortMessages(msgs: Message[], channel: boolean) {
   msgs.sort(
     channel
       ? (a, b) => a.rootTime - b.rootTime || Number(a.isReply) - Number(b.isReply) || a.time - b.time
@@ -214,8 +214,7 @@ export function sortMessages(msgs: Message[], channel: boolean): void {
   );
 }
 
-// Turn one chatsvc page of raw messages into sorted, normalized messages.
-export function parseRemotePage(j: unknown, channel: boolean): Message[] {
+export function parseRemotePage(j: unknown, channel: boolean) {
   const byId = new Map<string, Message>();
   for (const raw of arr(get(j, "messages"))) {
     const m = obj(raw);
@@ -241,8 +240,7 @@ export function parseRemotePage(j: unknown, channel: boolean): Message[] {
 }
 
 // Teams' worker `Message` (ComponentsChatQueriesMessageListQuery) -> our Message.
-// Chats only: flat timeline, every message its own root.
-export function normCdlMessage(raw: unknown, channel = false): Message | null {
+export function normCdlMessage(raw: unknown, channel = false) {
   const m = obj(raw);
   const messageType = str(m.messageType);
   const id = String(m.id);

@@ -2,25 +2,23 @@
 // the latest release tag and compares it with this build's version. It is the
 // only request that does not go to Teams' own backend, so it can be turned off
 // in Settings. A blocked or failed request (Teams' CSP, offline) shows nothing.
-
 import { useSyncExternalStore } from "react";
 import { read, write } from "./ui/lib/prefs";
 
 const API = "https://api.github.com/repos/ph1p/better-teams/releases/latest";
 const DAY = 24 * 60 * 60 * 1000;
 
-/** What to paste into Terminal to update an installed release. */
 export const UPDATE_CMD = "~/.better-teams/better-teams update";
-export const releaseUrl = (version: string): string => `https://github.com/ph1p/better-teams/releases/tag/v${version}`;
+export const releaseUrl = (version: string) => `https://github.com/ph1p/better-teams/releases/tag/v${version}`;
 
 interface Seen {
   at: number;
   tag: string;
 }
 
-/** True when version a ("v1.2.3" / "1.2.3") is newer than b. Non-release builds never compare. */
-export function isNewer(a: string, b: string): boolean {
-  const parse = (v: string): number[] | null => {
+/** Versions are "v1.2.3" / "1.2.3"; non-release builds never compare as newer. */
+export function isNewer(a: string, b: string) {
+  const parse = (v: string) => {
     const m = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(v.trim());
     return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
   };
@@ -33,24 +31,23 @@ export function isNewer(a: string, b: string): boolean {
 
 let latest: string | null = null;
 const subs = new Set<() => void>();
-const emit = (v: string | null): void => {
+const emit = (v: string | null) => {
   if (v === latest) return;
   latest = v;
   for (const f of subs) f();
 };
 
-export const updateCheckOn = (): boolean => read("updateCheck", true);
+export const updateCheckOn = () => read("updateCheck", true);
 
-/** Result of a check: a newer version, up to date, or GitHub not reachable. */
 export type UpdateResult = { kind: "newer"; version: string } | { kind: "current" } | { kind: "failed" };
 
-export function setUpdateCheck(on: boolean): void {
+export function setUpdateCheck(on: boolean) {
   write("updateCheck", on);
   if (on) void checkForUpdate();
   else emit(null);
 }
 
-async function fetchTag(): Promise<string | null> {
+async function fetchTag() {
   try {
     const r = await fetch(API, {
       headers: { Accept: "application/vnd.github+json" },
@@ -66,10 +63,7 @@ async function fetchTag(): Promise<string | null> {
   }
 }
 
-/**
- * Refresh the latest-release tag if the cached one is a day old, then publish it. `force` (the
- * "Check now" button) asks GitHub right away, even with the daily check turned off.
- */
+/** `force` (the "Check now" button) asks GitHub right away, even with the daily check turned off. */
 export async function checkForUpdate(force = false, now = Date.now()): Promise<UpdateResult | null> {
   if (!force && !updateCheckOn()) return null;
   const seen = read<Seen | null>("latestRelease", null);
@@ -95,4 +89,4 @@ const subscribe = (f: () => void): (() => void) => {
 };
 
 /** The newer release's version ("1.2.0"), or null. */
-export const useUpdate = (): string | null => useSyncExternalStore(subscribe, () => latest);
+export const useUpdate = () => useSyncExternalStore(subscribe, () => latest);

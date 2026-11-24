@@ -73,18 +73,18 @@ export function useComposerState(
   }
 
   const draft = (sel && drafts[sel]) || "";
-  const setDraft = (v: string): void => setDrafts((d) => ({ ...d, [sel!]: v }));
+  const setDraft = (v: string) => setDrafts((d) => ({ ...d, [sel!]: v }));
 
   const files = (sel && staged[sel]) || [];
-  const addFiles = (list: FileList | File[]): void => {
+  const addFiles = (list: FileList | File[]) => {
     const add = [...list];
     if (sel && add.length) setStaged((st) => ({ ...st, [sel]: [...(st[sel] || []), ...add] }));
   };
-  const removeFile = (index: number): void => {
+  const removeFile = (index: number) => {
     if (sel) setStaged((st) => ({ ...st, [sel]: (st[sel] || []).filter((_, i) => i !== index) }));
   };
 
-  const addPick = (pick: MentionPick): void => {
+  const addPick = (pick: MentionPick) => {
     setMentionPicks((mp) => {
       const cur = sel ? mp[sel] || [] : [];
       if (cur.some((p) => p.mri === pick.mri)) return mp;
@@ -93,7 +93,7 @@ export function useComposerState(
   };
 
   // Start a quote-reply: remember the target message and focus the composer.
-  const onQuote = useCallback((msg: Msg): void => {
+  const onQuote = useCallback((msg: Msg) => {
     setQuote({
       id: msg.id,
       from: msg.from || (msg.mine ? t().common.you : t().common.unknown),
@@ -106,7 +106,7 @@ export function useComposerState(
 
   // Answer in a channel thread: the composer posts into m's thread until sent
   // or cancelled. Replies target their thread's root.
-  const onThreadReply = useCallback((msg: Msg): void => {
+  const onThreadReply = useCallback((msg: Msg) => {
     setThreadTo({
       rootId: msg.rootId || msg.id,
       from: msg.from || (msg.mine ? t().common.you : t().common.unknown),
@@ -115,7 +115,7 @@ export function useComposerState(
     requestAnimationFrame(() => composer.current?.focus());
   }, []);
 
-  async function send(): Promise<void> {
+  async function send() {
     const text = draft.trim();
     if ((!text && !files.length) || !selChat) return;
     const chat = selChat;

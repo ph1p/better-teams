@@ -3,8 +3,7 @@ import { formatMessage } from "../../markdown";
 import { parseMentions, type MentionPick } from "../../mentions";
 import type { Message as Msg } from "../../types";
 
-// Plain text without whitespace or "@", for matching a draft to its synced copy.
-const bare = (s: string): string => s.replace(/[\s@]+/g, "");
+const bare = (s: string) => s.replace(/[\s@]+/g, "");
 const STALE_PENDING_MS = 15_000;
 const CLOCK_SKEW_MS = 5_000;
 
@@ -22,22 +21,22 @@ export interface Pending {
 }
 
 // djb2 string hash: lets the signature notice content changes without keeping a copy of every message's HTML.
-function hash(s: string): number {
+function hash(s: string) {
   let h = 5381;
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
   return h;
 }
 
 // Cheap change signature so polling doesn't re-render (and jump) when idle.
-const itemSig = (m: Msg): string =>
+const itemSig = (m: Msg) =>
   `${m.id}:${m.time}:${m.edited}:${m.deleted}:${hash(m.content)}:${m.files.map((f) => f.name).join("/")}:${m.reactions.map((r) => r.key + r.count + (r.mine ? "*" : "") + hash(r.users?.join() ?? "")).join()}`;
 
-export const msgSig = (list: Msg[]): string => list.map(itemSig).join("|");
+export const msgSig = (list: Msg[]) => list.map(itemSig).join("|");
 
 // Keep the previous object for messages whose signature is unchanged, so
 // memo(Message) can skip them. Returns `next` items otherwise. Any field
 // Message renders must be part of itemSig, or its row would go stale.
-export function reuseUnchanged(prev: Msg[], next: Msg[]): Msg[] {
+export function reuseUnchanged(prev: Msg[], next: Msg[]) {
   const old = new Map(prev.map((m) => [m.id, m]));
   return next.map((m) => {
     const p = old.get(m.id);
@@ -60,7 +59,7 @@ export function editedContent(
 // markdown and the synced copy HTML, so both go through the same renderer
 // and compare as plain text without whitespace or "@"; a suffix match
 // allows for the quote Teams puts in front of a reply.
-export function prunePending(pending: Pending[], chatId: string, list: Msg[], now: number): Pending[] {
+export function prunePending(pending: Pending[], chatId: string, list: Msg[], now: number) {
   if (!pending.length) return pending;
   const mine = list.filter((m) => m.mine);
   const texts = mine.map((m) => ({ time: m.time, text: bare(htmlToText(m.content)) }));

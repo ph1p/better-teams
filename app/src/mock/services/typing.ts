@@ -4,13 +4,13 @@ import type { CdlRes } from "../../services/cdl";
 import type { TypingTarget, TypingUser } from "../../services/typing";
 import { nameOf, onTyping, typingIn } from "../store";
 
-export function canSendTyping(t: TypingTarget, editing: boolean): boolean {
+export function canSendTyping(t: TypingTarget, editing: boolean) {
   return !!t.convId && !editing && !t.isChannel && t.members.length > 0;
 }
 
-export function notifyTyping(_t: TypingTarget, _editing = false): void {}
+export function notifyTyping(_t: TypingTarget, _editing = false) {}
 
-export function resetTyping(_convId: string): void {}
+export function resetTyping(_convId: string) {}
 
 export async function sendTyping(_convId: string): Promise<CdlRes<boolean>> {
   return { ok: true, data: true };
@@ -27,7 +27,7 @@ export async function typingUsers(convId: string): Promise<CdlRes<TypingUser[]>>
   return { ok: true, data: asUsers(typingIn(convId)) };
 }
 
-export function watchTyping(convId: string, cb: (users: TypingUser[]) => void): () => void {
+export function watchTyping(convId: string, cb: (users: TypingUser[]) => void) {
   cb(asUsers(typingIn(convId)));
   return onTyping((id, mris) => {
     if (id === convId) cb(asUsers(mris));

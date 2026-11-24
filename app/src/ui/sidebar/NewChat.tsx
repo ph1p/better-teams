@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type JSX, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { X } from "lucide-react";
 import { myMri, type PeopleHit } from "../../teamsData";
 import { Avatar } from "../shared/Avatar";
@@ -8,7 +8,6 @@ import { t } from "../../i18n";
 import { useModalExit } from "../lib/modalExit";
 import { usePickerKeys } from "../lib/pickerKeys";
 
-/** Outcome of a start attempt, reported back by App. */
 export type NewChatOutcome =
   | { kind: "done" }
   | { kind: "draft" } // Teams shows an empty new chat: needs a first message
@@ -26,11 +25,9 @@ interface NewChatProps {
   known?: () => PeopleHit[];
 }
 
-// "New chat" dialog: pick one or more people from the org directory (the same
-// substrate search as @mentions), optionally type a first message. App drives
-// Teams' own New message flow with them (send.ts openNativeNewChat), so the
+// App drives Teams' own New message flow (send.ts openNativeNewChat), so the
 // result is exactly what the stock UI would create.
-export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewChatProps): JSX.Element {
+export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewChatProps) {
   const { closing, close } = useModalExit(onClose);
   const [picked, setPicked] = useState<PeopleHit[]>(initial || []);
   const [q, setQ] = useState("");
@@ -54,23 +51,23 @@ export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewC
   const me = myMri();
   const shown = hits.filter((h) => h.mri !== me && !picked.some((p) => p.mri === h.mri));
 
-  const changed = (): void => {
+  const changed = () => {
     setIsDraft(false);
     setNote(null);
   };
-  const add = (p: PeopleHit): void => {
+  const add = (p: PeopleHit) => {
     setPicked((s) => [...s, p]);
     setQ("");
     changed();
     input.current?.focus();
   };
-  const remove = (mri: string): void => {
+  const remove = (mri: string) => {
     setPicked((s) => s.filter((p) => p.mri !== mri));
     changed();
   };
   const { hi, setHi, onKey } = usePickerKeys(shown, add, close);
 
-  const submit = async (): Promise<void> => {
+  const submit = async () => {
     if (!picked.length || busy) return;
     setBusy(true);
     setNote(null);
@@ -86,7 +83,7 @@ export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewC
     setNote(r);
   };
 
-  const onInputKey = (e: KeyboardEvent<HTMLInputElement>): void => {
+  const onInputKey = (e: KeyboardEvent<HTMLInputElement>) => {
     if (onKey(e)) return;
     if (e.key === "Enter") {
       e.preventDefault();

@@ -43,7 +43,6 @@
   --tc-mine: var(--color-tc-mine);
   --tc-radius: var(--radius-tc);
   --tc-font: var(--font-tc);
-  /* Destructive actions: soft red on hover, solid red once armed. */
   --tc-danger: #dc2626;
   --tc-danger-hover: #b91c1c;
   --tc-danger-fg: #ef4444;
@@ -53,8 +52,6 @@
 #tc-root * {
   box-sizing: border-box;
 }
-/* Keyboard focus: a single consistent accent ring on every interactive element,
-   only for keyboard users (not mouse clicks). Calm, not loud. */
 #tc-root :focus-visible {
   outline: 2px solid var(--tc-accent);
   outline-offset: 2px;
@@ -63,7 +60,6 @@
 #tc-root :focus:not(:focus-visible) {
   outline: none;
 }
-/* Respect the OS "reduce motion" setting: no slides, flashes, or lifts. */
 @media (prefers-reduced-motion: reduce) {
   #tc-root *,
   #tc-root *::before,
@@ -101,7 +97,6 @@
   }
 }
 
-/* Sidebar */
 #tc-root .tc-side {
   @apply flex flex-col min-h-0 relative;
   background: var(--tc-bg2);
@@ -284,7 +279,6 @@
     0 0 0 1px var(--tc-bg),
     0 0 0 1.75px var(--tc-ring);
 }
-/* Clickable avatar hover: keep the ring, add accent outside it. */
 #tc-root .tc-av-ring .tc-av-btn:hover {
   box-shadow:
     0 0 0 1.5px var(--tc-bg),
@@ -390,7 +384,6 @@
   font-size: 9px;
   line-height: 14px;
 }
-/* Strip under the header of an app chat: says plainly it's a bot, not a person. */
 #tc-root .tc-app-note {
   @apply flex items-center gap-2;
   padding: 7px 16px;
@@ -425,7 +418,6 @@
   background: var(--tc-accent);
 }
 
-/* Main */
 #tc-root .tc-main {
   @apply flex flex-col min-w-0 min-h-0;
 }
@@ -542,7 +534,6 @@
   width: 36px;
   height: 36px;
 }
-/* Continuation rows: the avatar column holds the clock time, shown on hover. */
 #tc-root .tc-msg-gutter {
   flex: 0 0 auto;
   width: 36px;
@@ -661,7 +652,6 @@
   border-top: 1px solid var(--tc-line);
   margin: 8px 0;
 }
-/* A quoted reply (richText marks it .tc-reply) is a jump affordance. */
 #tc-root .tc-msg-content blockquote.tc-reply {
   margin: 0 0 4px;
   padding: 4px 10px;
@@ -682,8 +672,6 @@
   color: var(--tc-fg);
   font-weight: 600;
 }
-/* Forwarded message: bordered card with the original sender + time on top;
-   the whole card opens the original (.open). */
 #tc-root .tc-fwd {
   margin: 4px 0 2px;
   padding: 8px 12px 10px;
@@ -771,7 +759,6 @@
   color: var(--tc-accent);
 }
 
-/* Bot / connector cards (ui/chat/Cards.tsx): a bordered panel per card. */
 #tc-root .tc-cards {
   display: flex;
   flex-direction: column;
@@ -1025,7 +1012,6 @@
   font-style: italic;
 }
 
-/* Composer */
 #tc-root .tc-composer {
   @apply relative;
   flex: 0 0 auto;
@@ -1197,6 +1183,8 @@
 /* Typing indicator sits on the composer box's top border: no layout shift. */
 #tc-root .tc-composer > .tc-typing {
   @apply absolute flex items-center pointer-events-none;
+  /* Above the composer box, which comes later in the DOM and would cover it. */
+  z-index: 5;
   bottom: calc(100% - 13px);
   left: calc(max(18px, calc((100% - 820px) / 2)) + 12px);
   max-width: calc(100% - 96px);
@@ -1275,7 +1263,6 @@
   }
 }
 
-/* Emoji toggle button in the composer */
 #tc-root .tc-emoji-btn {
   @apply grid place-items-center cursor-pointer self-end;
   flex: 0 0 auto;
@@ -1298,7 +1285,6 @@
   background: var(--tc-bg3);
 }
 
-/* @mention autocomplete popover, anchored above the composer box */
 #tc-root .tc-at-pop {
   @apply absolute flex flex-col;
   left: 0;
@@ -1341,7 +1327,6 @@
 #tc-root .tc-at-name {
   @apply truncate;
 }
-/* Channel / team entries: a glyph in the avatar's place, a hint on the right. */
 #tc-root .tc-at-glyph {
   @apply grid place-items-center;
   flex: 0 0 auto;
@@ -1359,7 +1344,6 @@
   white-space: nowrap;
 }
 
-/* Sidebar header icon button (New chat) */
 #tc-root .tc-side-btn {
   @apply grid place-items-center cursor-pointer;
   border: 0;
@@ -1375,7 +1359,6 @@
   color: var(--tc-accent);
 }
 
-/* New chat dialog: centered card over a dim scrim */
 #tc-root .tc-scrim {
   @apply fixed grid;
   inset: 0;
@@ -1589,7 +1572,6 @@
   cursor: default;
 }
 
-/* Emoji picker popover, anchored above the composer box */
 #tc-root .tc-emoji-pop {
   @apply absolute;
   left: 0;
@@ -1647,7 +1629,6 @@
   padding: 16px 0;
 }
 
-/* Scroll-to-newest button, floating above the composer when scrolled up */
 #tc-root .tc-scroll-newest {
   @apply absolute grid place-items-center cursor-pointer;
   left: 50%;
@@ -1698,7 +1679,6 @@
   z-index: 10;
 }
 
-/* Sections, unread, threads, reactions, files */
 #tc-root .tc-badge {
   background: var(--tc-accent);
   color: #fff;
@@ -1796,7 +1776,6 @@
   background: var(--tc-line);
 }
 
-/* Scroll wrapper + the day label pinned at the top while reading within a day. */
 #tc-root .tc-msgs-wrap {
   @apply relative flex flex-col flex-1;
   min-height: 0;
@@ -1848,7 +1827,6 @@
   padding: 2px 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
-/* Channel threads: one card per conversation, replies indented on a rail. */
 #tc-root .tc-thread {
   margin: 10px 0 14px;
   padding: 6px 8px 4px;
@@ -1866,7 +1844,6 @@
 #tc-root .tc-day + .tc-thread {
   margin-top: 4px;
 }
-/* Running channel meeting: green edge and a pulsing "Live" badge. */
 #tc-root .tc-thread {
   position: relative;
 }
@@ -2021,7 +1998,6 @@
   font-size: 11px;
   color: var(--tc-fg2);
 }
-/* Attachments: image thumbnails + file cards (open the file viewer) */
 #tc-root .tc-attach {
   @apply flex flex-col gap-1.5;
   margin-top: 6px;
@@ -2174,7 +2150,6 @@
   color: #fff;
 }
 
-/* Remove a file from your own message: on images, a floating button in the corner */
 #tc-root .tc-thumb-wrap {
   @apply relative;
   max-width: 100%;
@@ -2196,7 +2171,6 @@
   color: #fff;
 }
 
-/* File type colors (card icon, viewer header, "no preview" icon) */
 #tc-root .tc-card-icon,
 #tc-root .tc-viewer-icon,
 #tc-root .tc-viewer-none-icon {
@@ -2264,7 +2238,6 @@
   border-color: var(--tc-accent);
   background: color-mix(in srgb, var(--tc-accent) 16%, transparent);
 }
-/* Who reacted: hover card over a reaction pill; each person opens their profile. */
 #tc-root .tc-reactors {
   @apply fixed;
   z-index: 30;
@@ -2317,7 +2290,6 @@
   font-size: 12px;
   color: var(--tc-fg2);
 }
-/* Slack-style hover toolbar, pinned top-right of a message. */
 #tc-root .tc-tools {
   @apply absolute;
   top: -10px;
@@ -2354,7 +2326,6 @@
   background: var(--tc-hover);
   color: var(--tc-fg);
 }
-/* Reaction picker popover. */
 #tc-root .tc-react-pop {
   @apply absolute flex gap-0.5;
   top: 100%;
@@ -2391,11 +2362,9 @@
   background: var(--tc-hover);
   transform: scale(1.15);
 }
-/* Inline edit box + deleted/undo. */
 #tc-root .tc-edit {
   margin-top: 2px;
 }
-/* The shared editor, compact inside a message; taller before it scrolls. */
 #tc-root .tc-edit .tc-composer-box {
   padding: 4px 6px 4px 10px;
   border-color: var(--tc-accent);
@@ -2495,7 +2464,6 @@
   margin-top: 0;
 }
 
-/* Rich message content (richText.jsx injected HTML) */
 #tc-root .tc-inline-img {
   @apply block cursor-zoom-in;
   max-width: 360px;
@@ -2576,7 +2544,6 @@
   margin: 8px 0 2px;
 }
 
-/* Shiki code blocks (injected HTML) */
 #tc-root .tc-pre.tc-shiki {
   background: #0d1117;
   border-color: #222a35;
@@ -2596,7 +2563,6 @@
 #tc-root .tc-pre.tc-shiki .tc-code-line {
   display: inline;
 }
-/* Message code block: language + copy header, long blocks folded. */
 #tc-root .tc-codeblock {
   padding: 0;
   overflow: hidden;
@@ -2748,7 +2714,6 @@
   @apply flex items-center justify-end gap-1.5;
   padding-top: 10px;
 }
-/* Sidebar: section header + show-more */
 #tc-root .tc-sec {
   @apply flex items-center gap-1 cursor-pointer select-none;
   font-size: 12px;
@@ -2812,7 +2777,6 @@
   color: var(--tc-fg);
 }
 
-/* Profile drawer (right) */
 #tc-root .tc-profile {
   @apply fixed flex flex-col;
   top: 0;
@@ -2854,7 +2818,6 @@
     animation: none;
   }
 }
-/* Notes drawer parts. */
 #tc-root .tc-notes-head {
   @apply flex items-center gap-2;
   height: 52px;
@@ -2887,7 +2850,6 @@
 #tc-root .tc-notes-area:focus {
   border-color: var(--tc-accent);
 }
-/* Self-chat slot: pinned under the chat list, above the me bar. */
 #tc-root .tc-self-slot {
   flex: 0 0 auto;
   padding: 6px 8px;
@@ -2902,7 +2864,6 @@
   background: var(--tc-accent);
   color: #fff;
 }
-/* Bell (sidebar head): count badge pinned to its top-right corner. */
 #tc-root .tc-bell {
   @apply relative;
 }
@@ -2921,7 +2882,6 @@
   box-shadow: 0 0 0 2px var(--tc-bg2);
 }
 
-/* Inbox tabs (bell on): Unread | Activity, a two-part segmented control. */
 #tc-root .tc-inbox-tabs {
   gap: 2px;
   padding: 2px;
@@ -2949,7 +2909,6 @@
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
 }
 
-/* Activity feed (sidebar, inbox Activity tab): one button per item, newest first. */
 #tc-root .tc-activity {
   @apply flex flex-col;
   padding: 0 6px 12px;
@@ -3141,7 +3100,7 @@
   color: var(--tc-fg2);
   flex: 0 0 auto;
 }
-/* Single scroll region holding every group, so the whole panel scrolls. */
+/* One scroll region for every group, so the whole panel scrolls. */
 #tc-root .tc-profile-scroll {
   @apply flex-1 overflow-y-auto;
   min-height: 0;
@@ -3183,7 +3142,6 @@
   font-size: 13px;
   padding: 10px 10px;
 }
-/* Message + call action row under the profile identity. */
 #tc-root .tc-profile-actions {
   @apply flex gap-2 items-stretch;
   padding: 14px 16px;
@@ -3220,7 +3178,6 @@
   background: #fff;
 }
 
-/* In-conversation search bar. */
 #tc-root .tc-msgsearch {
   @apply flex items-center gap-2;
   padding: 8px 16px;
@@ -3258,7 +3215,6 @@
   color: var(--tc-fg);
 }
 
-/* Quote-reply chip above the composer. */
 #tc-root .tc-quote-chip {
   @apply flex items-start gap-2;
   margin: 0 0 8px;
@@ -3302,7 +3258,6 @@
   color: var(--tc-fg);
 }
 
-/* Right-click chat context menu. */
 #tc-root .tc-menu {
   @apply fixed;
   z-index: 20;
@@ -3367,7 +3322,6 @@
   flex: 0 0 auto;
 }
 
-/* Unread filter, nothing left. */
 #tc-root .tc-caught-up {
   @apply flex flex-col items-center;
   gap: 4px;
@@ -3398,7 +3352,6 @@
   background: var(--tc-hover);
 }
 
-/* Sidebar tools row: search field + "Unread" toggle pill side by side. */
 #tc-root .tc-side-tools {
   @apply flex items-center gap-1.5;
   margin: 0 12px 6px;
@@ -3420,8 +3373,7 @@
   font-weight: 700;
 }
 
-/* Compact rows: one line, small avatar; time only on hover (or when unread).
-   The last message is in the row's tooltip. */
+/* The last message is in the row's tooltip. */
 #tc-root .tc-row.compact {
   padding: 5px 8px;
   gap: 9px;
@@ -3461,7 +3413,6 @@
 #tc-root .tc-row.unread .tc-prev {
   color: var(--tc-fg);
 }
-/* Team label inside the Channels section. */
 #tc-root .tc-team-label {
   @apply flex items-center gap-1;
   font-size: 11px;
@@ -3473,7 +3424,6 @@
 #tc-root .tc-team-label > span {
   @apply truncate flex-1 min-w-0;
 }
-/* "+" to add a channel: shown while the label is hovered or the button focused. */
 #tc-root .tc-team-add {
   @apply grid place-items-center shrink-0 cursor-pointer;
   width: 20px;
@@ -3503,12 +3453,10 @@
   opacity: 0.7;
 }
 
-/* Team label's channel list: show or hide each channel. */
 #tc-root .tc-team-menu {
   @apply flex flex-col;
   width: 270px;
   padding: 4px;
-  /* The channel list scrolls, the head and hint stay put. */
   overflow: hidden;
 }
 #tc-root .tc-team-menu-head {
@@ -3554,7 +3502,6 @@
   margin-top: 4px;
 }
 
-/* Scrollbars: thin, themed. */
 #tc-root .tc-list,
 #tc-root .tc-msgs,
 #tc-root .tc-profile-chats {
@@ -3582,7 +3529,6 @@
   background: transparent;
 }
 
-/* Sidebar footer: signed-in user, presence, status + view switch menu. */
 #tc-root .tc-me {
   @apply relative;
   flex: 0 0 auto;
@@ -3790,7 +3736,6 @@
   cursor: default;
 }
 
-/* File viewer modal: dark full-window stage, toolbar on top */
 #tc-root .tc-viewer {
   @apply fixed flex flex-col;
   inset: 0;
@@ -4020,7 +3965,6 @@
   right: 12px;
 }
 
-/* Chat options ("…" in the header): menu extras on top of .tc-menu */
 #tc-root .tc-main {
   position: relative;
 }
@@ -4072,7 +4016,6 @@
   max-width: 240px;
 }
 
-/* Rename: the header title becomes an input */
 #tc-root .tc-head-rename {
   width: min(360px, 100%);
   outline: none;
@@ -4088,7 +4031,6 @@
   flex: 0 0 auto;
 }
 
-/* Members panel: a card under the header's right edge */
 #tc-root .tc-members {
   @apply absolute flex flex-col;
   top: 58px;
@@ -4170,14 +4112,12 @@
   opacity: 1;
 }
 
-/* Muted chat in the sidebar: a bell-off after the name, quieter unread */
 #tc-root .tc-row-muted {
   color: var(--tc-fg2);
   flex: 0 0 auto;
   opacity: 0.8;
 }
 
-/* Settings dialog: titled groups, each a soft card of preference rows */
 #tc-root .tc-settings {
   width: min(440px, calc(100vw - 32px));
   gap: 14px;
@@ -4252,7 +4192,6 @@
   background: var(--tc-hover);
 }
 
-/* Select field: native <select> without the platform arrow, plus a chevron */
 #tc-root .tc-select {
   @apply relative inline-flex items-center;
   min-width: 0;

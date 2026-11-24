@@ -15,8 +15,8 @@ interface NameParts {
   surname?: string;
 }
 
-/** Split a person into first and last name, or null when that cannot be done safely. */
-export function splitName(p: NameParts): { first: string; last: string } | null {
+/** null when the split cannot be done safely. */
+export function splitName(p: NameParts) {
   const given = (p.givenName ?? "").trim();
   const sur = (p.surname ?? "").trim();
   if (given && sur) return { first: given, last: sur };
@@ -36,7 +36,7 @@ export function splitName(p: NameParts): { first: string; last: string } | null 
   return null;
 }
 
-export function formatName(p: NameParts, fmt: NameFormat): string {
+export function formatName(p: NameParts, fmt: NameFormat) {
   const raw = p.displayName ?? "";
   if (fmt === "teams") return raw;
   const parts = splitName(p);
@@ -54,7 +54,7 @@ export function formatName(p: NameParts, fmt: NameFormat): string {
   }
 }
 
-let current: NameFormat = readPref();
+let current = readPref();
 const subs = new Set<() => void>();
 
 function readPref(): NameFormat {
@@ -62,9 +62,9 @@ function readPref(): NameFormat {
   return NAME_FORMATS.includes(v as NameFormat) ? (v as NameFormat) : "teams";
 }
 
-export const nameFormat = (): NameFormat => current;
+export const nameFormat = () => current;
 
-export function setNameFormat(f: NameFormat): void {
+export function setNameFormat(f: NameFormat) {
   current = f;
   write("nameFormat", f);
   for (const fn of subs) fn();
@@ -75,23 +75,23 @@ const subscribe = (fn: () => void): (() => void) => {
   return () => subs.delete(fn);
 };
 
-/** Re-render on a name format switch. Memoized components must call it themselves. */
-export function useNameFormat(): NameFormat {
+/** Memoized components must call it themselves to re-render on a switch. */
+export function useNameFormat() {
   return useSyncExternalStore(subscribe, nameFormat, nameFormat);
 }
 
-/** A short name for group titles and the typing indicator. */
-export function shortName(p: NameParts): string {
+/** For group titles and the typing indicator. */
+export function shortName(p: NameParts) {
   if (current === "teams") return (p.displayName ?? "").split(/[\s,]+/)[0];
   return formatName(p, current);
 }
 
-/** A person's name in the chosen format. Apps and bots are never reformatted. */
-export function personName(p: Profile | undefined, raw: string, mri: string, fmt: NameFormat = current): string {
+/** Apps and bots are never reformatted. */
+export function personName(p: Profile | undefined, raw: string, mri: string, fmt: NameFormat = current) {
   if (isAppMri(mri) || fmt === "teams") return raw || p?.displayName || "";
   if (p?.displayName) return formatName(p, fmt);
   return formatName({ displayName: raw }, fmt);
 }
 
-/** Full "First Last" name regardless of the name format setting (apps keep theirs). */
-export const fullName = (p: Profile | undefined, mri: string): string => personName(p, "", mri, "first-last");
+/** "First Last" regardless of the name format setting (apps keep theirs). */
+export const fullName = (p: Profile | undefined, mri: string) => personName(p, "", mri, "first-last");

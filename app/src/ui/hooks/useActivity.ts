@@ -4,7 +4,7 @@ import { isIdle, onTeamsChange } from "../lib/live";
 import { POLL_MS } from "../lib/constants";
 import type { Activity } from "../../types";
 
-const sig = (list: Activity[]): string => list.map((a) => `${a.id}:${a.time}:${a.count}:${a.unread ? 1 : 0}`).join("|");
+const sig = (list: Activity[]) => list.map((a) => `${a.id}:${a.time}:${a.count}:${a.unread ? 1 : 0}`).join("|");
 
 export interface ActivityFeed {
   items: Activity[];
@@ -23,7 +23,7 @@ export function useActivity(): ActivityFeed {
   useEffect(() => {
     let alive = true;
     let running = false;
-    const tick = async (force?: boolean): Promise<void> => {
+    const tick = async (force?: boolean) => {
       if (running || (!force && isIdle())) return;
       running = true;
       try {
@@ -50,7 +50,7 @@ export function useActivity(): ActivityFeed {
     };
   }, []);
 
-  const markAllRead = useCallback((): void => {
+  const markAllRead = useCallback(() => {
     const list = itemsRef.current;
     if (!list.some((a) => a.unread)) return;
     const newest = Math.max(...list.map((a) => a.time));

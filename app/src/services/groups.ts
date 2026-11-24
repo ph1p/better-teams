@@ -154,24 +154,22 @@ const REMOVE_THREAD_MEMBER = `mutation removeThreadMembershipMutation($threadId:
 
 type Data = Record<string, unknown>;
 
-/** The named field of a mutation's result, or a failure naming the error type. */
+// Fails with the error type's name when the field is an *Error union member.
 function field(r: CdlRes<Data>, name: string): CdlRes<true> {
   const c = check(r, name, /Error$/);
   return c.ok ? { ok: true, data: true } : c;
 }
 
-export async function setConversationTitle(convId: string, title: string): Promise<CdlRes<true>> {
+export async function setConversationTitle(convId: string, title: string) {
   return field(
     await cdl<Data>("ComponentsChatTitleUpdaterSetConversationTitleMutation", RENAME, { convId, title }),
     "setConversationTitle",
   );
 }
 
-/**
- * Add people (MRIs) to a group chat. `shareHistoryDays`: -1 none, 0 all,
- * N the last N days (Teams' own encoding; the worker turns N into a time).
- */
-export async function addMembers(convId: string, mris: string[], shareHistoryDays = 0): Promise<CdlRes<true>> {
+// `shareHistoryDays`: -1 none, 0 all, N the last N days (Teams' own encoding;
+// the worker turns N into a time).
+export async function addMembers(convId: string, mris: string[], shareHistoryDays = 0) {
   return field(
     await cdl<Data>("ComponentsChatAddMembersAddMembersToConversationMutation", ADD_MEMBERS, {
       convId,
@@ -182,7 +180,7 @@ export async function addMembers(convId: string, mris: string[], shareHistoryDay
   );
 }
 
-export async function removeMember(convId: string, mri: string): Promise<CdlRes<true>> {
+export async function removeMember(convId: string, mri: string) {
   return field(
     await cdl<Data>("ComponentsChatRosterRemoveMemberFromConversationMutation", REMOVE_MEMBER, {
       convId,
@@ -192,18 +190,17 @@ export async function removeMember(convId: string, mri: string): Promise<CdlRes<
   );
 }
 
-export async function leaveChat(convId: string): Promise<CdlRes<true>> {
+export async function leaveChat(convId: string) {
   return field(await cdl<Data>("ComponentsChatOptionsSharedLeaveChatMutation", LEAVE, { convId }), "leaveChat");
 }
 
-export async function setMuteChat(convId: string, mute: boolean): Promise<CdlRes<true>> {
+export async function setMuteChat(convId: string, mute: boolean) {
   return field(
     await cdl<Data>("ComponentsChatOptionsSharedSetMuteChatMutation", MUTE, { convId, mute }),
     "setMuteChat",
   );
 }
 
-/** Teams' channel notification presets (the "Channel notifications" menu). */
 export type ChannelPreset = "ALL_NEW_MSGS" | "MENTIONS_AND_REPLIES" | "MUTE";
 
 export interface ChannelNotifications {
@@ -232,12 +229,11 @@ export async function getChannelNotifications(channelId: string): Promise<CdlRes
   };
 }
 
-/** Set a channel's preset, keeping its @tag / @channel-@team mention choices. */
 export async function setChannelNotifications(
   convId: string,
   preset: ChannelPreset,
   keep?: Pick<ChannelNotifications, "tagMentions" | "channelTeamMentions">,
-): Promise<CdlRes<true>> {
+) {
   return field(
     await cdl<Data>("channelGranularSettingsMutation", CHANNEL_NOTIF_SET, {
       input: {
@@ -255,25 +251,22 @@ export async function setChannelNotifications(
   );
 }
 
-/** What can be left or hidden for a channel, and its team. */
 export interface ChannelInfo {
   channelType: string;
   isGeneral: boolean;
   canLeaveChannel: boolean;
-  /** Team thread id (19:…@thread.tacv2) and its M365 group id. */
+  // Team thread id (19:…@thread.tacv2) and its M365 group id.
   teamId: string;
   groupId: string;
   canLeaveTeam: boolean;
-  /** The team lets us add channels to it. */
   canAddChannel: boolean;
   canEdit: boolean;
   canDelete: boolean;
   displayName: string;
   isHidden: boolean;
-  /** Teams' memberRole for us in the channel and its team: "ADMIN" for owners. */
+  // Teams' memberRole for us in the channel and its team: "ADMIN" for owners.
   channelRole: string;
   teamRole: string;
-  /** May add people to this (private/shared) channel, or to the team. */
   canAddMembers: boolean;
   canAddTeamMember: boolean;
 }
@@ -321,8 +314,7 @@ export async function leaveTeam(teamThreadId: string, groupId: string): Promise<
   return r.data.errorCode ? { ok: false, reason: r.data.errorCode } : { ok: true, data: true };
 }
 
-/** Show or hide a standard channel in the channel list (Teams' "Hide"). */
-export async function setChannelVisibility(channelId: string, show: boolean): Promise<CdlRes<true>> {
+export async function setChannelVisibility(channelId: string, show: boolean) {
   return field(
     await cdl<Data>("useToggleChannelVisibilityMutation", CHANNEL_VISIBILITY, {
       input: { id: channelId, shouldShow: show, isJoinLeaveFlow: false },
@@ -349,7 +341,6 @@ export interface TeamChannelInfo {
   isShown: boolean;
 }
 
-/** A team's channels with their visibility; deleted ones are left out. */
 export async function getTeamChannels(teamThreadId: string): Promise<CdlRes<TeamChannelInfo[]>> {
   const r = await cdl<{ team?: { channels?: (TeamChannelInfo & { isDeleted?: boolean })[] } | null }>(
     "ComponentsCreateChannelGetTeamQuery",
@@ -362,7 +353,6 @@ export async function getTeamChannels(teamThreadId: string): Promise<CdlRes<Team
   return { ok: true, data: list.filter((c) => c && c.id && !c.isDeleted) };
 }
 
-/** Rename a channel (Teams' "Edit channel", name only). */
 export async function renameChannel(channelId: string, displayName: string): Promise<CdlRes<true>> {
   const r = check<{ success?: boolean }>(
     await cdl<Data>("editChannelMutation", EDIT_CHANNEL, {
@@ -376,10 +366,8 @@ export async function renameChannel(channelId: string, displayName: string): Pro
   return r.data.success === false ? { ok: false, reason: "editChannel refused" } : { ok: true, data: true };
 }
 
-/**
- * Delete a channel for the whole team. The worker reads the channel from its
- * store; the input's names and flags are its fallback when the store lacks it.
- */
+// The worker reads the channel from its store; the input's names and flags
+// are its fallback when the store lacks it.
 export async function deleteChannel(channelId: string, i: ChannelInfo): Promise<CdlRes<true>> {
   const r = await cdl<Data>("deleteChannelMutation", DELETE_CHANNEL, {
     input: {
@@ -395,11 +383,8 @@ export async function deleteChannel(channelId: string, i: ChannelInfo): Promise<
   return r.data.deleteChannel ? { ok: true, data: true } : { ok: false, reason: "deleteChannel refused" };
 }
 
-/**
- * Create a channel in a team (Teams' "Add channel"). Resolves to the new
- * channel's thread id, or "" when Teams didn't report it yet (private
- * channels: it arrives with the next sync).
- */
+// Resolves to the new channel's thread id, or "" when Teams didn't report it
+// yet (private channels: it arrives with the next sync).
 export async function createChannel(
   team: { teamId: string; groupId: string },
   channel: { displayName: string; description: string; isPrivate: boolean; threads: boolean },
@@ -429,18 +414,17 @@ export async function createChannel(
   return { ok: true, data: d.id || "" };
 }
 
-/** One person on a team's or private channel's roster. */
 export interface ThreadMember {
   mri: string;
   displayName: string;
   jobTitle: string;
-  /** Teams' TeamMemberRole: "Admin" (owner), "User", "Guest". */
+  // Teams' TeamMemberRole: "Admin" (owner), "User", "Guest".
   role: string;
   objectId: string;
   tenantId: string;
 }
 
-/** A team's (thread id) or private channel's roster, owners first in Teams' order. */
+// Owners first, in Teams' order.
 export async function listThreadMembers(threadId: string): Promise<CdlRes<ThreadMember[]>> {
   const out: ThreadMember[] = [];
   let nextLink: string | null = null;
@@ -478,13 +462,10 @@ export async function listThreadMembers(threadId: string): Promise<CdlRes<Thread
   return { ok: true, data: out };
 }
 
-/** People Teams couldn't add, by MRI with its error type; empty when all went in. */
+// Empty when all went in.
 export type AddFailures = { mri: string; error: string }[];
 
-/**
- * Add people as members to a team, or to a private channel when `channelId`
- * is given (they must already be in its team).
- */
+// With `channelId`: a private channel; its people must already be in the team.
 export async function addThreadMembers(
   team: { teamId: string; groupId: string },
   channelId: string | null,
@@ -517,11 +498,8 @@ export async function addThreadMembers(
   };
 }
 
-/**
- * Remove someone from a team (`threadId` its thread, `groupId` its M365
- * group) or a private channel (`threadId` the channel). The worker picks the
- * right service from the thread's type.
- */
+// `threadId` is the team's thread (with `groupId` its M365 group) or the
+// private channel. The worker picks the service from the thread's type.
 export async function removeThreadMember(
   threadId: string,
   groupId: string | null,

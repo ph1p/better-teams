@@ -19,13 +19,13 @@ export function useFollowNative(
   chats: Chat[],
   chatsRef: MutableRefObject<Chat[]>,
   open: (id: string) => void,
-): void {
+) {
   const last = useRef("");
   const pending = useRef<{ id: string; at: number } | null>(null);
   const selRef = useLatest(sel);
   const openRef = useLatest(open);
 
-  const tryOpen = (): void => {
+  const tryOpen = () => {
     const p = pending.current;
     if (!p) return;
     if (Date.now() - p.at > PENDING_MS || p.id === selRef.current) {
@@ -39,7 +39,7 @@ export function useFollowNative(
 
   useEffect(() => {
     last.current = nativeThreadId();
-    const tick = (): void => {
+    const tick = () => {
       const id = nativeThreadId();
       if (id === last.current) return;
       last.current = id;

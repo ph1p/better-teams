@@ -48,8 +48,8 @@ export function Section({
   onMenu,
   onAddChannel,
   onTeamChannels,
-}: SectionProps): JSX.Element {
-  const [collapsed, setCollapsed] = usePref<boolean>("sec:" + id, defaultCollapsed);
+}: SectionProps) {
+  const [collapsed, setCollapsed] = usePref("sec:" + id, defaultCollapsed);
   const [all, setAll] = useState(false);
   const unread = rows.filter((r) => r.unread).length;
   const open = !collapsed || !title;

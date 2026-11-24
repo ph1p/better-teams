@@ -19,7 +19,7 @@ export interface MentionPick {
   mentionType: string;
 }
 
-export function escText(s: string): string {
+export function escText(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
@@ -40,12 +40,12 @@ export interface MentionSpan {
 // if its literal `@Name` still occurs in the text (so deleting the text removes
 // the mention). Each text occurrence is consumed once, longest names first so
 // "@Ann Lee" wins over "@Ann". Spans come back in document order.
-export function claimMentions(text: string, picks: readonly MentionPick[]): MentionSpan[] {
+export function claimMentions(text: string, picks: readonly MentionPick[]) {
   if (!picks.length) return [];
-  // Longest display name first; keep original order as tiebreak for stable itemids.
+  // Original order as tiebreak keeps itemids stable.
   const ordered = picks.map((p, i) => ({ p, i })).sort((a, b) => b.p.name.length - a.p.name.length || a.i - b.i);
   const spans: MentionSpan[] = [];
-  const taken: boolean[] = Array.from({ length: text.length }, () => false);
+  const taken = Array.from({ length: text.length }, () => false);
   for (const { p } of ordered) {
     const token = "@" + p.name;
     let from = 0;
@@ -53,7 +53,6 @@ export function claimMentions(text: string, picks: readonly MentionPick[]): Ment
       const at = text.indexOf(token, from);
       if (at < 0) break;
       const end = at + token.length;
-      // Skip if any char already claimed by another (longer) mention.
       let free = true;
       for (let j = at; j < end; j++)
         if (taken[j]) {
@@ -71,13 +70,12 @@ export function claimMentions(text: string, picks: readonly MentionPick[]): Ment
   return spans.sort((a, b) => a.start - b.start);
 }
 
-/** The native mention span for itemid `idx`. */
-export function mentionSpan(idx: number, name: string): string {
+export function mentionSpan(idx: number, name: string) {
   return `<span itemtype="http://schema.skype.com/Mention" itemscope itemid="${idx}">${escText(name)}</span>`;
 }
 
-/** One properties.mentions entry (JSON) for itemid `idx`. */
-export function mentionEntry(idx: number, pick: MentionPick): string {
+/** One properties.mentions entry (JSON). */
+export function mentionEntry(idx: number, pick: MentionPick) {
   return JSON.stringify({
     "@type": "http://schema.skype.com/Mention",
     itemid: idx,
@@ -87,8 +85,7 @@ export function mentionEntry(idx: number, pick: MentionPick): string {
   });
 }
 
-// Turn the plain draft + the picks the user made into send-ready content:
-// escaped text with mention spans spliced in, itemids in document order.
+// itemids in document order.
 export function buildMentionContent(text: string, picks: readonly MentionPick[]): MentionContent {
   const spans = claimMentions(text, picks);
   if (!spans.length) return { html: escText(text), mentions: "[]" };
@@ -112,9 +109,9 @@ export interface MentionRef {
   mentionType: string;
 }
 
-/** properties.mentions (JSON string, IDB/REST) or CDL's mention list -> MentionRef[]. */
-export function parseMentions(raw: unknown): MentionRef[] {
-  let list: unknown = raw;
+/** properties.mentions (JSON string, IDB/REST) or CDL's mention list. */
+export function parseMentions(raw: unknown) {
+  let list = raw;
   if (typeof raw === "string") {
     try {
       list = JSON.parse(raw);
@@ -145,9 +142,9 @@ export function editMentions(refs: readonly MentionRef[]): {
 } {
   const byId = new Map(refs.map((r) => [r.itemid, r]));
   const seen = new Map<number, string>();
-  const isPart = (r: MentionRef | undefined): boolean => !!r && !/\s/.test(r.name);
+  const isPart = (r: MentionRef | undefined) => !!r && !/\s/.test(r.name);
   // A word span continuing the previous itemid's word span for the same person.
-  const cont = (id: number): boolean => {
+  const cont = (id: number) => {
     const r = byId.get(id);
     const prev = byId.get(id - 1);
     return isPart(r) && isPart(prev) && prev!.mri === r!.mri;

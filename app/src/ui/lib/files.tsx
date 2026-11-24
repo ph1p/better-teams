@@ -1,7 +1,4 @@
-// File types and icons for attachments, plus the tiny store
-// behind the file viewer modal (one viewer for the whole app).
-
-import { useSyncExternalStore, type JSX } from "react";
+import { useSyncExternalStore } from "react";
 import {
   File,
   FileArchive,
@@ -43,7 +40,7 @@ const KINDS: [FileKind, RegExp][] = [
   ["text", /^(txt|md|log)$/],
 ];
 
-export function fileKind(ext: string): FileKind {
+export function fileKind(ext: string) {
   const e = ext.toLowerCase();
   return KINDS.find(([, re]) => re.test(e))?.[0] ?? "other";
 }
@@ -62,9 +59,6 @@ const KIND_ICON: Record<FileKind, LucideIcon> = {
   other: File,
 };
 
-// ---- viewer store ---------------------------------------------------------
-
-/** One thing the viewer can show: an attachment or an inline image. */
 export interface ViewerItem {
   name: string;
   ext: string;
@@ -88,29 +82,29 @@ interface ViewerState {
 let state: ViewerState | null = null;
 const subs = new Set<() => void>();
 
-function set(next: ViewerState | null): void {
+function set(next: ViewerState | null) {
   state = next;
   subs.forEach((f) => f());
 }
 
-export function openViewer(items: ViewerItem[], index = 0): void {
+export function openViewer(items: ViewerItem[], index = 0) {
   if (items.length) set({ items, index: Math.max(0, Math.min(index, items.length - 1)) });
 }
 
-export function closeViewer(): void {
+export function closeViewer() {
   set(null);
 }
 
-export function stepViewer(delta: number): void {
+export function stepViewer(delta: number) {
   if (!state) return;
   const n = state.items.length;
   set({ ...state, index: (state.index + delta + n) % n });
 }
 
-/** True while the viewer is open; the app's own shortcuts pause meanwhile. */
-export const viewerOpen = (): boolean => state !== null;
+/** The app's own shortcuts pause while the viewer is open. */
+export const viewerOpen = () => state !== null;
 
-export function useViewer(): ViewerState | null {
+export function useViewer() {
   return useSyncExternalStore(
     (f) => {
       subs.add(f);
@@ -121,7 +115,7 @@ export function useViewer(): ViewerState | null {
 }
 
 /** Save an image through the page's own session (AMS answers only with Teams' cookies). */
-export async function saveImage(item: ViewerItem): Promise<boolean> {
+export async function saveImage(item: ViewerItem) {
   if (!item.image) return false;
   try {
     const r = await fetch(item.image, { credentials: "include" });
@@ -148,7 +142,7 @@ const TEXTY = new Set<FileKind>(["text", "code"]);
  * SharePoint's download link, or a local blob (a file still being sent).
  * The share link `url` is SharePoint's HTML page, not the content.
  */
-export function textSrc(it: ViewerItem): string | undefined {
+export function textSrc(it: ViewerItem) {
   if (!TEXTY.has(it.kind)) return undefined;
   return it.download || (it.url?.startsWith("blob:") ? it.url : undefined);
 }
@@ -186,7 +180,6 @@ export function imageItem(src: string, alt: string, link?: string): ViewerItem {
   return item;
 }
 
-/** The type icon on its kind-colored tile. */
 export function KindIcon({
   kind,
   className,
@@ -197,7 +190,7 @@ export function KindIcon({
   className: string;
   size: number;
   strokeWidth?: number;
-}): JSX.Element {
+}) {
   const Icon = KIND_ICON[kind];
   return (
     <span className={className + " k-" + kind}>

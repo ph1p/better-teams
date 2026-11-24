@@ -25,7 +25,7 @@ interface ListOptions {
 export async function listMessages(
   conversationId: string,
   { channel = false, limit = 300, remoteLimit = limit }: ListOptions = {},
-): Promise<Message[] | null> {
+) {
   const db = await open("replychain");
   const stores = [...db.objectStoreNames].filter((s) => s.startsWith("replychains"));
   const chains = (await Promise.all(stores.map((s) => getByPrefix(db, s, conversationId)))).flat();
@@ -83,7 +83,7 @@ export async function listMessages(
 // Fetch messages for a conversation straight from chatsvc — the exact endpoint
 // Teams itself calls — using Teams' own live token. Returns normalized messages,
 // or null if no token is available or the request fails.
-async function fetchRemoteMessages(conversationId: string, limit: number, channel = false): Promise<Message[] | null> {
+async function fetchRemoteMessages(conversationId: string, limit: number, channel = false) {
   const cached = remoteCache.get(conversationId);
   if (cached && Date.now() - cached.at < REMOTE_TTL) return cached.msgs;
   const r = await chatsvc.getMessages(conversationId, limit);
@@ -110,11 +110,7 @@ const pagedFrom = new Map<string, string>();
 
 // One CDL page, oldest first. null when the worker failed. `empty` marks a chat
 // the worker knows has no messages; an unsynced chat answers an empty page.
-async function cdlPage(
-  conversationId: string,
-  cursor?: string,
-  channel = false,
-): Promise<{ msgs: Message[]; older: string | null; empty: boolean; synced: boolean } | null> {
+async function cdlPage(conversationId: string, cursor?: string, channel = false) {
   const r = await chat.listMessages(conversationId, cursor);
   if (!r.ok) return null;
   const msgs = r.data.messages.map((m) => normCdlMessage(m, channel)).filter((n): n is Message => !!n);
@@ -131,7 +127,7 @@ const SYNC_WAIT_MS = 1_200;
 // First page of an uncached chat through Teams' worker. Keeps an existing
 // cursor so a poll does not reset scroll-up paging. [] = the chat really has
 // no messages; null = the worker could not answer (callers fall back to REST).
-async function cdlFirstPage(conversationId: string, channel = false): Promise<Message[] | null> {
+async function cdlFirstPage(conversationId: string, channel = false) {
   let p = await cdlPage(conversationId, undefined, channel);
   if (p && !p.synced && !p.msgs.length && !p.older) {
     await new Promise((r) => setTimeout(r, SYNC_WAIT_MS));
@@ -155,11 +151,7 @@ const backwardLinks = new Map<string, string | null>();
 // than one scroll allowed and left the view stuck at the top in real chats.
 // Returns older messages ([] = nothing yet, retry later), or null at the start
 // of history.
-export async function fetchOlderRemote(
-  conversationId: string,
-  channel = false,
-  before?: string,
-): Promise<Message[] | null> {
+export async function fetchOlderRemote(conversationId: string, channel = false, before?: string) {
   // Scrolled up before the chat's priming finished: get a cursor first rather
   // than reporting "no history".
   if (!cdlCursors.has(conversationId) && !backwardLinks.has(conversationId)) await primeRemote(conversationId, channel);
@@ -231,7 +223,7 @@ export function primeRemote(conversationId: string, channel = false): Promise<Me
 
 const priming = new Map<string, Promise<Message[] | null>>();
 
-async function primeOnce(conversationId: string, channel: boolean): Promise<Message[] | null> {
+async function primeOnce(conversationId: string, channel: boolean) {
   const first = await cdlFirstPage(conversationId, channel);
   if (first) return first;
   if (backwardLinks.has(conversationId)) return null;
@@ -242,12 +234,10 @@ async function primeOnce(conversationId: string, channel: boolean): Promise<Mess
   return parseRemotePage(j, channel);
 }
 
-/**
- * Forget a reached start of history when a chat is opened again. An empty page
- * can also come from a worker that hasn't synced the chat yet; kept for the
- * whole session, it left scroll-up dead until Teams restarted.
- */
-export function resetPaging(conversationId: string): void {
+// Forget a reached start of history when a chat is opened again. An empty page
+// can also come from a worker that hasn't synced the chat yet; kept for the
+// whole session, it left scroll-up dead until Teams restarted.
+export function resetPaging(conversationId: string) {
   if (cdlCursors.get(conversationId) === null) cdlCursors.delete(conversationId);
   if (backwardLinks.get(conversationId) === null) backwardLinks.delete(conversationId);
   pagedFrom.delete(conversationId);

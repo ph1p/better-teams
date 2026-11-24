@@ -15,8 +15,8 @@ import { locale, t } from "../../i18n";
 
 type Dict = Record<string, unknown>;
 const isDict = (v: unknown): v is Dict => typeof v === "object" && v !== null && !Array.isArray(v);
-const list = (v: unknown): Dict[] => (Array.isArray(v) ? v.filter(isDict) : []);
-const str = (v: unknown): string => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
+const list = (v: unknown) => (Array.isArray(v) ? v.filter(isDict) : []);
+const str = (v: unknown) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
 
 interface Ctx {
   hidden: Record<string, boolean>;
@@ -24,10 +24,8 @@ interface Ctx {
   openInTeams?: () => void;
 }
 
-// --- Inline markdown (the subset Adaptive Cards support) ---------------------
-
 // {{DATE(2026-11-23T15:58:00Z, SHORT)}} / {{TIME(…)}} -> localized text.
-function expandDates(s: string): string {
+function expandDates(s: string) {
   return s.replace(
     /\{\{(DATE|TIME)\(([^,)]+)(?:,\s*(SHORT|LONG|COMPACT))?\)\}\}/g,
     (all, fn: string, iso: string, fmt) => {
@@ -43,7 +41,7 @@ function expandDates(s: string): string {
 const INLINE =
   /\*\*(.+?)\*\*|__(.+?)__|\[([^\]]+)\]\(([^)\s]+)\)|(?<![\w*])\*(?!\s)([^*]+?)\*(?![\w*])|(?<![\w_])_(?!\s)([^_]+?)_(?![\w_])|<at>(.*?)<\/at>/g;
 
-function inline(s: string, key: string): ReactNode[] {
+function inline(s: string, key: string) {
   const out: ReactNode[] = [];
   let last = 0;
   let n = 0;
@@ -70,7 +68,7 @@ function inline(s: string, key: string): ReactNode[] {
   return out;
 }
 
-const decode = (s: string): string =>
+const decode = (s: string) =>
   s
     .replace(/&nbsp;/g, " ")
     .replace(/&lt;/g, "<")
@@ -79,15 +77,14 @@ const decode = (s: string): string =>
     .replace(/&#39;/g, "'")
     .replace(/&amp;/g, "&");
 
-/** Card text: markdown lines, "- " / "1. " lists, line breaks. */
-function Md({ text }: { text: string }): JSX.Element {
+function Md({ text }: { text: string }) {
   const lines = decode(expandDates(text.replace(/<br\s*\/?>/gi, "\n").replace(/<(?!\/?at>)[^>]+>/g, ""))).split(
     /\r?\n/,
   );
   const out: ReactNode[] = [];
   let items: ReactNode[] = [];
   let ordered = false;
-  const flush = (): void => {
+  const flush = () => {
     if (!items.length) return;
     const L = ordered ? "ol" : "ul";
     out.push(<L key={"l" + out.length}>{items}</L>);
@@ -109,15 +106,13 @@ function Md({ text }: { text: string }): JSX.Element {
   return <>{out}</>;
 }
 
-// --- Elements ----------------------------------------------------------------
-
 const SIZES: Record<string, number> = { small: 24, medium: 40, large: 72 };
-const px = (v: unknown): number => {
+const px = (v: unknown) => {
   const m = /^(\d+)px$/.exec(str(v));
   return m ? Number(m[1]) : 0;
 };
 
-function textCls(e: Dict, base: string): string {
+function textCls(e: Dict, base: string) {
   const c = [base];
   const size = str(e.size).toLowerCase();
   if (size && size !== "default") c.push("sz-" + size);
@@ -138,7 +133,7 @@ function align(e: Dict): CSSProperties | undefined {
 
 // Small icons and avatars from third-party hosts are dropped (not worth a
 // "load image" button); larger untrusted images sit behind one.
-function shown(e: Dict, size?: string): boolean {
+function shown(e: Dict, size?: string) {
   const src = safeImgSrc(str(e.url));
   if (!src) return false;
   if (isTrustedImgHost(src)) return true;
@@ -146,7 +141,7 @@ function shown(e: Dict, size?: string): boolean {
   return str(e.style).toLowerCase() !== "person" && !(w && w <= 48);
 }
 
-function Img({ e, size }: { e: Dict; size?: string }): JSX.Element | null {
+function Img({ e, size }: { e: Dict; size?: string }) {
   const src = safeImgSrc(str(e.url));
   const alt = str(e.altText);
   const person = str(e.style).toLowerCase() === "person";
@@ -163,7 +158,7 @@ function Img({ e, size }: { e: Dict; size?: string }): JSX.Element | null {
   return <img className={cls} src={src} alt={alt} style={style} loading="lazy" />;
 }
 
-function Columns({ e, ctx }: { e: Dict; ctx: Ctx }): JSX.Element {
+function Columns({ e, ctx }: { e: Dict; ctx: Ctx }) {
   return (
     <div className="tc-ac-cols">
       {list(e.columns).map((col, i) => {
@@ -196,12 +191,12 @@ function Columns({ e, ctx }: { e: Dict; ctx: Ctx }): JSX.Element {
   );
 }
 
-function boxCls(e: Dict): string {
+function boxCls(e: Dict) {
   const s = str(e.style).toLowerCase();
   return s && s !== "default" ? " box " + s : "";
 }
 
-function Facts({ e }: { e: Dict }): JSX.Element {
+function Facts({ e }: { e: Dict }) {
   return (
     <dl className="tc-ac-facts">
       {list(e.facts).map((f, i) => (
@@ -218,7 +213,7 @@ function Facts({ e }: { e: Dict }): JSX.Element {
   );
 }
 
-function Table({ e, ctx }: { e: Dict; ctx: Ctx }): JSX.Element {
+function Table({ e, ctx }: { e: Dict; ctx: Ctx }) {
   const cols = list(e.columns).length || Math.max(0, ...list(e.rows).map((r) => list(r.cells).length));
   const header = e.firstRowAsHeader !== false;
   return (
@@ -234,7 +229,7 @@ function Table({ e, ctx }: { e: Dict; ctx: Ctx }): JSX.Element {
   );
 }
 
-function Rich({ e }: { e: Dict }): JSX.Element {
+function Rich({ e }: { e: Dict }) {
   return (
     <p className="tc-ac-text" style={align(e)}>
       {(Array.isArray(e.inlines) ? e.inlines : []).map((r: unknown, i) => {
@@ -261,8 +256,7 @@ function Rich({ e }: { e: Dict }): JSX.Element {
   );
 }
 
-// Card-toggled visibility wins over the authored isVisible.
-function visibleEl(e: Dict, ctx: Ctx): boolean {
+function visibleEl(e: Dict, ctx: Ctx) {
   const id = str(e.id);
   return id && id in ctx.hidden ? !ctx.hidden[id] : e.isVisible !== false;
 }
@@ -278,7 +272,7 @@ const DRAWN = new Set([
   "ActionSet",
 ]);
 
-/** Whether Element draws anything for `e`: mirrors its null returns. */
+// Mirrors Element's null returns.
 function draws(e: Dict, ctx: Ctx): boolean {
   if (!visibleEl(e, ctx)) return false;
   if (e.type === "Image") return shown(e);
@@ -286,7 +280,7 @@ function draws(e: Dict, ctx: Ctx): boolean {
   return isDict(e.fallback) && draws(e.fallback, ctx);
 }
 
-function Element({ e, ctx }: { e: Dict; ctx: Ctx }): JSX.Element | null {
+function Element({ e, ctx }: { e: Dict; ctx: Ctx }) {
   if (!visibleEl(e, ctx)) return null;
   let node: JSX.Element | null;
   switch (e.type) {
@@ -346,7 +340,7 @@ function Element({ e, ctx }: { e: Dict; ctx: Ctx }): JSX.Element | null {
   return <div className={cls}>{node}</div>;
 }
 
-function Items({ items, ctx }: { items: unknown; ctx: Ctx }): JSX.Element {
+function Items({ items, ctx }: { items: unknown; ctx: Ctx }) {
   return (
     <>
       {list(items).map((e, i) => (
@@ -356,9 +350,7 @@ function Items({ items, ctx }: { items: unknown; ctx: Ctx }): JSX.Element {
   );
 }
 
-// --- Actions -----------------------------------------------------------------
-
-function Actions({ actions, ctx }: { actions: unknown; ctx: Ctx }): JSX.Element | null {
+function Actions({ actions, ctx }: { actions: unknown; ctx: Ctx }) {
   const [shown, setShown] = useState<number | null>(null);
   const [more, setMore] = useState(false);
   const all = list(actions);
@@ -367,7 +359,7 @@ function Actions({ actions, ctx }: { actions: unknown; ctx: Ctx }): JSX.Element 
   const secondary = all.filter((a) => str(a.mode).toLowerCase() === "secondary");
   const visible = more ? all : primary;
   const sub = shown !== null && isDict(all[shown]?.card) ? (all[shown].card as Dict) : null;
-  const button = (a: Dict): JSX.Element => {
+  const button = (a: Dict) => {
     const i = all.indexOf(a);
     const title = str(a.title) || str(a.tooltip);
     const style = str(a.style).toLowerCase();
@@ -463,7 +455,7 @@ function Actions({ actions, ctx }: { actions: unknown; ctx: Ctx }): JSX.Element 
   );
 }
 
-function Body({ card, ctx }: { card: Dict; ctx: Ctx }): JSX.Element {
+function Body({ card, ctx }: { card: Dict; ctx: Ctx }) {
   return (
     <>
       <Items items={card.body} ctx={ctx} />
@@ -471,8 +463,6 @@ function Body({ card, ctx }: { card: Dict; ctx: Ctx }): JSX.Element {
     </>
   );
 }
-
-// --- Hero / thumbnail / O365 connector cards -> Adaptive elements ------------
 
 function button(b: Dict): Dict {
   const url = str(b.value) || str(b.url);
@@ -530,7 +520,6 @@ function fromConnector(c: Dict): Dict {
   return { body, actions };
 }
 
-/** The card as Adaptive-shaped {body, actions}, or null when its type is unknown. */
 export function toAdaptive(card: Card): Dict | null {
   const c = card.content;
   const ct = card.contentType.toLowerCase();
@@ -541,7 +530,7 @@ export function toAdaptive(card: Card): Dict | null {
   return null;
 }
 
-function OneCard({ card, openInTeams }: { card: Card; openInTeams?: () => void }): JSX.Element | null {
+function OneCard({ card, openInTeams }: { card: Card; openInTeams?: () => void }) {
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
   const ac = toAdaptive(card);
   if (!ac) return null;
@@ -562,7 +551,6 @@ function OneCard({ card, openInTeams }: { card: Card; openInTeams?: () => void }
   );
 }
 
-// Initial isVisible of the element with this id, searched through the card.
 function isHiddenByDefault(node: unknown, id: string): boolean {
   if (Array.isArray(node)) return node.some((n) => isHiddenByDefault(n, id));
   if (!isDict(node)) return false;
@@ -570,7 +558,7 @@ function isHiddenByDefault(node: unknown, id: string): boolean {
   return ["body", "items", "columns", "rows", "cells"].some((k) => isHiddenByDefault(node[k], id));
 }
 
-export function Cards({ cards, openInTeams }: { cards: readonly Card[]; openInTeams?: () => void }): JSX.Element {
+export function Cards({ cards, openInTeams }: { cards: readonly Card[]; openInTeams?: () => void }) {
   return (
     <div className="tc-cards">
       {cards.map((c, i) => (

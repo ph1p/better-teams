@@ -4,14 +4,14 @@ import { useEffect } from "react";
 // The capture-phase handlers run before React's own, so events that start
 // inside `inside` (a CSS selector: the popup and its toggle) are ignored;
 // otherwise mousedown would unmount an item before its click lands.
-export function useDismiss(open: boolean, inside: string, onClose: () => void): void {
+export function useDismiss(open: boolean, inside: string, onClose: () => void) {
   useEffect(() => {
     if (!open) return;
-    const close = (e: Event): void => {
+    const close = (e: Event) => {
       if (e.target instanceof Element && e.target.closest(inside)) return;
       onClose();
     };
-    const onKey = (e: KeyboardEvent): void => {
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("mousedown", close, true);

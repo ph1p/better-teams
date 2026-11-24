@@ -1,6 +1,5 @@
 import type { Messages } from "../en";
 
-// The open conversation: header, options menu, members, timeline, messages.
 export const chat: Messages["chat"] = {
   // Header
   name: "Chatname",

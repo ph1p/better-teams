@@ -1,5 +1,3 @@
-// Shared timing/sizing constants for the overlay UI.
-
 // How often the chat list and the open conversation poll IndexedDB.
 export const POLL_MS = 4000;
 // Messages from the same sender within this window group into one bubble cluster.

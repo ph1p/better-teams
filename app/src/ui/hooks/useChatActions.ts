@@ -50,7 +50,7 @@ interface Deps {
 }
 
 // Resolve a person's UPN (email) for Teams deep links.
-const upnOf = (mri: string): string => {
+const upnOf = (mri: string) => {
   const p = profile(mri);
   return p.email || (String(mri || "").match(/[^:]+@[^:]+/) || [""])[0];
 };
@@ -72,7 +72,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   // up after the next poll picks it out of Teams' local store.
   // `id` may also be a match, for a chat whose id we don't know yet.
   const pickWhenListed = useCallback(
-    async (id: string | ((c: Chat) => boolean), ms = 12000): Promise<boolean> => {
+    async (id: string | ((c: Chat) => boolean), ms = 12000) => {
       const match = typeof id === "string" ? (c: Chat) => c.id === id : id;
       // Only auto-select if the user hasn't opened something else meanwhile.
       const startSel = selRef.current;
@@ -91,7 +91,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
 
   // Everyone in our chats with a cached profile, for the New chat dialog's
   // instant local matches (the directory search needs a captured token).
-  const knownPeople = useCallback((): PeopleHit[] => {
+  const knownPeople = useCallback(() => {
     const me = myMri();
     const seen = new Set<string>();
     const out: PeopleHit[] = [];
@@ -110,7 +110,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
 
   // Send `text` into an existing chat: chatsvc first, Teams' composer as fallback.
   const sendInto = useCallback(
-    async (id: string, title: string, text: string): Promise<boolean> => {
+    async (id: string, title: string, text: string) => {
       let r = await sendRemote(id, text, null, []);
       if (!r.ok && r.reason === "no-token") r = await sendMessage(id, title, text);
       if (!r.ok) flash(t().app.sentFailedAfterOpen(r.reason), 5000);
@@ -140,7 +140,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
       // A chat we list whose members aren't exactly these people (e.g. the 1:1
       // Teams shows mid-pick) is not the one asked for.
       const want = new Set(people.map((p) => p.mri));
-      const wrongChat = (id: string): boolean => {
+      const wrongChat = (id: string) => {
         const c = chatsRef.current.find((x) => x.id === id);
         if (!c || c.kind !== "chat") return false;
         const got = c.members.filter((m) => m !== myMri());
@@ -178,7 +178,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   // "Message" on a profile: open the 1:1 (see startNewChat). A brand-new one
   // opens the New chat dialog on Teams' draft to take the first message.
   const startDirect = useCallback(
-    async (mri: string): Promise<void> => {
+    async (mri: string) => {
       const p = profile(mri);
       const hit: PeopleHit = { mri, displayName: p.displayName || "", email: upnOf(mri), jobTitle: p.jobTitle || "" };
       const r = await startNewChat([hit], "");
@@ -193,7 +193,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   // called through their 1:1 chat. No deep-link fallback: navigating to a
   // teams.microsoft.com/l/ link replaces the Teams page with the web launcher.
   const startCall = useCallback(
-    async (mris: string[], kind: "audio" | "video", chat?: Chat): Promise<void> => {
+    async (mris: string[], kind: "audio" | "video", chat?: Chat) => {
       const target =
         chat ||
         (mris.length === 1
@@ -214,7 +214,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   // Join the selected conversation's running call through Teams' own Join
   // button (send.ts joinNativeMeeting); the call-window guard hides the overlay.
   const joinCall = useCallback(
-    async (rootId: string): Promise<void> => {
+    async (rootId: string) => {
       const c = chatsRef.current.find((x) => x.id === sel);
       if (!c) return;
       const res = await joinNativeMeeting(c.id, c.title, rootId, c.team);
@@ -223,8 +223,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
     [sel, flash, chatsRef],
   );
 
-  // Start a meeting in the selected channel (Teams' "Meet now").
-  const meetNow = useCallback(async (): Promise<void> => {
+  const meetNow = useCallback(async () => {
     const c = chatsRef.current.find((x) => x.id === sel);
     if (!c) return;
     const res = await startNativeChannelMeeting(c.id, c.title, c.team);
@@ -234,12 +233,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   // Apply a change to our list at once and put the old fields back (with a
   // flash) when Teams refuses it. Used by every chat action below.
   const optimistic = useCallback(
-    async (
-      chat: Chat,
-      next: Partial<Chat>,
-      write: () => Promise<WriteResult>,
-      failed: (reason: string) => string,
-    ): Promise<boolean> => {
+    async (chat: Chat, next: Partial<Chat>, write: () => Promise<WriteResult>, failed: (reason: string) => string) => {
       setChats((cs) => cs.map((c) => (c.id === chat.id ? { ...c, ...next } : c)));
       const res = await write();
       if (res.ok) return true;
@@ -251,10 +245,9 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
     [flash, setChats],
   );
 
-  // Set a chat's read/unread state (used by the right-click menu). Writes the
-  // read pointer to Teams (syncs all devices).
+  // Writes the read pointer to Teams (syncs all devices).
   const setChatUnread = useCallback(
-    async (chat: Chat, wantUnread: boolean): Promise<void> => {
+    async (chat: Chat, wantUnread: boolean) => {
       await optimistic(
         chat,
         { unread: wantUnread },
@@ -265,9 +258,8 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
     [optimistic],
   );
 
-  // Hide or unhide a chat (right-click menu).
   const setHidden = useCallback(
-    async (chat: Chat, hidden: boolean): Promise<void> => {
+    async (chat: Chat, hidden: boolean) => {
       if (
         (await optimistic(
           chat,
@@ -283,9 +275,8 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
     [optimistic, flash],
   );
 
-  // Accept or block a chat request (banner in place of the composer).
   const answerRequest = useCallback(
-    async (chat: Chat, action: "Accept" | "Block"): Promise<void> => {
+    async (chat: Chat, action: "Accept" | "Block") => {
       await optimistic(
         chat,
         { request: false, ...(action === "Block" ? { hidden: true } : {}) },
@@ -296,9 +287,8 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
     [optimistic],
   );
 
-  // Add to or remove from Teams' Favorites (right-click menu).
   const setFavorite = useCallback(
-    (chat: Chat, favorite: boolean): Promise<boolean> =>
+    (chat: Chat, favorite: boolean) =>
       optimistic(
         chat,
         { favorite },
@@ -311,9 +301,9 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   // Show or hide a channel in its team's list (the team label's channel menu).
   // A channel not in our list yet (never synced) is written without a patch.
   const setChannelShown = useCallback(
-    async (channelId: string, shown: boolean): Promise<boolean> => {
-      const write = (): Promise<WriteResult> => writeChannelShown(channelId, shown);
-      const failed = (r: string): string => t().app.channelShownFailed(shown, r);
+    async (channelId: string, shown: boolean) => {
+      const write = () => writeChannelShown(channelId, shown);
+      const failed = (r: string) => t().app.channelShownFailed(shown, r);
       const chat = chatsRef.current.find((c) => c.id === channelId);
       if (chat) return optimistic(chat, { channelHidden: !shown }, write, failed);
       const res = await write();
@@ -324,7 +314,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   );
 
   const rename = useCallback(
-    (chat: Chat, title: string): Promise<boolean> => {
+    (chat: Chat, title: string) => {
       const name = title.trim();
       if (!name || name === chat.title) return Promise.resolve(true);
       return optimistic(chat, { title: name }, () => renameChat(chat.id, name), t().app.renameFailed);
@@ -333,7 +323,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   );
 
   const setMuted = useCallback(
-    async (chat: Chat, muted: boolean): Promise<void> => {
+    async (chat: Chat, muted: boolean) => {
       if (
         await optimistic(
           chat,
@@ -349,7 +339,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   );
 
   const addMembers = useCallback(
-    async (chat: Chat, people: PeopleHit[], shareHistoryDays = 0): Promise<boolean> => {
+    async (chat: Chat, people: PeopleHit[], shareHistoryDays = 0) => {
       const mris = people.map((p) => p.mri).filter((m) => !chat.members.includes(m));
       if (!mris.length) return true;
       return optimistic(
@@ -363,7 +353,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   );
 
   const removeMember = useCallback(
-    (chat: Chat, mri: string): Promise<boolean> =>
+    (chat: Chat, mri: string) =>
       optimistic(
         chat,
         { members: chat.members.filter((m) => m !== mri) },
@@ -377,7 +367,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   // its whole team, or delete it (getChannelActions decides; the menus already
   // named which).
   const leave = useCallback(
-    async (chat: Chat, what: "channel" | "team" | "delete" = "channel"): Promise<void> => {
+    async (chat: Chat, what: "channel" | "team" | "delete" = "channel") => {
       if (!chat.isChannel) {
         if (await optimistic(chat, { left: true, hidden: true }, () => leaveChat(chat.id), t().app.leaveFailed)) {
           flash(t().app.left(chat.title), 4000);
@@ -421,14 +411,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   // picked for a private channel are added once it is listed. Resolves to an
   // error text for the dialog, or null.
   const addChannel = useCallback(
-    async (
-      from: Chat,
-      name: string,
-      desc: string,
-      priv: boolean,
-      threads: boolean,
-      people: PeopleHit[] = [],
-    ): Promise<string | null> => {
+    async (from: Chat, name: string, desc: string, priv: boolean, threads: boolean, people: PeopleHit[] = []) => {
       const acts = await getChannelActions(from.id);
       if (!acts) return t().app.createChannelFailed("no channel info");
       const r = await createChannel(acts, name, desc, priv, threads);
@@ -457,7 +440,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
 
   // The team label's "+": open the dialog only where Teams lets us add one.
   const openNewChannel = useCallback(
-    async (from: Chat): Promise<void> => {
+    async (from: Chat) => {
       const acts = await getChannelActions(from.id);
       if (acts?.create) setNewChannel(from);
       else flash(t().app.cantAddChannel, 4000);

@@ -19,7 +19,7 @@ export type Expiry = "Never" | "Today" | "OneHour" | "TwoHours" | "FourHours" | 
 const ME_PRESENCE =
   "fragment DataViewSchemaCdlMePresenceFragment on Presence {id,availability,activity,isOutOfOffice,outOfOfficeMessage,forcedAvailabilityExpiryDate,workLocation {location,locationSource,approximateDetails {id,name,idType}},statusNote {message,publishTime,expiry},isFocus}";
 
-const result = (name: string): string =>
+const result = (name: string) =>
   `fragment ${name} on PresenceResult {... on PresenceSuccess {__typename,presence {id,...DataViewSchemaCdlMePresenceFragment}},... on PresenceErrorGeneric {__typename,errorCode},... on PresenceErrorNetworkOffline {__typename,errorCode}}`;
 
 const SET_PRESENCE = [
@@ -45,11 +45,8 @@ function outcome(r: CdlRes<Record<string, PresenceResult | null>>, field: string
   return { ok: true, data: true };
 }
 
-/**
- * Force an availability, or reset to automatic with `null` (Teams sends
- * `{request:null}` for "Reset status"). Mirrors Teams' setPresenceAvailability.
- */
-export async function setAvailability(availability: Availability | null, expiry?: Expiry): Promise<CdlRes<true>> {
+// `null` resets to automatic (Teams sends `{request:null}` for "Reset status").
+export async function setAvailability(availability: Availability | null, expiry?: Expiry) {
   const request = availability ? { availability, ...(expiry ? { expiry } : {}) } : null;
   const r = await cdl<Record<string, PresenceResult | null>>(
     "DataViewSchemaCdlSetPresenceAvailabilityMutation",
@@ -60,12 +57,10 @@ export async function setAvailability(availability: Availability | null, expiry?
   return outcome(r, "setPresence");
 }
 
-/**
- * Set the status note ("custom status") as Teams' dialog does: the editor's
- * HTML (`<p>text</p>`) is HTML-escaped once more, plus a `<pinnednote>` marker
- * when "show when people message me" is on. Empty `text` clears the note.
- */
-export async function setStatusNote(text: string, expiry: Expiry, pinned: boolean): Promise<CdlRes<true>> {
+// As Teams' dialog does: the editor's HTML (`<p>text</p>`) is HTML-escaped once
+// more, plus a `<pinnednote>` marker when "show when people message me" is on.
+// Empty `text` clears the note.
+export async function setStatusNote(text: string, expiry: Expiry, pinned: boolean) {
   const t = text.trim();
   const request = t
     ? { message: escapeHtml(`<p>${escapeHtml(t)}</p>`) + (pinned ? "<pinnednote></pinnednote>" : ""), expiry }
@@ -77,7 +72,7 @@ export async function setStatusNote(text: string, expiry: Expiry, pinned: boolea
 }
 
 // Same character set as lodash escape, which Teams uses here.
-function escapeHtml(s: string): string {
+function escapeHtml(s: string) {
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -86,7 +81,6 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/** One entry of a presence push, as the worker reports it. */
 export interface PresenceEvent {
   /** MRI, e.g. `8:orgid:<guid>`. */
   id: string;
@@ -99,11 +93,8 @@ export interface PresenceEvent {
   statusNote?: { message?: string | null; publishTime?: string | null; expiry?: string | null } | null;
 }
 
-/**
- * Follow the presence of `userIds` (MRIs): first the current state, then every
- * change. `cb` gets each batch the worker pushes. Returns stop().
- */
-export function watchPresence(userIds: string[], cb: (batch: PresenceEvent[]) => void): () => void {
+// First the current state, then every change. Returns stop().
+export function watchPresence(userIds: string[], cb: (batch: PresenceEvent[]) => void) {
   return cdlSubscribe<{ presenceUpdateEventBatch?: unknown }>(
     "ComponentsComposeMessagePresenceBatchSubscription",
     D.PRESENCE_BATCH_SUB,

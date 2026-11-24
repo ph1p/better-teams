@@ -2,9 +2,9 @@
 // @-picker. Different origin and bearer (aud SubstrateSearch) than chatsvc.
 // Request shape verified against a live client (Nov 2026).
 
-import { call, type Res } from "./http";
+import { call } from "./http";
 
-function uuid(): string {
+function uuid() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (ch) => {
     const r = (Math.random() * 16) | 0;
@@ -28,8 +28,8 @@ const PEOPLE_FIELDS = [
   "Department",
 ];
 
-/** Raw People suggestions for `query`. `oid` anchors the request to the user's mailbox. */
-export function suggestPeople(query: string, size: number, oid: string): Promise<Res> {
+// `oid` anchors the request to the user's mailbox.
+export function suggestPeople(query: string, size: number, oid: string) {
   const body = {
     EntityRequests: [
       {

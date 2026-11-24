@@ -19,7 +19,7 @@ const NOTES: Record<string, string> = {
   [PEOPLE[4].mri]: "&lt;p&gt;Im Urlaub, Vertretung: Sofia&lt;/p&gt;",
 };
 
-export function watchPresence(userIds: string[], cb: (batch: PresenceEvent[]) => void): () => void {
+export function watchPresence(userIds: string[], cb: (batch: PresenceEvent[]) => void) {
   const want = new Set(userIds);
   const now = userIds.map((id) => ({
     id,

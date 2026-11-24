@@ -1,10 +1,8 @@
-import type { JSX, SelectHTMLAttributes } from "react";
+import type { SelectHTMLAttributes } from "react";
 import { ChevronDown } from "lucide-react";
 
-// Native <select> (keeps the OS picker and keyboard handling) with the app's
-// own field look: theme colors, rounded box, a lucide chevron instead of the
-// platform arrow.
-export function Select({ className, children, ...rest }: SelectHTMLAttributes<HTMLSelectElement>): JSX.Element {
+// Native <select> keeps the OS picker and keyboard handling; only the look is ours.
+export function Select({ className, children, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <span className={"tc-select" + (className ? " " + className : "")}>
       <select {...rest}>{children}</select>

@@ -13,13 +13,13 @@ export type Seg = string | { cls: string; kids: Seg[]; color?: string };
 /** Code → colored token lines (highlight.ts), or null when not highlighted. */
 export type CodeTokens = (code: string, lang: string) => { content: string; color?: string }[][] | null;
 
-const span = (cls: string, ...kids: Seg[]): Seg => ({ cls, kids });
+const span = (cls: string, ...kids: Seg[]) => ({ cls, kids });
 
 // Same marks src/markdown.ts renders on send; code first, nothing nests in it.
 const INLINE =
   /`([^`\n]+)`|\*\*(?=\S)([^*\n]+?)(?<=\S)\*\*|~~(?=\S)([^~\n]+?)(?<=\S)~~|(?<![*\w])\*(?=\S)([^*\n]+?)(?<=\S)\*(?![*\w])|(?<!\w)_(?=\S)([^_\n]+?)(?<=\S)_(?!\w)/g;
 
-function mentions(text: string, re: RegExp | null): Seg[] {
+function mentions(text: string, re: RegExp | null) {
   if (!re) return text ? [text] : [];
   const out: Seg[] = [];
   let at = 0;
@@ -32,7 +32,7 @@ function mentions(text: string, re: RegExp | null): Seg[] {
   return out;
 }
 
-function inline(line: string, re: RegExp | null): Seg[] {
+function inline(line: string, re: RegExp | null) {
   const out: Seg[] = [];
   let at = 0;
   for (const m of line.matchAll(INLINE)) {
@@ -50,8 +50,7 @@ function inline(line: string, re: RegExp | null): Seg[] {
   return out;
 }
 
-/** Matcher for the picked @mentions' display names (null: none picked). */
-export function mentionRe(names: readonly string[]): RegExp | null {
+export function mentionRe(names: readonly string[]) {
   if (!names.length) return null;
   const alts = [...names]
     .sort((a, b) => b.length - a.length)
@@ -60,8 +59,7 @@ export function mentionRe(names: readonly string[]): RegExp | null {
   return new RegExp(`@(?:${alts})`, "g");
 }
 
-/** Draft text → backdrop segments; `re` from mentionRe, `code` colors fenced code. */
-export function highlightDraft(text: string, re: RegExp | null = null, code?: CodeTokens): Seg[] {
+export function highlightDraft(text: string, re: RegExp | null = null, code?: CodeTokens) {
   const lines = text.split("\n");
   const out: Seg[] = [];
   for (let i = 0; i < lines.length;) {

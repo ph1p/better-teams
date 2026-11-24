@@ -12,7 +12,6 @@ import { t } from "../i18n";
 import type { ChannelNotifications, ChannelPreset, ThreadMember } from "../services/groups";
 
 export type { ChannelNotifications, ChannelPreset };
-/** One person on a team's or private channel's roster. */
 export type ChannelMember = ThreadMember;
 
 /**
@@ -28,19 +27,18 @@ export interface ChannelActions {
   team: boolean;
   rename: boolean;
   delete: boolean;
-  /** A new channel can be added to this channel's team. */
   create: boolean;
   channelId: string;
-  /** Team thread id (19:…@thread.tacv2) and its M365 group id. */
+  // Team thread id (19:…@thread.tacv2) and its M365 group id.
   teamId: string;
   groupId: string;
-  /** Whose roster the members panel shows; null for none (shared channels). */
+  // null for none (shared channels).
   members: "team" | "channel" | null;
-  /** We may add people to that roster, or remove them (owners only). */
+  // Removing: owners only.
   addMembers: boolean;
   removeMembers: boolean;
-  /** We may add people to the team itself (team owners); a private channel
-   * takes only team members, so outsiders join the team first. */
+  // Team owners; a private channel takes only team members, so outsiders
+  // join the team first.
   addTeamMembers: boolean;
 }
 
@@ -49,24 +47,21 @@ const OVERRIDE_MS = 60_000;
 interface Pending {
   title?: string;
   muted?: boolean;
-  /** Members we added (true) or removed (false), by MRI. */
+  // MRI -> added (true) or removed (false).
   members?: Map<string, boolean>;
   at: number;
 }
 
 const pending = new Map<string, Pending>();
 
-function touch(convId: string): Pending {
+function touch(convId: string) {
   let p = pending.get(convId);
   if (!p || Date.now() - p.at > OVERRIDE_MS) pending.set(convId, (p = { at: Date.now() }));
   else p.at = Date.now();
   return p;
 }
 
-/**
- * Apply pending writes to what IndexedDB says about a chat. Each field's
- * override drops once IndexedDB shows the same value.
- */
+// Each field's override drops once IndexedDB shows the same value.
 export function withPending<T extends { title: string; muted: boolean; members: string[] }>(convId: string, idb: T): T {
   const p = pending.get(convId);
   if (!p) return idb;
@@ -97,7 +92,7 @@ export function withPending<T extends { title: string; muted: boolean; members: 
   return out;
 }
 
-/** Rename a group chat or a channel. Teams trims the name; an empty one is refused. */
+// Teams trims the name; an empty one is refused.
 export async function renameChat(conversationId: string, title: string): Promise<WriteResult> {
   const t = title.trim();
   if (!t) return { ok: false, reason: "empty name" };
@@ -123,13 +118,13 @@ export async function addChatMembers(
   return toWrite(r, "cdl");
 }
 
-export async function removeChatMember(conversationId: string, mri: string): Promise<WriteResult> {
+export async function removeChatMember(conversationId: string, mri: string) {
   const r = await groups.removeMember(conversationId, mri);
   if (r.ok) (touch(conversationId).members ??= new Map()).set(mri, false);
   return toWrite(r, "cdl");
 }
 
-/** Leave a group chat, then hide it, as Teams does. */
+// Then hide it, as Teams does.
 export async function leaveChat(conversationId: string): Promise<WriteResult> {
   const r = await groups.leaveChat(conversationId);
   if (!r.ok) return toWrite(r, "cdl");
@@ -142,8 +137,7 @@ export async function leaveChat(conversationId: string): Promise<WriteResult> {
 // OVERRIDE_MS passes) this value wins.
 const shownOverride = new Map<string, { at: number; shown: boolean }>();
 
-/** A channel's visibility in its team's list, with this session's toggles applied. */
-export function effectiveShown(convId: string, idbShown: boolean): boolean {
+export function effectiveShown(convId: string, idbShown: boolean) {
   const ov = shownOverride.get(convId);
   if (!ov) return idbShown;
   if (ov.shown === idbShown || Date.now() - ov.at > OVERRIDE_MS) {
@@ -153,17 +147,15 @@ export function effectiveShown(convId: string, idbShown: boolean): boolean {
   return ov.shown;
 }
 
-/** One channel in a team's show/hide list. */
 export interface TeamChannel {
   id: string;
   name: string;
   general: boolean;
-  /** The team owner shows it to members by default (Teams' "Recommended"). */
+  // The team owner shows it to members by default (Teams' "Recommended").
   recommended: boolean;
   shown: boolean;
 }
 
-/** All channels of a team for the show/hide list; null when Teams doesn't answer. */
 export async function getTeamChannels(teamId: string): Promise<TeamChannel[] | null> {
   const r = await groups.getTeamChannels(teamId);
   if (!r.ok) return null;
@@ -176,8 +168,7 @@ export async function getTeamChannels(teamId: string): Promise<TeamChannel[] | n
   }));
 }
 
-/** Show or hide a channel in its team's list (Teams' channel "Show" / "Hide"). */
-export async function setChannelShown(channelId: string, shown: boolean): Promise<WriteResult> {
+export async function setChannelShown(channelId: string, shown: boolean) {
   const r = await groups.setChannelVisibility(channelId, shown);
   if (r.ok) {
     shownOverride.set(channelId, { at: Date.now(), shown });
@@ -191,16 +182,14 @@ export async function setChannelShown(channelId: string, shown: boolean): Promis
 // listChats skips them here.
 const departed = new Set<string>();
 
-/** True when we left this channel, or left the team with this thread id, just now. */
-export function isDeparted(convId: string, teamId?: string): boolean {
+export function isDeparted(convId: string, teamId?: string) {
   return departed.has(convId) || (!!teamId && departed.has(teamId));
 }
 
 // The answer barely changes; the menu asks on open and the action again on click.
 const actionsCache = new Map<string, { at: number; v: ChannelActions | null }>();
 
-/** What can be left or hidden for a channel; null when Teams doesn't say. */
-export async function getChannelActions(channelId: string): Promise<ChannelActions | null> {
+export async function getChannelActions(channelId: string) {
   const hit = actionsCache.get(channelId);
   if (hit && Date.now() - hit.at < OVERRIDE_MS) return hit.v;
   const r = await groups.getChannelInfo(channelId);
@@ -240,7 +229,6 @@ export async function getChannelActions(channelId: string): Promise<ChannelActio
   return v;
 }
 
-/** Leave or hide the channel itself, as getChannelActions decided. */
 export async function leaveChannel(a: ChannelActions): Promise<WriteResult> {
   if (!a.channel) return { ok: false, reason: "can't leave this channel" };
   // A hidden channel stays listed (hidden), so it can be shown again.
@@ -253,7 +241,6 @@ export async function leaveChannel(a: ChannelActions): Promise<WriteResult> {
   return toWrite(r, "cdl");
 }
 
-/** Delete the channel for the whole team. */
 export async function deleteChannel(a: ChannelActions): Promise<WriteResult> {
   if (!a.delete) return { ok: false, reason: "can't delete this channel" };
   const i = await groups.getChannelInfo(a.channelId);
@@ -266,10 +253,10 @@ export async function deleteChannel(a: ChannelActions): Promise<WriteResult> {
   return toWrite(r, "cdl");
 }
 
-/** A new channel's thread id; "" when Teams didn't report it yet. */
+// `id` is "" when Teams didn't report it yet.
 export type CreateResult = { ok: true; id: string } | { ok: false; reason: string };
 
-/** Add a channel to the team `a` belongs to; `threads` picks Teams' threads layout over posts. */
+// `threads` picks Teams' threads layout over posts.
 export async function createChannel(
   a: ChannelActions,
   name: string,
@@ -291,9 +278,9 @@ export async function createChannel(
 // (the team's or the channel's). Our own adds and removals drop the entry.
 const rosterCache = new Map<string, { at: number; v: Promise<ChannelMember[] | null> }>();
 const ROSTER_MS = 5 * 60_000;
-const rosterId = (a: ChannelActions): string => (a.members === "team" ? a.teamId : a.channelId);
+const rosterId = (a: ChannelActions) => (a.members === "team" ? a.teamId : a.channelId);
 
-/** The roster `a.members` names: people only, bots and apps left out. Null when Teams doesn't say. */
+// People only, bots and apps left out.
 export function listChannelMembers(a: ChannelActions): Promise<ChannelMember[] | null> {
   if (!a.members) return Promise.resolve(null);
   const id = rosterId(a);
@@ -307,18 +294,16 @@ export function listChannelMembers(a: ChannelActions): Promise<ChannelMember[] |
   return v;
 }
 
-/** Of `mris`, those not in the team of private channel `a` (any case of MRI). */
-async function outsideTeam(a: ChannelActions, mris: string[]): Promise<string[]> {
+// MRIs compare case-insensitively.
+async function outsideTeam(a: ChannelActions, mris: string[]) {
   const team = await listChannelMembers({ ...a, members: "team" });
   if (!team) return [];
   const inTeam = new Set(team.map((m) => m.mri.toLowerCase()));
   return mris.filter((m) => !inTeam.has(m.toLowerCase()));
 }
 
-/**
- * Adds people to the roster `a` shows. For a private channel, anyone not in
- * its team joins the team first: Teams refuses them otherwise.
- */
+// For a private channel, anyone not in its team joins the team first: Teams
+// refuses them otherwise.
 export async function addChannelMembers(a: ChannelActions, mris: string[]): Promise<WriteResult> {
   if (!a.addMembers || !a.members) return { ok: false, reason: "can't add members here" };
   if (!mris.length) return { ok: true };
@@ -358,8 +343,7 @@ async function addTo(a: ChannelActions, mris: string[]): Promise<WriteResult> {
   }
 }
 
-/** Remove someone from the roster `a.members` names. */
-export async function removeChannelMember(a: ChannelActions, m: ChannelMember): Promise<WriteResult> {
+export async function removeChannelMember(a: ChannelActions, m: ChannelMember) {
   if (!a.removeMembers || !a.members) return { ok: false, reason: "can't remove members here" };
   const team = a.members === "team";
   const r = toWrite(await groups.removeThreadMember(team ? a.teamId : a.channelId, team ? a.groupId : null, m), "cdl");
@@ -367,7 +351,6 @@ export async function removeChannelMember(a: ChannelActions, m: ChannelMember): 
   return r;
 }
 
-/** Leave the channel's whole team, all its channels with it. */
 export async function leaveTeam(a: ChannelActions): Promise<WriteResult> {
   if (!a.team) return { ok: false, reason: "can't leave this team" };
   const r = await groups.leaveTeam(a.teamId, a.groupId);
@@ -379,7 +362,7 @@ export async function leaveTeam(a: ChannelActions): Promise<WriteResult> {
   return toWrite(r, "cdl");
 }
 
-/** Mute a chat's notifications (Teams' "Mute"). Channels use setChannelNotifications. */
+// Channels use setChannelNotifications.
 export async function setChatMuted(conversationId: string, muted: boolean): Promise<WriteResult> {
   if (isChannelId(conversationId)) return { ok: false, reason: "use channel notifications" };
   const r = await groups.setMuteChat(conversationId, muted);
@@ -387,7 +370,7 @@ export async function setChatMuted(conversationId: string, muted: boolean): Prom
   return toWrite(r, "cdl");
 }
 
-export async function getChannelNotifications(channelId: string): Promise<ChannelNotifications | null> {
+export async function getChannelNotifications(channelId: string) {
   const r = await groups.getChannelNotifications(channelId);
   return r.ok ? r.data : null;
 }
@@ -396,6 +379,6 @@ export async function setChannelNotifications(
   channelId: string,
   preset: ChannelPreset,
   current?: ChannelNotifications | null,
-): Promise<WriteResult> {
+) {
   return toWrite(await groups.setChannelNotifications(channelId, preset, current ?? undefined), "cdl");
 }

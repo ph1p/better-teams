@@ -22,7 +22,7 @@ const NO_PICKS: MentionPick[] = [];
 
 // A channel's people for @mentions: its own roster (private/shared) or the
 // team's (standard). Fetched on the first "@"; data/groups.ts caches it.
-function channelRoster(channelId: string): Promise<MentionPick[]> {
+function channelRoster(channelId: string) {
   return getChannelActions(channelId)
     .then((a) => (a ? listChannelMembers(a) : null))
     .then((ms) => (ms ?? []).map((m): MentionPick => ({ mri: m.mri, name: m.displayName, mentionType: "person" })))
@@ -33,13 +33,12 @@ function channelRoster(channelId: string): Promise<MentionPick[]> {
 const AT_Q = /(?:^|\s)@([^\s@]{0,40})$/;
 const EMOJI_Q = /(?:^|[\s(]):([a-z0-9_+-]{2,30})$/i;
 const EMOJI_DONE = /(?:^|[\s(]):([a-z0-9_+-]{2,30}):$/i;
-// Keeps the arrow-selected popup row visible.
 // The end-anchored popup regexes only need the text just before the caret.
-const tail = (upto: string): string => upto.slice(-48);
+const tail = (upto: string) => upto.slice(-48);
 // Caret inside a code fence or an open `code span` on its line: no emoji there.
-const inCode = (upto: string): boolean =>
+const inCode = (upto: string) =>
   inOpenFence(upto) || upto.slice(upto.lastIndexOf("\n") + 1).split("`").length % 2 === 0;
-const plainEnter = (e: React.KeyboardEvent): boolean => e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing;
+const plainEnter = (e: React.KeyboardEvent) => e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing;
 
 export interface MessageEditorProps {
   /** Where the text goes: members feed the @mention picker, id the typing signal. */
@@ -63,38 +62,27 @@ export interface MessageEditorProps {
   notifyTyping?: boolean;
   /** Focus on mount, caret at the end. */
   autoFocus?: boolean;
-  /** Toolbar content before the emoji / code block buttons. */
   lead?: ReactNode;
-  /** Content after the text field (e.g. the send button). */
   trail?: ReactNode;
   className?: string;
 }
 
-// The text editor shared by the composer and inline message edits: live
-// markdown backdrop, @mention autocomplete (chat members + org directory),
-// ":emoji:" autocomplete and auto-replace, the emoji picker, the code block
-// button, format keys (ui/lib/editKeys.ts) and auto-grow. Popups anchor above
-// the .tc-editor box.
-export function MessageEditor(p: MessageEditorProps): JSX.Element {
+export function MessageEditor(p: MessageEditorProps) {
   const { chat, value: draft, inputRef } = p;
-  // @-autocomplete popup: open flag + current filter query (text after the @).
   const [atOpen, setAtOpen] = useState(false);
   const [atQuery, setAtQuery] = useState("");
   // Org-directory @mention hits (debounced searchPeople), merged after local members.
   // Kept with the query they answer; shown only while that query is current.
   const [org, setOrg] = useState<{ q: string; hits: MentionPick[] }>({ q: "", hits: NO_PICKS });
   const atOrg = atOpen && org.q === atQuery.trim() ? org.hits : NO_PICKS;
-  // Channels: the roster, loaded once the @-picker first opens there.
   const [roster, setRoster] = useState<{ id: string; picks: MentionPick[] }>({ id: "", picks: NO_PICKS });
   const atRoster = roster.id === chat.id ? roster.picks : NO_PICKS;
   const [emojiOpen, setEmojiOpen] = useState(false);
   // Code block dialog: the draft range it writes over (the fence the caret is
   // in, else the selection) and the block to start from.
   const [codeAt, setCodeAt] = useState<(Fence & { isNew: boolean }) | null>(null);
-  // ":smi" emoji autocomplete: the query after the colon, or null when closed.
   const [emQuery, setEmQuery] = useState<string | null>(null);
   const emHits = useMemo(() => (emQuery ? searchShortcodes(emQuery) : []), [emQuery]);
-  // Highlighted row of whichever popup is open (arrow keys move it).
   const [active, setActive] = useState(0);
   const root = useRef<HTMLDivElement>(null);
   const hlRef = useRef<HTMLDivElement>(null);
@@ -112,25 +100,23 @@ export function MessageEditor(p: MessageEditorProps): JSX.Element {
 
   // Replace [start, end) of the textarea with `ins`, caret after it. Goes
   // through the native edit path, so Cmd+Z undoes it; onChange then syncs the draft.
-  const splice = (start: number, end: number, ins: string): void => {
+  const splice = (start: number, end: number, ins: string) => {
     const el = inputRef.current;
     if (el) replaceText(el, start, end, ins);
   };
-  const insertAtCaret = (ins: string): void => {
+  const insertAtCaret = (ins: string) => {
     const el = inputRef.current;
     if (!el) p.onChange(draft + ins);
     else splice(el.selectionStart ?? draft.length, el.selectionEnd ?? draft.length, ins);
   };
 
-  // Resolved, filtered @mention candidates whose name matches the text typed
-  // after the "@": in a channel the channel itself and its team (as Teams
-  // offers them; a private or shared channel can't mention the whole team),
-  // then the chat's members or channel roster (minus me), then org-directory hits.
+  // In a channel the channel itself and its team come first, as Teams offers
+  // them (a private or shared channel can't mention the whole team).
   const myself = myMri();
-  const atCandidates = useMemo<MentionPick[]>(() => {
+  const atCandidates = useMemo(() => {
     if (!atOpen) return NO_PICKS;
     const q = atQuery.trim().toLowerCase();
-    const hit = (name: string): boolean => !!name && (!q || name.toLowerCase().includes(q));
+    const hit = (name: string) => !!name && (!q || name.toLowerCase().includes(q));
     const groups: MentionPick[] = [];
     if (chat.isChannel) {
       if (chat.title && hit(chat.title)) groups.push({ mri: chat.id, name: chat.title, mentionType: "channel" });
@@ -158,9 +144,7 @@ export function MessageEditor(p: MessageEditorProps): JSX.Element {
     return out.slice(0, 8);
   }, [chat, atOpen, atQuery, myself, atOrg, atRoster]);
 
-  // Track an "@word" or ":word" the caret sits at the end of; any other edit
-  // closes its popup. A finished ":name:" becomes its emoji, like Slack.
-  const onDraftChange = (v: string): void => {
+  const onDraftChange = (v: string) => {
     p.onChange(v);
     // Teams signals typing on every non-empty editor change (throttled per chat).
     if (p.notifyTyping && v.trim())
@@ -183,17 +167,15 @@ export function MessageEditor(p: MessageEditorProps): JSX.Element {
     setEmQuery(em && !inCode(upto) ? em[1] : null);
   };
 
-  // Replace the half-typed ":query" at the caret with the emoji.
-  const pickEmoji = (glyph: string): void => {
+  const pickEmoji = (glyph: string) => {
     const caret = inputRef.current?.selectionStart ?? draft.length;
     const em = EMOJI_Q.exec(tail(draft.slice(0, caret)));
     setEmQuery(null);
     splice(em ? caret - em[1].length - 1 : caret, caret, glyph);
   };
 
-  // Replace the half-typed "@query" at the caret with "@Display Name " and
-  // record the pick so the send path emits a real mention span.
-  const pickMention = (pick: MentionPick): void => {
+  // The recorded pick lets the send path emit a real mention span.
+  const pickMention = (pick: MentionPick) => {
     const caret = inputRef.current?.selectionStart ?? draft.length;
     const m = AT_Q.exec(tail(draft.slice(0, caret)));
     p.onPick(pick);
@@ -202,8 +184,7 @@ export function MessageEditor(p: MessageEditorProps): JSX.Element {
     splice(m ? caret - m[1].length - 1 : caret, caret, "@" + pick.name + " ");
   };
 
-  // The open popup (@mention wins over :emoji): row count, pick, close.
-  const pop: "at" | "em" | null = atCandidates.length ? "at" : emHits.length ? "em" : null;
+  const pop = atCandidates.length ? "at" : emHits.length ? "em" : null;
   const popN = pop === "at" ? atCandidates.length : emHits.length;
   const on = pop ? Math.min(active, popN - 1) : 0;
   const popPick = (i: number) => (pop === "at" ? pickMention(atCandidates[i]) : pickEmoji(emHits[i].glyph));
@@ -214,20 +195,20 @@ export function MessageEditor(p: MessageEditorProps): JSX.Element {
     onMouseEnter: () => setActive(i),
     onClick: () => popPick(i),
   });
-  const closePops = (): void => {
+  const closePops = () => {
     setAtOpen(false);
     setAtQuery("");
     setEmQuery(null);
   };
 
-  const openCode = (): void => {
+  const openCode = () => {
     const el = inputRef.current;
     if (!el) return;
     const { selectionStart: s, selectionEnd: e } = el;
     const f = fenceAt(el.value, s);
     setCodeAt(f ? { ...f, isNew: false } : { start: s, end: e, lang: "", code: el.value.slice(s, e), isNew: true });
   };
-  const closeCode = (): void => {
+  const closeCode = () => {
     setCodeAt(null);
     inputRef.current?.focus();
   };
@@ -248,9 +229,7 @@ export function MessageEditor(p: MessageEditorProps): JSX.Element {
     };
   }, [atOpen, chat.isChannel, chat.id, roster.id]);
 
-  // Debounced org-directory search while the @-picker is open. Local members
-  // show at once; org hits stream in ~250ms after typing stops. The `live`
-  // guard drops stale responses so an older query can't overwrite a newer one.
+  // The `live` guard drops stale responses so an older query can't overwrite a newer one.
   useEffect(() => {
     const q = atQuery.trim();
     if (!atOpen || q.length < 2) return;
@@ -270,10 +249,9 @@ export function MessageEditor(p: MessageEditorProps): JSX.Element {
     };
   }, [atOpen, atQuery]);
 
-  // Auto-grow up to the CSS max-height, then scroll; keep the backdrop aligned.
-  // Grow the box to its text. While the app is hidden (switched to Teams) the
+  // While the app is hidden (switched to Teams) the
   // box has no layout and measures 0, so wait until it shows again.
-  const fit = (): void => {
+  const fit = () => {
     const el = inputRef.current;
     if (!el || !el.getClientRects().length) return;
     el.style.height = "auto";
@@ -302,12 +280,9 @@ export function MessageEditor(p: MessageEditorProps): JSX.Element {
     el.setSelectionRange(el.value.length, el.value.length);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Close the emoji picker on any outside click, scroll, Escape, or resize; the
-  // picker and its toggle button count as inside.
   useDismiss(emojiOpen, "#tc-root .tc-emoji-pop, #tc-root .tc-emoji-btn", () => setEmojiOpen(false));
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
-    // Open @mention or :emoji popup: arrows move, Enter / Tab pick, Escape closes.
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (pop) {
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
@@ -431,7 +406,6 @@ export function MessageEditor(p: MessageEditorProps): JSX.Element {
               if (hlRef.current) hlRef.current.scrollTop = e.currentTarget.scrollTop;
             }}
             onSelect={(e) => {
-              // Moving the caret away from a ":query" closes its popup.
               if (emQuery === null) return;
               const el = e.currentTarget;
               if (!EMOJI_Q.test(tail(el.value.slice(0, el.selectionStart)))) setEmQuery(null);

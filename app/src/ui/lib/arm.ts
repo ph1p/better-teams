@@ -4,18 +4,14 @@ import { useEffect, useState } from "react";
 
 const ARM_MS = 3000;
 
-export function useArm<K>(): {
-  armed: K | null;
-  tryArm: (key: K, act: () => void) => void;
-  disarm: () => void;
-} {
+export function useArm<K>() {
   const [armed, setArmed] = useState<K | null>(null);
   useEffect(() => {
     if (armed === null) return;
     const h = setTimeout(() => setArmed(null), ARM_MS);
     return () => clearTimeout(h);
   }, [armed]);
-  const tryArm = (key: K, act: () => void): void => {
+  const tryArm = (key: K, act: () => void) => {
     if (armed !== key) {
       setArmed(key);
       return;

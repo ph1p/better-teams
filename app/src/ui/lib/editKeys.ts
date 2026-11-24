@@ -24,7 +24,7 @@ export function replaceText(
   text: string,
   selFrom?: number,
   selTo?: number,
-): void {
+) {
   el.focus();
   el.setSelectionRange(start, end);
   const done = typeof document.execCommand === "function" && document.execCommand("insertText", false, text);
@@ -44,11 +44,9 @@ function lineBounds(v: string, at: number): [number, number] {
   return [s, e < 0 ? v.length : e];
 }
 
-/** Wrap the selection in `mark` (or insert an empty pair with the caret inside). */
-export function wrapSelection(el: HTMLTextAreaElement, mark: string): void {
+export function wrapSelection(el: HTMLTextAreaElement, mark: string) {
   const { selectionStart: s, selectionEnd: e, value: v } = el;
   const sel = v.slice(s, e);
-  // Already wrapped: unwrap.
   if (v.slice(s - mark.length, s) === mark && v.slice(e, e + mark.length) === mark) {
     replaceText(el, s - mark.length, e + mark.length, sel, 0, sel.length);
     return;
@@ -65,8 +63,7 @@ export function wrapSelection(el: HTMLTextAreaElement, mark: string): void {
   replaceText(el, s, e, mark + sel + mark, mark.length, mark.length + sel.length);
 }
 
-/** Indent (or outdent) the caret line or every selected line. */
-export function indent(el: HTMLTextAreaElement, out: boolean): void {
+export function indent(el: HTMLTextAreaElement, out: boolean) {
   const { selectionStart: s, selectionEnd: e, value: v } = el;
   if (!out && s === e) {
     replaceText(el, s, s, INDENT);
@@ -84,8 +81,7 @@ export function indent(el: HTMLTextAreaElement, out: boolean): void {
   replaceText(el, ls, le, text, from - ls, Math.max(from, e + text.length - block.length) - ls);
 }
 
-/** Enter in code: new line with the same indent, one more after an opening bracket or colon. */
-export function codeNewline(el: HTMLTextAreaElement): void {
+export function codeNewline(el: HTMLTextAreaElement) {
   const { selectionStart: s, selectionEnd: e, value: v } = el;
   const line = v.slice(lineBounds(v, s)[0], s);
   let ind = /^[ \t]*/.exec(line)?.[0] ?? "";
@@ -101,7 +97,6 @@ export interface Fence {
   code: string;
 }
 
-/** The ``` block the caret sits in (fence lines count), or null. */
 export function fenceAt(v: string, at: number): Fence | null {
   let pos = 0;
   let open: { start: number; lang: string; body: number } | null = null;
@@ -124,19 +119,16 @@ export function fenceAt(v: string, at: number): Fence | null {
     : null;
 }
 
-/** Write a fenced block over [start, end), on lines of its own; caret after it. */
-export function putCodeBlock(el: HTMLTextAreaElement, start: number, end: number, lang: string, code: string): void {
+export function putCodeBlock(el: HTMLTextAreaElement, start: number, end: number, lang: string, code: string) {
   const v = el.value;
   const pre = start > 0 && v[start - 1] !== "\n" ? "\n" : "";
   const post = end < v.length && v[end] !== "\n" ? "\n" : "";
   replaceText(el, start, end, pre + "```" + lang + "\n" + code.replace(/\s+$/, "") + "\n```" + post);
 }
 
-/**
- * Handle formatting keys. Returns true when the key was consumed; the caller
- * then skips its own handling (send, cancel, …).
- */
-export function handleFormatKey(e: KeyboardEvent<HTMLTextAreaElement>, onCodeBlock: () => void): boolean {
+// Returns true when the key was consumed; the caller then skips its own
+// handling (send, cancel, …).
+export function handleFormatKey(e: KeyboardEvent<HTMLTextAreaElement>, onCodeBlock: () => void) {
   const el = e.currentTarget;
   if (e.nativeEvent.isComposing) return false;
   const mod = e.metaKey || e.ctrlKey;
@@ -187,7 +179,7 @@ export function handleFormatKey(e: KeyboardEvent<HTMLTextAreaElement>, onCodeBlo
     if (!m) return false;
     e.preventDefault();
     if (!m[3].trim()) {
-      replaceText(el, ls, s, ""); // empty item: end the list
+      replaceText(el, ls, s, "");
       return true;
     }
     const n = /\d/.test(m[2]) ? `${parseInt(m[2], 10) + 1}${m[2].slice(-1)}` : m[2];

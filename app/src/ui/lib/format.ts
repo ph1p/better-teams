@@ -1,5 +1,3 @@
-// Pure formatting + text-extraction helpers shared across the overlay UI.
-//
 // Teams enforces a Trusted Types CSP that forbids creating any policy, which
 // makes EVERY html-string -> DOM sink throw: innerHTML, DOMParser.parseFromString,
 // Range.createContextualFragment, template.innerHTML, iframe.srcdoc. So nothing
@@ -12,11 +10,10 @@ import { locale, t } from "../../i18n";
 import { nameFormat, personName, shortName } from "../../names";
 import { cardSummary } from "../../cards";
 
-/** A 1:1 chat with one person (not a group, app, channel or meeting). */
-export const isDirect = (c: Chat): boolean => c.kind === "chat" && !c.group && !c.app;
+export const isDirect = (c: Chat) => c.kind === "chat" && !c.group && !c.app;
 
 /** A chat's display name. The data layer keeps "Notes" untranslated; the UI shows it in the current language. */
-export function chatTitle(c: Chat): string {
+export function chatTitle(c: Chat) {
   if (c.kind === "notes") return t().common.notes;
   if (!c.nameTitle || nameFormat() === "teams") return c.title;
   if (c.avatarMri) return personName(profile(c.avatarMri), c.title, c.avatarMri);
@@ -27,7 +24,7 @@ export function chatTitle(c: Chat): string {
   return named.length > 3 ? `${shown} +${named.length - 3}` : shown;
 }
 
-export function initials(name: string): string {
+export function initials(name: string) {
   const parts = (name || "?")
     .replace(/[^\p{L}\p{N}\s]/gu, "")
     .trim()
@@ -35,8 +32,7 @@ export function initials(name: string): string {
   return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase() || "?";
 }
 
-// Stable per-name avatar colour so rows are distinguishable at a glance.
-export function hue(name: string): number {
+export function hue(name: string) {
   let h = 0;
   for (const ch of name || "") h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return h % 360;
@@ -59,9 +55,9 @@ function formatters(loc: string) {
   };
 }
 let fmts = formatters(locale());
-const fmt = (): ReturnType<typeof formatters> => (fmts.loc === locale() ? fmts : (fmts = formatters(locale())));
+const fmt = () => (fmts.loc === locale() ? fmts : (fmts = formatters(locale())));
 
-export function fmtTime(ts: number): string {
+export function fmtTime(ts: number) {
   if (!ts) return "";
   const d = new Date(ts);
   const now = new Date();
@@ -71,14 +67,14 @@ export function fmtTime(ts: number): string {
   return fmt().dayMonth.format(d);
 }
 
-export const fmtClock = (ts: number): string => (ts ? fmt().clock.format(ts) : "");
+export const fmtClock = (ts: number) => (ts ? fmt().clock.format(ts) : "");
 // The narrow avatar gutter of follow-up messages has no room for "AM"/"PM":
 // "4:58" instead of "04:58 PM". The header above already shows the full time.
 // formatToParts allocates per call and every follow-up message renders one on
 // each poll, so results are kept per minute until the locale changes.
 let gutterFor: ReturnType<typeof formatters> | null = null;
 const gutterCache = new Map<number, string>();
-export function fmtGutterClock(ts: number): string {
+export function fmtGutterClock(ts: number) {
   if (!ts) return "";
   const f = fmt();
   if (gutterFor !== f || gutterCache.size > 500) {
@@ -99,18 +95,17 @@ export function fmtGutterClock(ts: number): string {
 }
 
 /** Short date + time ("23.11.26, 19:32"), as Teams shows on forwarded messages. */
-export const fmtStamp = (ts: number): string => (ts ? fmt().stamp.format(ts) : "");
-/** Full date and time, for tooltips. */
-export const fmtFull = (ts: number): string => (ts ? fmt().full.format(ts) : "");
+export const fmtStamp = (ts: number) => (ts ? fmt().stamp.format(ts) : "");
+export const fmtFull = (ts: number) => (ts ? fmt().full.format(ts) : "");
 
-export function fmtDay(ts: number): string {
+export function fmtDay(ts: number) {
   const d = new Date(ts);
   const now = new Date();
   const yest = new Date(now);
   yest.setDate(now.getDate() - 1);
   // Locale-aware "today"/"yesterday" so labels match the dates around them.
   const f = fmt();
-  const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   if (d.toDateString() === now.toDateString()) return cap(f.rel.format(0, "day"));
   if (d.toDateString() === yest.toDateString()) return cap(f.rel.format(-1, "day"));
   return (d.getFullYear() === now.getFullYear() ? f.long : f.longYear).format(d);
@@ -134,14 +129,14 @@ const ENTITIES: Record<string, string> = {
   copy: "©",
   reg: "®",
 };
-function decodeEntities(s: string): string {
+function decodeEntities(s: string) {
   return s
     .replace(/&#x([0-9a-f]+);/gi, (_, h: string) => String.fromCodePoint(parseInt(h, 16)))
     .replace(/&#(\d+);/g, (_, d: string) => String.fromCodePoint(parseInt(d, 10)))
     .replace(/&([a-z]+);/gi, (m, n: string) => (n in ENTITIES ? ENTITIES[n] : m));
 }
 
-export function htmlToText(html: string): string {
+export function htmlToText(html: string) {
   if (!html) return "";
   return decodeEntities(
     String(html)
@@ -164,9 +159,9 @@ export function htmlToText(html: string): string {
     .trim();
 }
 
-export const oneLine = (html: string): string => htmlToText(html).replace(/\s+/g, " ").trim();
+export const oneLine = (html: string) => htmlToText(html).replace(/\s+/g, " ").trim();
 
-export function messageText(m: Message): string {
+export function messageText(m: Message) {
   const cards = m.cards?.length ? cardSummary(m.cards) : "";
   if (/Media_Card/i.test(m.messageType)) return cards || t().sidebar.card;
   if (/^RichText\/Media_/i.test(m.messageType)) return "[" + m.messageType.split("_").pop() + "]";
@@ -175,13 +170,13 @@ export function messageText(m: Message): string {
 
 // Prefer a cached imageUri from the profile row; fall back to the live Teams
 // profile-photo endpoint (cookie-auth). Empty MRI → no photo, initials shown.
-export function avatarUri(mri: string): string {
+export function avatarUri(mri: string) {
   if (!mri) return "";
   return profile(mri).imageUri || profilePhotoUrl(mri);
 }
 
 // RichText/Html (and plain Text) carry real message HTML we render structurally;
 // cards and media messages have no renderable HTML, so fall back to a label.
-export const isHtmlMsg = (m: Message): boolean =>
+export const isHtmlMsg = (m: Message) =>
   /^(RichText\/Html|Text)$/i.test(m.messageType) ||
   (!/Media_|Card|UriObject/i.test(m.messageType) && /<[a-z]/i.test(m.content || ""));

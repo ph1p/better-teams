@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type JSX } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { ChatIcon } from "../shared/Avatar";
 import { chatTitle, messageText, oneLine } from "../lib/format";
@@ -8,21 +8,17 @@ import { t } from "../../i18n";
 import type { Chat, Message as Msg } from "../../types";
 
 interface ForwardDialogProps {
-  /** The message being forwarded (shown as a preview). */
   msg: Msg;
-  /** Conversations to pick from; requests and chats you left are skipped. */
   chats: Chat[];
-  /** Forward into `target` with an optional comment; resolves to an error text or null. */
   onForward: (target: Chat, comment: string) => Promise<string | null>;
   onClose: () => void;
 }
 
 const MAX_HITS = 12;
 
-// Forward dialog: search your chats and channels, pick one, add an optional
-// comment. The send goes through Teams' own forward path (forwardMessage in
-// data/writes.ts), so the target shows the native forwarded-message card.
-export function ForwardDialog({ msg, chats, onForward, onClose }: ForwardDialogProps): JSX.Element {
+// Sends through Teams' own forward path (forwardMessage in data/writes.ts), so
+// the target shows the native forwarded-message card.
+export function ForwardDialog({ msg, chats, onForward, onClose }: ForwardDialogProps) {
   const { closing, close } = useModalExit(onClose);
   const [q, setQ] = useState("");
   const [target, setTarget] = useState<Chat | null>(null);
@@ -47,14 +43,14 @@ export function ForwardDialog({ msg, chats, onForward, onClose }: ForwardDialogP
       .slice(0, MAX_HITS);
   }, [chats, q]);
 
-  const choose = (c: Chat): void => {
+  const choose = (c: Chat) => {
     setTarget(c);
     setQ("");
     setError(null);
     note.current?.focus();
   };
 
-  const submit = async (): Promise<void> => {
+  const submit = async () => {
     if (!target || busy) return;
     setBusy(true);
     setError(null);

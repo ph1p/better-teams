@@ -1,10 +1,7 @@
 import { substrate } from "../services";
 import { CURRENT_OID } from "./idb";
 
-// ---------------------------------------------------------------------------
-// Org-wide people search (for @mentions).
-//
-// Teams' powerbar @-picker hits the SubstrateSearch "suggestions" endpoint on
+// Org-wide people search for @mentions. Teams' powerbar @-picker hits the SubstrateSearch "suggestions" endpoint on
 // substrate.office.com — a DIFFERENT origin and a DIFFERENT bearer than chatsvc
 // (aud 66a88757-… / SubstrateSearch). services/substrate.ts owns the request.
 // We replay the People EntityRequest from that same endpoint and map each hit to
@@ -18,8 +15,7 @@ export interface PeopleHit {
   jobTitle: string;
 }
 
-// Pull the first non-empty string field (case-insensitive) off a loose object.
-function pick(obj: Record<string, unknown>, ...keys: string[]): string {
+function pick(obj: Record<string, unknown>, ...keys: string[]) {
   for (const k of keys) {
     const v = obj[k];
     if (typeof v === "string" && v) return v;
@@ -54,12 +50,11 @@ function collectPeople(root: unknown, out: PeopleHit[], seen: Set<string>): void
   }
 }
 
-// Search the org directory for people matching `query` (substrate REST).
 // Returns [] (never throws) when nothing answers, so callers can fall back to
 // local chat members. Teams' own chat composer only offers chat members
 // (worker op searchUsersByConversation filters the roster locally, see
 // docs/cdl-api.md); org-wide hits are an overlay extra.
-export async function searchPeople(query: string, size = 8): Promise<PeopleHit[]> {
+export async function searchPeople(query: string, size = 8) {
   const q = (query || "").trim();
   if (!q) return [];
   const r = await substrate.suggestPeople(q, size, CURRENT_OID);

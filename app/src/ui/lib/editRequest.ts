@@ -7,15 +7,13 @@ import { useLatest } from "./latest";
 type Start = (back?: () => void) => void;
 const editors = new Map<string, RefObject<Start>>();
 
-/** Start editing message `id`; false when it isn't rendered (or not editable). */
-export function requestEdit(id: string, back?: () => void): boolean {
+export function requestEdit(id: string, back?: () => void) {
   const start = editors.get(id);
   start?.current(back);
   return !!start;
 }
 
-/** Register `start` as message `id`'s editor while `enabled`. */
-export function useEditRequest(id: string, enabled: boolean, start: Start): void {
+export function useEditRequest(id: string, enabled: boolean, start: Start) {
   const latest = useLatest(start);
   useEffect(() => {
     if (!enabled) return;

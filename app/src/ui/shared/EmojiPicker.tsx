@@ -1,13 +1,9 @@
-// A small, searchable emoji picker. Used by the composer to insert an emoji
-// character into the draft (plain text — always safe) and, with a restricted
-// set, by the message reaction menu. Keyword search is a tiny built-in index;
-// no network, no dependency. Closes on outside click / Escape (handled by the
-// caller, which conditionally renders it).
-import { useMemo, useRef, useState, type JSX } from "react";
+// Inserts plain text (always safe). Outside click / Escape are handled by the
+// caller, which conditionally renders it.
+import { useMemo, useRef, useState } from "react";
 import { t } from "../../i18n";
 
-// [emoji, space-separated keywords]. Kept compact but covering the common set.
-// Extend freely — this is plain data.
+// [emoji, space-separated keywords]
 const EMOJI: ReadonlyArray<readonly [string, string]> = [
   ["👍", "thumbs up yes like approve ok"],
   ["👎", "thumbs down no dislike"],
@@ -67,7 +63,7 @@ interface EmojiPickerProps {
   className?: string;
 }
 
-export function EmojiPicker({ onPick, className }: EmojiPickerProps): JSX.Element {
+export function EmojiPicker({ onPick, className }: EmojiPickerProps) {
   const [q, setQ] = useState("");
   const input = useRef<HTMLInputElement>(null);
   const list = useMemo(() => {

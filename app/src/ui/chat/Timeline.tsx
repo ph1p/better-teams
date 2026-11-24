@@ -21,13 +21,10 @@ interface TimelineProps {
   cid: string;
   chat?: Chat;
   channel: boolean;
-  /** Message picked with the arrow keys, if any. */
   selectedId?: string | null;
-  /** My optimistic messages for this chat. */
   pending: Pending[];
   /** Active in-chat search query (lower-cased), "" when off. */
   mq: string;
-  /** The query as typed, for the "no match" note. */
   searchText: string;
   openThreads: ReadonlySet<string>;
   onToggleThread: (rootId: string) => void;
@@ -35,15 +32,12 @@ interface TimelineProps {
   replyingTo?: string;
   /** Filled after render: message id -> thread root id (channels). */
   msgRootRef: RefObject<Map<string, string>>;
-  // Empty / loading state.
   loading: boolean;
-  /** The open chat's messages arrived (possibly empty). */
   ready: boolean;
   failed: boolean;
   empty: boolean;
   onRetry: () => void;
   onOpenInTeams: () => void;
-  // Per-message actions.
   onReact: (cid: string, messageId: string, key: string, add: boolean) => void;
   onDelete: (cid: string, messageId: string) => void;
   onRemoveFile: (cid: string, messageId: string, index: number) => void;
@@ -59,11 +53,10 @@ interface TimelineProps {
   onJoinCall: (rootId: string) => void;
 }
 
-// Same sender within a few minutes continues the previous message's group.
-const continues = (prev: Msg | null, m: Msg): boolean =>
+const continues = (prev: Msg | null, m: Msg) =>
   !!prev && prev.fromMri === m.fromMri && m.time - prev.time <= GROUP_GAP_MS;
 
-const renderPending = (p: Pending): JSX.Element => (
+const renderPending = (p: Pending) => (
   <div key={p.key} className="tc-msg first pending">
     <Avatar name={t().common.you} />
     <div className="tc-msg-body">
@@ -97,16 +90,14 @@ const renderPending = (p: Pending): JSX.Element => (
   </div>
 );
 
-// The open conversation's messages: day dividers and sender groups; channels
-// as one card per thread. Ends with loose pending sends and the empty states.
-export function Timeline(p: TimelineProps): JSX.Element {
+export function Timeline(p: TimelineProps) {
   const { visible, cid, chat, channel, pending: myPending, mq, openThreads, msgRootRef } = p;
   const now = useNow(30_000);
   useLayoutEffect(() => {
     if (channel) msgRootRef.current = new Map(visible.map((m) => [m.id, m.rootId]));
   }, [channel, visible, msgRootRef]);
   const body: JSX.Element[] = [];
-  const renderMsg = (m: Msg, first: boolean): JSX.Element => (
+  const renderMsg = (m: Msg, first: boolean) => (
     <Message
       key={m.id}
       m={m}
@@ -130,8 +121,7 @@ export function Timeline(p: TimelineProps): JSX.Element {
       onOpenInTeams={p.onOpenInTeams}
     />
   );
-  // A meeting's end marker renders as one quiet line, not a message.
-  const renderReply = (m: Msg, first: boolean): JSX.Element =>
+  const renderReply = (m: Msg, first: boolean) =>
     m.call === "end" ? (
       <div key={m.id} className="tc-call-end">
         <Video size={13} /> {messageText(m)} · {fmtClock(m.time)}
@@ -142,8 +132,6 @@ export function Timeline(p: TimelineProps): JSX.Element {
   // Pending thread replies render inside their thread; the rest at the bottom.
   const threadPending = new Set<number>();
   if (channel) {
-    // Channels: one card per thread (root post + its replies, already sorted
-    // by root time). Long threads show only the newest replies until expanded.
     // Group by rootId, not adjacency: a root's rootTime (its arrival time) and
     // its replies' rootTime (derived from the root id) can differ by a few ms,
     // which would sort them apart and orphan the replies.

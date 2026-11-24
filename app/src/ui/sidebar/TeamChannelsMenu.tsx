@@ -1,4 +1,4 @@
-import { useMemo, type JSX } from "react";
+import { useMemo } from "react";
 import { Hash, House } from "lucide-react";
 import { getTeamChannels, type TeamChannel } from "../../teamsData";
 import { useDismiss } from "../lib/dismiss";
@@ -24,7 +24,7 @@ interface TeamChannelsMenuProps {
 }
 
 // General first, then the recommended ones, then by name — Teams' own order.
-const order = (a: TeamChannel, b: TeamChannel): number =>
+const order = (a: TeamChannel, b: TeamChannel) =>
   Number(b.general) - Number(a.general) ||
   Number(b.recommended) - Number(a.recommended) ||
   a.name.localeCompare(b.name);
@@ -32,12 +32,10 @@ const order = (a: TeamChannel, b: TeamChannel): number =>
 const loadChannels = (teamId: string): Promise<TeamChannel[] | null> =>
   teamId ? getTeamChannels(teamId) : Promise.resolve(null);
 
-// The team label's channel menu: every channel of the team with a checkbox to
-// show or hide it in the sidebar, as Teams' "Show/hide channels". General has
-// the house icon; channels the team owner shows by default say "Recommended".
-// Our own list (from IndexedDB) shows at once; Teams' team query then adds
-// channels we have no row for and the Recommended flags.
-export function TeamChannelsMenu({ menu, chats, onSetShown, onClose }: TeamChannelsMenuProps): JSX.Element {
+// As Teams' "Show/hide channels". Our own list (from IndexedDB) shows at once;
+// Teams' team query then adds channels we have no row for and the Recommended
+// flags (channels the team owner shows by default).
+export function TeamChannelsMenu({ menu, chats, onSetShown, onClose }: TeamChannelsMenuProps) {
   // The label's own button toggles the menu, so a press on it doesn't dismiss.
   useDismiss(true, "#tc-root .tc-team-menu, #tc-root .tc-team-chans", onClose);
   const teamId = menu.chat.teamId || "";
@@ -65,9 +63,9 @@ export function TeamChannelsMenu({ menu, chats, onSetShown, onClose }: TeamChann
       .sort(order);
   }, [chats, teamId, remote]);
 
-  const toggle = async (c: TeamChannel): Promise<void> => {
+  const toggle = async (c: TeamChannel) => {
     const shown = !c.shown;
-    const patch = (v: boolean): void => setRemote((r) => r && r.map((x) => (x.id === c.id ? { ...x, shown: v } : x)));
+    const patch = (v: boolean) => setRemote((r) => r && r.map((x) => (x.id === c.id ? { ...x, shown: v } : x)));
     patch(shown);
     if (!(await onSetShown(c.id, shown))) patch(!shown);
   };

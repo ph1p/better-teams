@@ -11,7 +11,7 @@ export interface Card {
   content: Record<string, unknown>;
 }
 
-function fromList(list: unknown): Card[] {
+function fromList(list: unknown) {
   const out: Card[] = [];
   for (const a of Array.isArray(list) ? list : []) {
     if (!isObj(a)) continue;
@@ -22,7 +22,7 @@ function fromList(list: unknown): Card[] {
   return out;
 }
 
-function fromSwift(content: string): Card[] {
+function fromSwift(content: string) {
   const m = /<Swift[^>]*\bb64="([^"]+)"/i.exec(content || "");
   if (!m) return [];
   try {
@@ -34,16 +34,14 @@ function fromSwift(content: string): Card[] {
   }
 }
 
-/** Cards of one message: from its Swift content, else from its cards list (array or JSON string). */
-export function parseCards(content: string, cards?: unknown): Card[] {
+export function parseCards(content: string, cards?: unknown) {
   const swift = fromSwift(content);
   return swift.length ? swift : fromList(parsed(cards));
 }
 
-const str = (v: unknown): string => (typeof v === "string" ? v : "");
+const str = (v: unknown) => (typeof v === "string" ? v : "");
 
-/** Markdown / HTML / template noise off a card string, for previews and search. */
-export function plainCardText(s: string): string {
+export function plainCardText(s: string) {
   return s
     .replace(/\{\{(?:DATE|TIME)\(([^,)]+)[^}]*\}\}/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
@@ -57,7 +55,6 @@ export function plainCardText(s: string): string {
     .trim();
 }
 
-// Adaptive Card text in reading order (TextBlocks, TextRuns, facts).
 function adaptiveTexts(el: unknown, out: string[]): void {
   if (Array.isArray(el)) {
     for (const x of el) adaptiveTexts(x, out);
@@ -72,10 +69,9 @@ function adaptiveTexts(el: unknown, out: string[]): void {
   for (const k of ["body", "items", "columns", "rows", "cells"]) adaptiveTexts(el[k], out);
 }
 
-const get = (o: unknown, k: string): unknown => (isObj(o) ? o[k] : undefined);
+const get = (o: unknown, k: string) => (isObj(o) ? o[k] : undefined);
 
-/** Short text of a card list ("title · line · line"), "" when nothing readable. */
-export function cardSummary(cards: readonly Card[]): string {
+export function cardSummary(cards: readonly Card[]) {
   const parts: string[] = [];
   for (const { content: c } of cards) {
     if (c.type === "AdaptiveCard" || Array.isArray(c.body)) adaptiveTexts(c.body, parts);

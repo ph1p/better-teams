@@ -1,18 +1,10 @@
-// A message's attached files: image thumbnails (from the preview Teams stored)
-// and type-colored file cards. Clicking any of them opens the file viewer on
-// that file, with the message's other files a ←/→ away.
-//
-// On your own messages each file has a remove button (shown on hover). The
-// first click arms it, a second click within a few seconds removes the file.
-
 import { t } from "../../i18n";
-import type { JSX } from "react";
 import { ExternalLink, Trash2, X } from "lucide-react";
 import { fileItem, KindIcon, openViewer, type ViewerItem } from "../lib/files";
 import { useArm } from "../lib/arm";
 import type { FileRef } from "../../types";
 
-function RemoveBtn({ name, armed, onClick }: { name: string; armed: boolean; onClick: () => void }): JSX.Element {
+function RemoveBtn({ name, armed, onClick }: { name: string; armed: boolean; onClick: () => void }) {
   return (
     <button
       className={"tc-x-btn tc-attach-x" + (armed ? " armed" : "")}
@@ -34,18 +26,12 @@ function RemoveBtn({ name, armed, onClick }: { name: string; armed: boolean; onC
   );
 }
 
-export function Attachments({
-  files,
-  onRemove,
-}: {
-  files: FileRef[];
-  onRemove?: (index: number) => void;
-}): JSX.Element | null {
+export function Attachments({ files, onRemove }: { files: FileRef[]; onRemove?: (index: number) => void }) {
   const { armed, tryArm } = useArm<number>();
   if (!files.length) return null;
   const items = files.map(fileItem);
-  const open = (i: number): void => openViewer(items, i);
-  const remove = (i: number): void => tryArm(i, () => onRemove?.(i));
+  const open = (i: number) => openViewer(items, i);
+  const remove = (i: number) => tryArm(i, () => onRemove?.(i));
   const thumbs: [ViewerItem, number][] = [];
   const cards: [ViewerItem, number][] = [];
   items.forEach((it, i) => (it.image ? thumbs : cards).push([it, i]));

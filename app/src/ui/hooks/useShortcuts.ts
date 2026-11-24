@@ -20,11 +20,11 @@ interface Shortcuts {
 
 // Keyboard: ⌘K search, ⌥↑/⌥↓ previous/next chat, ⌥⇧↑/⌥⇧↓ previous/next
 // unread chat, ⌥U Unread filter, ⌥N notes drawer, Esc leaves search.
-export function useShortcuts(opts: Shortcuts): void {
+export function useShortcuts(opts: Shortcuts) {
   // Latest options, so the window listener is attached once.
   const o = useLatest(opts);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
+    const onKey = (e: KeyboardEvent) => {
       if (isIdle() || viewerOpen()) return;
       const { flat, sel, pick, searchRef, msgSearchOpen, unreadOnly } = o.current;
       if (e.metaKey && !e.altKey && e.key.toLowerCase() === "k") {

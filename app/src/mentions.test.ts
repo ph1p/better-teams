@@ -41,7 +41,7 @@ describe("parseMentions", () => {
 });
 
 describe("editMentions + htmlToMarkdown", () => {
-  const span = (id: number, name: string): string =>
+  const span = (id: number, name: string) =>
     `<span itemtype="http://schema.skype.com/Mention" itemscope itemid="${id}">${name}</span>`;
   it("turns mention spans back into @Name with picks", () => {
     const em = editMentions(parseMentions([{ itemid: 0, mri: "8:a", displayName: "Maya Chen" }]));

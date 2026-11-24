@@ -5,7 +5,7 @@
 // a fallback. One shared observer, throttled, fans out to subscribers.
 
 // Overlay hidden (⌥⌘T) or window in background: don't poll IndexedDB.
-export const isIdle = (): boolean => {
+export const isIdle = () => {
   if (document.hidden) return true;
   const root = document.getElementById("tc-root");
   return !!root && root.style.display === "none";
@@ -15,11 +15,11 @@ const LIVE_THROTTLE_MS = 300;
 const liveSubs = new Set<() => void>();
 let liveObs: MutationObserver | null = null;
 
-export function onTeamsChange(cb: () => void): () => void {
+export function onTeamsChange(cb: () => void) {
   liveSubs.add(cb);
   if (!liveObs) {
     let timer: ReturnType<typeof setTimeout> | 0 = 0;
-    const fire = (): void => {
+    const fire = () => {
       timer = 0;
       for (const f of liveSubs) f();
     };

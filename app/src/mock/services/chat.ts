@@ -8,7 +8,7 @@ import * as store from "../store";
 const done: CdlRes<true> = { ok: true, data: true };
 const no = <T>(reason: string): CdlRes<T> => ({ ok: false, reason });
 
-export function newClientMessageId(): string {
+export function newClientMessageId() {
   let s = String(1 + Math.floor(Math.random() * 9));
   while (s.length < 19) s += Math.floor(Math.random() * 10);
   return s;
@@ -37,7 +37,7 @@ export async function markRead(convId: string, _last: MsgRef): Promise<CdlRes<tr
   return store.setRead(convId, true) ? done : no("unknown chat");
 }
 
-export function markChannelRead(convId: string, last: MsgRef): Promise<CdlRes<true>> {
+export function markChannelRead(convId: string, last: MsgRef) {
   return markRead(convId, last);
 }
 
@@ -68,7 +68,7 @@ export async function answerChatRequest(
   return store.answerRequest(convId, action) ? done : no("unknown chat");
 }
 
-export function watchChatEvents(convId: string, onEvents: (events: ChatEvent[]) => void): () => void {
+export function watchChatEvents(convId: string, onEvents: (events: ChatEvent[]) => void) {
   return store.onChatEvent((id, type, messageId) => {
     if (id === convId) onEvents([{ type, convId: id, ...(messageId ? { messageId } : {}) }]);
   });

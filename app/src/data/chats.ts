@@ -18,14 +18,14 @@ const KIND: Record<string, ChatKind> = {
   StreamOfNotes: "notes",
 };
 
-/** The title is built from member names (no topic, at least one named member). */
-function isNameTitle(c: Dict, kind: ChatKind, others: string[]): boolean {
+// No topic and at least one named member: the title is built from member names.
+function isNameTitle(c: Dict, kind: ChatKind, others: string[]) {
   if (kind !== "chat" && kind !== "meeting") return false;
   if (str(obj(c.threadProperties).topic)) return false;
   return others.some((m) => profile(m).displayName);
 }
 
-function chatTitle(c: Dict, kind: ChatKind, others: string[]): string {
+function chatTitle(c: Dict, kind: ChatKind, others: string[]) {
   const tp = obj(c.threadProperties);
   if (kind === "notes") return "Notes";
   if (kind === "channel") {
@@ -52,7 +52,7 @@ function chatTitle(c: Dict, kind: ChatKind, others: string[]): string {
 // chats, so reading it alone made the overlay disagree with Teams. Returns the
 // folder's id and its conversation ids; empty on any failure (favorites are
 // optional).
-async function favoritesFolder(): Promise<{ id: string; ids: Set<string> }> {
+async function favoritesFolder() {
   const ids = new Set<string>();
   try {
     const db = await open("conversation-folder");
@@ -72,14 +72,14 @@ async function favoritesFolder(): Promise<{ id: string; ids: Set<string> }> {
 // IndexedDB agrees (the worker writes it a moment after the mutation answers).
 const favOverride = new Map<string, boolean>();
 
-function effectiveFavorite(conversationId: string, idbFav: boolean): boolean {
+function effectiveFavorite(conversationId: string, idbFav: boolean) {
   const ov = favOverride.get(conversationId);
   if (ov === undefined) return idbFav;
   if (ov === idbFav) favOverride.delete(conversationId);
   return ov;
 }
 
-/** Add a chat to or take it out of Teams' Favorites (syncs to all clients). */
+// Teams' Favorites sync to all clients.
 export async function setChatFavorite(conversationId: string, fav: boolean): Promise<WriteResult> {
   const { id } = await favoritesFolder();
   if (!id) return { ok: false, reason: "no Favorites folder" };
@@ -93,14 +93,14 @@ export async function setChatFavorite(conversationId: string, fav: boolean): Pro
 // chat hidden until you accept it (consumer: interopconversationstatus;
 // enterprise: conversationstatus AcceptPendingRecipient).
 const PENDING = new Set(["AcceptPending", "ExtendedDirectoryAcceptPending"]);
-function isRequest(props: Dict): boolean {
+function isRequest(props: Dict) {
   return PENDING.has(str(props.interopconversationstatus)) || props.conversationstatus === "AcceptPendingRecipient";
 }
 
 // Our answer to a request, held while IndexedDB still says pending.
 const requestOverride = new Map<string, "Accept" | "Block">();
 
-/** Accept or block a chat request. Block also hides the chat. */
+// Block also hides the chat.
 export async function answerChatRequest(c: Chat, action: "Accept" | "Block"): Promise<WriteResult> {
   const r = await chat.answerChatRequest(c.id, c.inviter ?? "", action);
   if (!r.ok) return r;
@@ -111,7 +111,7 @@ export async function answerChatRequest(c: Chat, action: "Accept" | "Block"): Pr
 // Running call: Teams keeps "awareness_conversationLiveState:<rootId>" in the
 // thread properties (JSON: status, expiration in s). A call whose end event got
 // lost stays "Active" but expires, so expiration is checked too.
-function liveCallRoot(tp: Dict): string {
+function liveCallRoot(tp: Dict) {
   const now = Date.now();
   for (const [k, v] of Object.entries(tp)) {
     if (!k.startsWith("awareness_conversationLiveState:")) continue;
@@ -121,12 +121,11 @@ function liveCallRoot(tp: Dict): string {
   return "";
 }
 
-/** Left the thread: its last leave is newer than its last join. */
-function hasLeft(tp: Dict): boolean {
+function hasLeft(tp: Dict) {
   return (Number(tp.lastleaveat) || 0) > (Number(tp.lastjoinat) || 0);
 }
 
-export async function listChats(): Promise<Chat[]> {
+export async function listChats() {
   void flushPendingHorizons();
   const db = await open("conversation");
   const rows = (await getAll(db, "conversations", 10000)).map(obj);
@@ -228,7 +227,6 @@ export async function listChats(): Promise<Chat[]> {
               ...(channelType ? { channelType } : {}),
             }
           : {}),
-        // 1:1 chats get the other person's photo.
         avatarMri: kind === "chat" && others.length === 1 ? others[0] : "",
         // Other participants' MRIs — powers the "chats with this user" panel.
         members: others,
@@ -238,7 +236,6 @@ export async function listChats(): Promise<Chat[]> {
         hidden,
         // The worker's setMuteChat writes the conversation property alerts = String(!mute).
         muted: kind !== "channel" && (props.alerts === "false" || props.alerts === false),
-        // Everything of kind chat that isn't 1:1 is a group chat.
         group:
           kind === "chat" &&
           !isOneToOneId(str(c.id)) &&

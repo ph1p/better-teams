@@ -33,9 +33,9 @@ const BULLET = /^\s*[-*+]\s+(.*)$/;
 const NUMBERED = /^\s*\d{1,3}[.)]\s+(.*)$/;
 const QUOTE = /^\s*>\s?(.*)$/;
 
-const escAttr = (s: string): string => escText(s).replace(/"/g, "&quot;");
+const escAttr = (s: string) => escText(s).replace(/"/g, "&quot;");
 
-function uuid(): string {
+function uuid() {
   try {
     return crypto.randomUUID();
   } catch {
@@ -43,8 +43,8 @@ function uuid(): string {
   }
 }
 
-/** Is the caret inside an unclosed ``` fence? (Enter then means newline.) */
-export function inOpenFence(textBeforeCaret: string): boolean {
+/** Inside an unclosed ``` fence Enter means newline. */
+export function inOpenFence(textBeforeCaret: string) {
   let open = false;
   for (const line of textBeforeCaret.split("\n")) {
     if (open ? FENCE_CLOSE.test(line) : FENCE_OPEN.test(line)) open = !open;
@@ -60,21 +60,21 @@ class Renderer {
   ) {}
 
   /** Mention markers back to their literal `@Name` (inside code). */
-  private literal(s: string): string {
+  private literal(s: string) {
     return s.replace(MENTION_RE, (_, i: string) => "@" + this.names[+i]);
   }
 
-  private keep(html: string): string {
+  private keep(html: string) {
     return H0 + (this.stash.push(html) - 1) + H1;
   }
 
-  private link(url: string, label: string): string {
+  private link(url: string, label: string) {
     const u = escAttr(url);
     return this.keep(`<a href="${u}" rel="noreferrer noopener" title="${u}" target="_blank">${label}</a>`);
   }
 
-  /** Inline markup of one line (or several joined by \n → <br />). */
-  inline(src: string): string {
+  /** One line, or several joined by \n → <br />. */
+  inline(src: string) {
     // Code spans first: nothing inside them is markup.
     let s = src.replace(/`([^`\n]+)`/g, (_, code: string) => this.keep(`<code>${escText(this.literal(code))}</code>`));
     s = s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, (_, label: string, url: string) =>
@@ -91,7 +91,7 @@ class Renderer {
     return s.replace(STASH_RE, (_, i: string) => this.stash[+i]);
   }
 
-  private code(lines: string[], lang: string): string {
+  private code(lines: string[], lang: string) {
     const id = "codeBlockEditor-" + this.newId();
     const body = lines.map((l) => escText(this.literal(l))).join("<br />");
     const cls = "language-" + (lang.toLowerCase() || "plaintext");
@@ -104,7 +104,7 @@ class Renderer {
   blocks(lines: string[]): string {
     let html = "";
     let para: string[] = [];
-    const flush = (): void => {
+    const flush = () => {
       if (para.length) html += "<p>" + this.inline(para.join("\n")) + "</p>";
       para = [];
     };
@@ -179,7 +179,6 @@ export function formatMessage(
     newId,
   ).blocks(src.split("\n"));
 
-  // Number the surviving mentions in document order.
   const entries: string[] = [];
   const html = raw.replace(MENTION_RE, (_, i: string) => {
     const idx = entries.length;

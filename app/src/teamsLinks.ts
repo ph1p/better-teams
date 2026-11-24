@@ -7,7 +7,7 @@
 //   /l/channel/<threadId>/<channelName>?...
 
 export interface TeamsLink {
-  /** Conversation (chat or channel thread) id, e.g. "19:...@thread.tacv2". */
+  /** Chat or channel thread id, e.g. "19:...@thread.tacv2". */
   cid: string;
   /** Message to jump to; empty for a link to the conversation itself. */
   mid: string;

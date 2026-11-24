@@ -1,32 +1,24 @@
-// The file viewer modal: one for the whole app, opened with openViewer().
-//
-//   image      lightbox; click toggles fit / actual size
-//   text       plain text / code fetched and shown as is
-//   document   SharePoint's own viewer page in a frame (Office, PDF, video, …)
-//   other      type icon and the open / download actions
-//
-// Esc closes, ←/→ step through the message's files. Keys are caught in the
+// One modal for the whole app, opened with openViewer(). Keys are caught in the
 // capture phase; the app's own shortcuts pause while it is open (viewerOpen).
-// A click on the backdrop (outside the picture, frame or bar) closes it.
 
-import { useEffect, useRef, useState, type JSX, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { ChevronLeft, ChevronRight, Download, ExternalLink, Link2, Check, LoaderCircle, X } from "lucide-react";
 import { closeViewer, KindIcon, saveImage, stepViewer, textSrc, useViewer, type ViewerItem } from "../lib/files";
 import { useCopied } from "../lib/clipboard";
 import { t } from "../../i18n";
 
-function onBackdrop(e: MouseEvent<HTMLDivElement>): void {
+function onBackdrop(e: MouseEvent<HTMLDivElement>) {
   const t = e.target as Element;
   if (t === e.currentTarget || t.classList.contains("tc-viewer-stage")) closeViewer();
 }
 
-function meta(it: ViewerItem): string {
+function meta(it: ViewerItem) {
   const parts = [it.ext ? it.ext.toUpperCase() : it.image ? t().app.image : ""];
   if (it.width && it.height) parts.push(`${it.width} × ${it.height}`);
   return parts.filter(Boolean).join(" · ");
 }
 
-function ImageStage({ item }: { item: ViewerItem }): JSX.Element {
+function ImageStage({ item }: { item: ViewerItem }) {
   const [zoom, setZoom] = useState(false);
   const [state, setState] = useState<"loading" | "ok" | "error">("loading");
   return (
@@ -49,12 +41,12 @@ function ImageStage({ item }: { item: ViewerItem }): JSX.Element {
   );
 }
 
-function FrameStage({ item }: { item: ViewerItem }): JSX.Element {
+function FrameStage({ item }: { item: ViewerItem }) {
   const [loaded, setLoaded] = useState(false);
   const [blocked, setBlocked] = useState(false);
   useEffect(() => {
     // A frame the page's CSP refuses fires no error on the <iframe> itself.
-    const onCsp = (e: SecurityPolicyViolationEvent): void => {
+    const onCsp = (e: SecurityPolicyViolationEvent) => {
       if (item.embed && e.blockedURI && item.embed.startsWith(e.blockedURI)) setBlocked(true);
     };
     document.addEventListener("securitypolicyviolation", onCsp);
@@ -78,7 +70,7 @@ function FrameStage({ item }: { item: ViewerItem }): JSX.Element {
 
 const TEXT_MAX = 2_000_000;
 
-function TextStage({ item, src }: { item: ViewerItem; src: string }): JSX.Element {
+function TextStage({ item, src }: { item: ViewerItem; src: string }) {
   const [text, setText] = useState<string | null | undefined>(undefined); // null: failed
   useEffect(() => {
     const ctl = new AbortController();
@@ -129,7 +121,7 @@ function TextStage({ item, src }: { item: ViewerItem; src: string }): JSX.Elemen
   );
 }
 
-function NoPreview({ item, reason }: { item: ViewerItem; reason?: string }): JSX.Element {
+function NoPreview({ item, reason }: { item: ViewerItem; reason?: string }) {
   return (
     <div className="tc-viewer-none">
       <KindIcon kind={item.kind} className="tc-viewer-none-icon" size={40} strokeWidth={1.5} />
@@ -151,14 +143,13 @@ function NoPreview({ item, reason }: { item: ViewerItem; reason?: string }): JSX
   );
 }
 
-export function FileViewer(): JSX.Element | null {
+export function FileViewer() {
   const v = useViewer();
   const closeBtn = useRef<HTMLButtonElement>(null);
   const [copied, copy] = useCopied();
   const [saving, setSaving] = useState(false);
   const open = !!v;
 
-  // Focus the dialog on open and give focus back to whatever opened it.
   useEffect(() => {
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
@@ -168,7 +159,7 @@ export function FileViewer(): JSX.Element | null {
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent): void => {
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeViewer();
       else if (e.key === "ArrowLeft") stepViewer(-1);
       else if (e.key === "ArrowRight") stepViewer(1);
@@ -184,7 +175,7 @@ export function FileViewer(): JSX.Element | null {
   const item = v.items[v.index];
   const text = textSrc(item);
   const many = v.items.length > 1;
-  const save = (): void => {
+  const save = () => {
     setSaving(true);
     void saveImage(item).finally(() => setSaving(false));
   };

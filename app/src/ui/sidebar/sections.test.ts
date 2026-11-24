@@ -5,7 +5,7 @@ vi.mock("../../teamsData", () => ({ profile: () => ({ displayName: "" }) }));
 import type { Chat } from "../../types";
 import { buildSections } from "./sections";
 
-const chat = (id: string, time: number, extra: Partial<Chat> = {}): Chat =>
+const chat = (id: string, time: number, extra: Partial<Chat> = {}) =>
   ({ id, title: "Anna " + id, kind: "chat", group: false, app: false, team: "", members: [], time, ...extra }) as Chat;
 
 describe("buildSections search", () => {

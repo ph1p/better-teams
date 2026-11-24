@@ -1,28 +1,24 @@
 import type { Card } from "./cards";
 import type { MentionRef } from "./mentions";
-// Shared domain types for the overlay. These describe the NORMALIZED shapes the
-// data layer (teamsData) emits after narrowing Teams' untyped IndexedDB rows and
-// chatsvc REST payloads. UI code consumes only these, never raw Teams data.
+// NORMALIZED shapes the data layer (teamsData) emits after narrowing Teams'
+// untyped IndexedDB rows and chatsvc REST payloads. UI code consumes only these,
+// never raw Teams data.
 
-/** A Teams conversation kind, as surfaced in the sidebar sections. */
 export type ChatKind = "chat" | "meeting" | "channel" | "notes";
 
-/** Message importance flag carried on a Teams message. */
 export type Importance = "normal" | "high" | "urgent";
 
 /** One reaction bucket on a message (all users who used the same emotion). */
 export interface Reaction {
   /** Emotion key, e.g. "like" / "heart" / "1f52d_telescope"; see glyphFor. */
   key: string;
-  /** How many people reacted with this emotion. */
   count: number;
   /** True when the current user is among them. */
   mine: boolean;
-  /** Who reacted (MRIs, in reaction order), when Teams sent the list. */
+  /** MRIs, in reaction order, when Teams sent the list. */
   users?: string[];
 }
 
-/** A file/attachment reference extracted from a message. */
 export interface FileRef {
   name: string;
   /** Open-in-browser URL (SharePoint), or "" when Teams gave none. */
@@ -39,14 +35,12 @@ export interface FileRef {
   raw?: unknown;
 }
 
-/** The last-message preview shown on a chat row. */
 export interface LastMessage {
   from: string;
   content: string;
   type: string;
 }
 
-/** A conversation row for the sidebar list. */
 export interface Chat {
   id: string;
   kind: ChatKind;
@@ -57,13 +51,13 @@ export interface Chat {
   isChannel: boolean;
   /** 1:1 partner MRI, set only for direct chats; "" otherwise. */
   avatarMri: string;
-  /** MRIs of the other members (used for shared-chat lookups). */
+  /** MRIs of the other members. */
   members: string[];
   /** 1:1 chat with a Teams app/bot (Jira, Workflows, …): no calls, no presence. */
   app: boolean;
   favorite: boolean;
   pinned: boolean;
-  /** Hidden from the chat list (Teams' "Hide"); search still finds it. */
+  /** Teams' "Hide"; search still finds it. */
   hidden: boolean;
   /** Channels: the team's thread id (General's own id). */
   teamId?: string;
@@ -75,19 +69,19 @@ export interface Chat {
    * Teams keeps listed (in italics).
    */
   channelHidden?: boolean;
-  /** Channels: a private or shared channel (own roster); unset for standard ones. */
+  /** Channels: own roster; unset for standard ones. */
   channelType?: "private" | "shared";
-  /** Notifications muted (Teams' "Mute"). Chats only; channels have presets. */
+  /** Teams' "Mute". Chats only; channels have presets. */
   muted: boolean;
-  /** A group chat (not 1:1): can be renamed, has a roster you can change and leave. */
+  /** Not 1:1: can be renamed, has a roster you can change and leave. */
   group: boolean;
   /** We left this conversation (or were removed). */
   left: boolean;
-  /** Last-activity time, ms since epoch. */
+  /** Last activity, ms since epoch. */
   time: number;
   unread: boolean;
   last: LastMessage;
-  /** A chat request: someone outside your contacts wrote first; accept or block it. */
+  /** Someone outside your contacts wrote first; accept or block it. */
   request?: boolean;
   /** MRI of who started the chat (the request's inviter). */
   inviter?: string;
@@ -95,7 +89,6 @@ export interface Chat {
   liveCall?: string;
 }
 
-/** A normalized message ready to render. */
 export interface ForwardRef {
   senderMri: string;
   /** Original sender's display name ("" when unknown). */
@@ -116,7 +109,7 @@ export interface Message {
   isReply: boolean;
   from: string;
   fromMri: string;
-  /** Message HTML content (Teams markup) or plain text. */
+  /** Teams HTML markup or plain text. */
   content: string;
   messageType: string;
   mine: boolean;
@@ -130,15 +123,15 @@ export interface Message {
   cards?: Card[];
   /** @mentions in `content` (absent when none), matched to its spans by itemid. */
   mentions?: MentionRef[];
-  /** Message time, ms since epoch. */
+  /** ms since epoch. */
   time: number;
-  /** Forwarded message: where the original came from (its body is the Forward blockquote in `content`). */
+  /** Where the original came from (its body is the Forward blockquote in `content`). */
   forwarded?: ForwardRef;
   /** Channel meeting event: the thread root ("start") or its end marker. */
   call?: "start" | "end";
 }
 
-/** A person's profile card, as cached by Teams. Fields absent in cache are "". */
+/** As cached by Teams. Fields absent in cache are "". */
 export interface Profile {
   displayName: string;
   imageUri: string;
@@ -162,10 +155,9 @@ export interface Quote {
   time: number;
 }
 
-/** Result of a write operation against Teams' backend. */
 export type WriteResult = { ok: true; via?: string } | { ok: false; reason: string };
 
-/** What an activity-feed item reports: Teams' activityType, narrowed to the kinds the UI labels. */
+/** Teams' activityType, narrowed to the kinds the UI labels. */
 export type ActivityKind = "mention" | "reaction" | "reply" | "other";
 
 /** One item of Teams' activity feed (the "48:notifications" stream). */
@@ -176,11 +168,10 @@ export interface Activity {
   type: string;
   /** Reaction key for reactions ("like", "heart"…), else "". */
   subtype: string;
-  /** Activity time, ms since epoch. */
+  /** ms since epoch. */
   time: number;
-  /** Conversation the activity happened in. */
   threadId: string;
-  /** Message the activity points at, "" when none. */
+  /** "" when none. */
   messageId: string;
   actorMri: string;
   actorName: string;

@@ -3,17 +3,14 @@ import type { Chat } from "../../types";
 import { isDirect } from "../lib/format";
 import type { Messages } from "../../i18n";
 
-/** A headed section; its title comes from t().sidebar.sections at render time. */
 /**
  * Whether a chat shows in the sidebar outside search: not hidden itself, and
  * not a hidden channel (General stays listed, in italics, as in Teams).
  */
-export const listed = (c: Chat): boolean => !c.hidden && !(c.channelHidden && !c.general);
+export const listed = (c: Chat) => !c.hidden && !(c.channelHidden && !c.general);
 
 export type SectionId = keyof Messages["sidebar"]["sections"];
 
-// One sidebar group as built by buildSections; rendered by <Section>. Search
-// results and the Unread inbox have no header.
 export interface SideSection {
   id: SectionId | "search" | "unread";
   rows: Chat[];
@@ -35,8 +32,7 @@ export function buildSections(
     // Search: one flat result list. 1:1 chats first, then title matches before
     // team / member-name matches, newest first within each. Hidden chats are
     // found too.
-    const hay = (c: Chat): string =>
-      (c.team + " " + c.members.map((m) => profile(m).displayName).join(" ")).toLowerCase();
+    const hay = (c: Chat) => (c.team + " " + c.members.map((m) => profile(m).displayName).join(" ")).toLowerCase();
     const hits: Array<{ c: Chat; r: number }> = [];
     for (const c of chats) {
       const inTitle = c.title.toLowerCase().includes(q);
@@ -55,7 +51,7 @@ export function buildSections(
   // The self-chat (Notes) lives in its own slot at the bottom of the sidebar,
   // never in a section.
   // Chat requests wait on top until accepted or blocked, outside every other section.
-  const pinned = (c: Chat): boolean => c.kind !== "notes" && !c.request && (c.favorite || c.pinned);
+  const pinned = (c: Chat) => c.kind !== "notes" && !c.request && (c.favorite || c.pinned);
   const rest = list.filter((c) => !pinned(c) && c.kind !== "notes" && !c.request);
   // Channels grouped by team; teams ordered by their latest activity, so the
   // busy team sits on top. Within a team, newest first (list order).

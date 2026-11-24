@@ -10,7 +10,7 @@
 
 import { invalidate, whenToken, type Audience } from "./auth";
 
-const ALLOWED_HOSTS: RegExp[] = [
+const ALLOWED_HOSTS = [
   /^teams\.microsoft\.com$/,
   /^teams\.cloud\.microsoft$/,
   /^[a-z0-9-]+\.teams\.microsoft\.com$/, // presence, chatsvcagg, …
@@ -20,7 +20,7 @@ const ALLOWED_HOSTS: RegExp[] = [
   /^([a-z0-9-]+\.)?teams\.live\.com$/, // personal (MSA) accounts and their presence
 ];
 
-export function allowedUrl(url: string): URL | null {
+export function allowedUrl(url: string) {
   try {
     const u = new URL(url, location.origin);
     if (u.protocol !== "https:") return null;
@@ -44,7 +44,7 @@ export interface CallOptions {
 const isRawBody = (b: unknown): b is BodyInit =>
   typeof b === "string" || b instanceof Blob || b instanceof ArrayBuffer || ArrayBuffer.isView(b);
 
-async function once(url: URL, aud: Audience, tok: string, o: CallOptions): Promise<Response> {
+async function once(url: URL, aud: Audience, tok: string, o: CallOptions) {
   // Consumer chatsvc authenticates with the skype token header, not a bearer.
   const auth: Record<string, string> = aud === "skype" ? { "x-skypetoken": tok } : { authorization: "Bearer " + tok };
   const headers: Record<string, string> = { ...auth, ...o.headers };

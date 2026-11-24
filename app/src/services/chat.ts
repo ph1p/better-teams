@@ -11,7 +11,7 @@
 import { cdl, cdlSubscribe, check, type CdlRes } from "./cdl";
 import * as D from "./chatDocs";
 
-/** One @mention, as Teams' MentionInput. `itemId` matches the span's itemid. */
+// Teams' MentionInput. `itemId` matches the span's itemid.
 export interface MentionInput {
   itemId: string;
   userId: string;
@@ -19,7 +19,7 @@ export interface MentionInput {
   displayName: string;
 }
 
-/** A message reference: what Teams keys read state and edits on. */
+// What Teams keys read state and edits on.
 export interface MsgRef {
   id: string;
   clientMessageId: string;
@@ -28,10 +28,10 @@ export interface MsgRef {
 }
 
 const uuid = (): string => crypto.randomUUID();
-const iso = (ms: number): string => new Date(ms).toISOString();
+const iso = (ms: number) => new Date(ms).toISOString();
 
-/** 19-digit client message id, as Teams' composer generates. */
-export function newClientMessageId(): string {
+// 19 digits, as Teams' composer generates.
+export function newClientMessageId() {
   let s = String(1 + Math.floor(Math.random() * 9));
   while (s.length < 19) s += Math.floor(Math.random() * 10);
   return s;
@@ -53,7 +53,6 @@ export interface SendInput {
   forward?: { ids: string[]; fromConvId: string };
 }
 
-/** Send (or edit) a message: Teams' `autoSendMessage`, action Create/Update. */
 export async function sendMessage(i: SendInput): Promise<CdlRes<{ id: string; originalArrivalTime?: string }>> {
   const edit = !!i.edit;
   const message = {
@@ -143,7 +142,6 @@ export async function sendMessage(i: SendInput): Promise<CdlRes<{ id: string; or
   return check(r, "sendMessage");
 }
 
-/** Delete one of my messages: Teams' `ComponentsMessageAutoDeleteMutation`. */
 export async function deleteMessage(
   convId: string,
   msg: { id: string; clientMessageId: string },
@@ -165,7 +163,6 @@ export async function deleteMessage(
   return c.ok ? { ok: true, data: true } : c;
 }
 
-/** Add or remove my reaction: Teams' `ComponentsMessageSharedUpdateMessageEmotionMutation`. */
 export async function setEmotion(convId: string, messageId: string, key: string, add: boolean): Promise<CdlRes<true>> {
   const r = await cdl<Record<string, unknown>>("ComponentsMessageSharedUpdateMessageEmotionMutation", D.EMOTION, {
     action: add ? "add" : "remove",
@@ -181,7 +178,7 @@ export async function setEmotion(convId: string, messageId: string, key: string,
   return c.ok ? { ok: true, data: true } : c;
 }
 
-const chMessage = (m: MsgRef): { clientMessageId: string; originalArrivalTime: string } => ({
+const chMessage = (m: MsgRef) => ({
   clientMessageId: m.clientMessageId || m.id,
   originalArrivalTime: iso(m.time),
 });
@@ -213,28 +210,25 @@ async function setBookmark(
   return c.ok ? { ok: true, data: true } : c;
 }
 
-/**
- * Mark a chat read up to `last` (its newest message), as Teams' "Mark as read":
- * clear the unread bookmark ("0"/"0"), then move the consumption horizon.
- */
-export async function markRead(convId: string, last: MsgRef): Promise<CdlRes<true>> {
+// As Teams' "Mark as read": clear the unread bookmark ("0"/"0"), then move the
+// consumption horizon to `last` (the chat's newest message).
+export async function markRead(convId: string, last: MsgRef) {
   const b = await setBookmark(convId, { clientMessageId: "0", originalArrivalTime: "0" });
   if (!b.ok) return b;
   return setHorizon(convId, last);
 }
 
-/** Mark a chat unread, as Teams' "Mark as unread": bookmark its newest message. */
 // Channels: Teams sends the same mutation for the channel id, without the
 // bookmark clear and without offlineActionOptions (catalog, 2026-11-19).
-export function markChannelRead(convId: string, last: MsgRef): Promise<CdlRes<true>> {
+export function markChannelRead(convId: string, last: MsgRef) {
   return setHorizon(convId, last, false);
 }
 
-export function markUnread(convId: string, last: MsgRef): Promise<CdlRes<true>> {
+// As Teams' "Mark as unread": bookmark the chat's newest message.
+export function markUnread(convId: string, last: MsgRef) {
   return setBookmark(convId, chMessage(last));
 }
 
-/** One page of a chat's timeline, as the worker returns it. */
 export interface MessagePage {
   /** Teams `Message` objects, NEWEST first (untyped: caller normalizes). */
   messages: unknown[];
@@ -250,12 +244,8 @@ export interface MessagePage {
   synced: boolean;
 }
 
-/**
- * Read a chat's messages as Teams' chat pane does: `ComponentsChatQueriesMessageListQuery`
- * without a cursor for the newest page, then with `{cursor, direction:"BACKWARD"}`
- * for each older page. The cursor value is the oldest message id on a page; an
- * empty page ends the history.
- */
+// As Teams' chat pane: no cursor for the newest page, then
+// `{cursor, direction:"BACKWARD"}` for each older page.
 export async function listMessages(convId: string, cursor?: string): Promise<CdlRes<MessagePage>> {
   const r = await cdl<Record<string, unknown>>("ComponentsChatQueriesMessageListQuery", D.MESSAGE_LIST, {
     enableDiverseEmotionsNonreactive: false,
@@ -350,12 +340,10 @@ export async function answerChatRequest(
   return c.ok ? { ok: true, data: true } : c;
 }
 
-/** One live event for a chat, reduced to what the overlay acts on. */
 export interface ChatEvent {
   /** Teams' event type: NewMessage, MessageUpdate, MessageRemoved, ThreadUpdate, ... */
   type: string;
   convId: string;
-  /** Message id for message events. */
   messageId?: string;
 }
 
@@ -368,7 +356,7 @@ export interface ChatEvent {
  * booleans, so true). Each push is a batch (`chatServiceBatchEvent: [...]`).
  * Returns stop (sends GQL_STOP).
  */
-export function watchChatEvents(convId: string, onEvents: (events: ChatEvent[]) => void): () => void {
+export function watchChatEvents(convId: string, onEvents: (events: ChatEvent[]) => void) {
   return cdlSubscribe<{ chatServiceBatchEvent?: unknown }>(
     "DataResolversBrowserChatServiceEventsChatServiceBatchEventSubscription",
     D.CHAT_EVENTS,

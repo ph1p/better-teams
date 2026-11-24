@@ -29,7 +29,7 @@ export const common: Messages["common"] = {
     Unknown: "Status unbekannt",
   },
   language: "Sprache",
-  languageAuto: (name: string) => `Automatisch (${name})`,
+  languageAuto: (name) => `Automatisch (${name})`,
   nameFormat: "Namen",
   settings: "Einstellungen",
   settingsGeneral: "Allgemein",

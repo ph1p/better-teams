@@ -52,26 +52,22 @@ export async function forwardMessage(
   return { ok: true, via: "cdl" };
 }
 
-// Send a text message through the exact chatsvc endpoint Teams itself POSTs to,
-// with Teams' own live token. Mirrors the captured native-send body 1:1. Returns
-// { ok, reason? }. Returns { ok:false, reason:"no-token" } when no bearer is
-// available yet, so the caller can fall back to the native composer.
-// `quote`, when given, is the message being quote-replied to:
-// { id, from, text, fromMri }. It prepends a Skype Reply blockquote exactly as
-// Teams' native quote-reply does, so the reply threads to that message.
+// REST fallback posts to the exact chatsvc endpoint Teams POSTs to, with its
+// live token, mirroring the captured native-send body 1:1. "no-token" when no
+// bearer is available yet, so the caller can fall back to the native composer.
+// `quote` prepends a Skype Reply blockquote exactly as Teams' native
+// quote-reply does, so the reply threads to that message.
 export async function sendRemote(
   conversationId: string,
   text: string,
   quote: Quote | null,
   mentions: readonly MentionPick[] = [],
-  /** Channel thread to reply in (the root message id). Ignored for chats. */
+  // Channel thread root message id. Ignored for chats.
   rootId?: string,
 ): Promise<WriteResult> {
   const body = (text || "").trim();
   if (!body) return { ok: false, reason: "empty" };
-  // Markdown-lite → native Teams HTML, with any @mention spans spliced in.
   const mc = formatMessage(body, mentions);
-  // Native quote-reply: prepend the Skype Reply blockquote (captured format).
   const content = buildQuoteHtml(quote) + mc.html;
   const clientMessageId = chat.newClientMessageId();
   const channel = isChannelId(conversationId);
@@ -133,7 +129,6 @@ export async function sendRemote(
   };
   const rest = await chatsvc.postMessage(target, payload);
   if (!rest.ok) return toWrite(rest);
-  // Our cached view is now stale; drop it so the next poll re-fetches.
   remoteCache.delete(conversationId);
   return { ok: true, via: "endpoint" };
 }
@@ -198,7 +193,6 @@ export async function editMessage(
   messageId: string,
   text: string,
   quoteHtml = "",
-  /** @mentions the edited text keeps or adds (see mentions.ts). */
   picks: readonly MentionPick[] = [],
 ): Promise<WriteResult> {
   const mc = formatMessage(String(text), picks);
@@ -236,11 +230,8 @@ export async function undoDelete(conversationId: string, messageId: string): Pro
   return { ok: true };
 }
 
-/**
- * Take files off a sent message: rewrite its properties.files with only the
- * ones to keep. The files stay in the sender's OneDrive, as when Teams itself
- * removes an attachment.
- */
+// Rewrites properties.files with only `keep`. The files stay in the sender's
+// OneDrive, as when Teams itself removes an attachment.
 export async function removeFiles(conversationId: string, messageId: string, keep: FileRef[]): Promise<WriteResult> {
   if (keep.some((f) => f.raw === undefined)) return { ok: false, reason: "file data missing" };
   const r = await chatsvc.putMessageProperty(

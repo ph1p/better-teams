@@ -25,28 +25,28 @@ export const LANGS: { id: Lang; name: string }[] = [
   { id: "de", name: "Deutsch" },
 ];
 
-function readPref(): LangPref {
+function readPref() {
   const v = read<unknown>("lang", "auto");
   return v === "en" || v === "de" ? v : "auto";
 }
 
-const isLang = (tag: string): Lang | null => {
+const isLang = (tag: string) => {
   const base = tag.toLowerCase().split(/[-_]/)[0];
   return base in DICTS ? (base as Lang) : null;
 };
 
 /** The browser/Teams language tags to try, most specific first. */
-function wanted(): string[] {
+function wanted() {
   const page = typeof document !== "undefined" ? document.documentElement.lang : "";
   const nav = typeof navigator !== "undefined" ? [...(navigator.languages ?? []), navigator.language] : [];
   return [page, ...nav].filter(Boolean);
 }
 
-function localeFor(l: Lang): string {
+function localeFor(l: Lang) {
   return wanted().find((w) => isLang(w) === l) ?? (l === "de" ? "de-DE" : "en-US");
 }
 
-function detect(): Lang {
+function detect() {
   for (const tag of wanted()) {
     const l = isLang(tag);
     if (l) return l;
@@ -55,26 +55,26 @@ function detect(): Lang {
 }
 
 let pref: LangPref = readPref();
-let cur: Lang = pref === "auto" ? detect() : pref;
+let cur = pref === "auto" ? detect() : pref;
 let tag = localeFor(cur);
 const subs = new Set<() => void>();
 
 /** The active language's strings. */
 export const t = (): Messages => DICTS[cur];
 
-export const lang = (): Lang => cur;
+export const lang = () => cur;
 /** What "automatic" resolves to right now (for the picker's label). */
-export const autoLang = (): Lang => detect();
-export const langPref = (): LangPref => pref;
+export const autoLang = () => detect();
+export const langPref = () => pref;
 
 /**
  * The BCP 47 tag for Intl date/number formatting: the user's own regional
  * variant when it is in the active language (de-AT, en-GB), else a default.
  * Computed on a language switch, not per call (formatting runs on every poll).
  */
-export const locale = (): string => tag;
+export const locale = () => tag;
 
-export function setLangPref(p: LangPref): void {
+export function setLangPref(p: LangPref) {
   pref = p;
   write("lang", p);
   const next = p === "auto" ? detect() : p;
@@ -90,6 +90,6 @@ const subscribe = (fn: () => void): (() => void) => {
 };
 
 /** Re-render on a language switch. Call once near the root. */
-export function useLang(): Lang {
+export function useLang() {
   return useSyncExternalStore(subscribe, lang, lang);
 }

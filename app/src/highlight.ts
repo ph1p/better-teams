@@ -8,7 +8,7 @@
 // load there. We use Shiki's pure-JS regex engine instead (no WASM, no eval).
 // Init is async (grammars load once). Until it finishes, callers get null and
 // render plain <pre>. When ready we re-render via an onReady hook.
-import { createHighlighterCore, type HighlighterCore, type ThemedToken } from "shiki/core";
+import { createHighlighterCore, type HighlighterCore } from "shiki/core";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 
 import themeDark from "shiki/themes/github-dark-default.mjs";
@@ -35,7 +35,6 @@ import csharp from "shiki/langs/csharp.mjs";
 type LangInput = Parameters<typeof createHighlighterCore>[0] extends { langs: infer L } ? L : never;
 type ThemeInput = Parameters<typeof createHighlighterCore>[0] extends { themes: infer T } ? T : never;
 
-// Map common aliases Teams/users write to the grammar name Shiki knows.
 const ALIAS: Record<string, string> = {
   js: "javascript",
   mjs: "javascript",
@@ -82,7 +81,7 @@ let hl: HighlighterCore | null = null;
 let initStarted = false;
 const readyCbs = new Set<() => void>();
 
-export function normLang(lang: string): string {
+export function normLang(lang: string) {
   const l = String(lang || "")
     .toLowerCase()
     .trim();
@@ -96,7 +95,7 @@ export function onHighlighterReady(cb: () => void): () => void {
   return () => readyCbs.delete(cb);
 }
 
-export function initHighlighter(): void {
+export function initHighlighter() {
   if (initStarted) return;
   initStarted = true;
   createHighlighterCore({
@@ -119,10 +118,9 @@ export function initHighlighter(): void {
     });
 }
 
-// Highlight code to an array of {content, color, fontStyle} token lines, so the
-// caller renders React spans itself (no innerHTML — Trusted Types forbids it).
-// Returns null until the highlighter is ready or when the language is unknown.
-export function highlightLines(code: string, lang: string): ThemedToken[][] | null {
+// Token lines, so the caller renders React spans itself (no innerHTML — Trusted
+// Types forbids it). null until the highlighter is ready or for unknown languages.
+export function highlightLines(code: string, lang: string) {
   const name = normLang(lang);
   if (!hl || !name) return null;
   const dark = !document.documentElement.classList.contains("tc-light");

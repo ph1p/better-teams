@@ -11,7 +11,7 @@ const adaptive = {
   ],
 };
 
-const swift = (attachments: unknown[]): string =>
+const swift = (attachments: unknown[]) =>
   `<URIObject type="SWIFT.1"><Swift b64="${btoa(
     String.fromCharCode(...new TextEncoder().encode(JSON.stringify({ type: "message/card", attachments }))),
   )}"/></URIObject>`;

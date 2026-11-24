@@ -1,4 +1,3 @@
-// Strings shared across areas: generic actions, presence, the language picker.
 export const common = {
   save: "Save",
   cancel: "Cancel",

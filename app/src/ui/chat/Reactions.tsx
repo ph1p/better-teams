@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type JSX } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { myMri, profile } from "../../teamsData";
 import { personName } from "../../names";
@@ -19,21 +19,19 @@ interface Props {
   onOpenProfile: (mri: string) => void;
 }
 
-// The reaction pills under a message. Hovering one shows who reacted (avatar +
-// name, me first); each person opens their profile. The popover is portaled to
-// #tc-root with a fixed position so the message list's scroll box can't clip it,
-// and it stays open while the pointer moves from the pill into it.
-export function Reactions({ reactions, onReact, onOpenProfile }: Props): JSX.Element {
+// The popover is portaled to #tc-root with a fixed position so the message
+// list's scroll box can't clip it.
+export function Reactions({ reactions, onReact, onOpenProfile }: Props) {
   const [hover, setHover] = useState<{ key: string; style: CSSProperties } | null>(null);
   const timer = useRef(0);
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  const later = (ms: number, fn: () => void): void => {
+  const later = (ms: number, fn: () => void) => {
     clearTimeout(timer.current);
     timer.current = window.setTimeout(fn, ms);
   };
-  const show = (key: string, el: HTMLElement, now = false): void => {
-    const open = (): void => {
+  const show = (key: string, el: HTMLElement, now = false) => {
+    const open = () => {
       const r = el.getBoundingClientRect();
       setHover({ key, style: menuPos(r.left, r.top, r.bottom, POP_W, 6) });
     };
@@ -42,8 +40,8 @@ export function Reactions({ reactions, onReact, onOpenProfile }: Props): JSX.Ele
       open();
     } else later(hover ? 0 : OPEN_MS, open);
   };
-  const hide = (): void => later(CLOSE_MS, () => setHover(null));
-  const keep = (): void => clearTimeout(timer.current);
+  const hide = () => later(CLOSE_MS, () => setHover(null));
+  const keep = () => clearTimeout(timer.current);
 
   const cur = hover ? reactions.find((r) => r.key === hover.key) : undefined;
   const root = cur && document.getElementById("tc-root");
@@ -81,9 +79,8 @@ interface ListProps {
   onOpenProfile: (mri: string) => void;
 }
 
-function ReactorList({ r, style, onEnter, onLeave, onOpenProfile }: ListProps): JSX.Element {
+function ReactorList({ r, style, onEnter, onLeave, onOpenProfile }: ListProps) {
   const me = myMri();
-  // Me first, then everyone else in reaction order.
   const users = [...(r.users ?? [])].sort((a, b) => Number(b === me) - Number(a === me));
   const unknown = Math.max(0, r.count - users.length);
   return (

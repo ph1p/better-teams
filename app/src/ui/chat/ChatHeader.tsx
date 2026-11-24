@@ -1,5 +1,5 @@
 import { t } from "../../i18n";
-import { useState, type JSX } from "react";
+import { useState } from "react";
 import { BellOff, Blocks, MessageSquareText, Phone, Search, StickyNote, Video, X } from "lucide-react";
 import { profile, type PeopleHit } from "../../teamsData";
 import { isAppMri } from "../../apps";
@@ -34,7 +34,6 @@ interface ChatHeaderProps {
   onNewChannel: (chat: Chat) => void;
 }
 
-// The title, as an input while renaming: Enter saves, Escape or leaving cancels.
 function RenameInput({
   chat,
   onRename,
@@ -43,9 +42,9 @@ function RenameInput({
   chat: Chat;
   onRename: (chat: Chat, title: string) => Promise<boolean>;
   onDone: () => void;
-}): JSX.Element {
+}) {
   const [v, setV] = useState(chat.title);
-  const save = async (): Promise<void> => {
+  const save = async () => {
     if (await onRename(chat, v)) onDone();
   };
   return (
@@ -71,8 +70,6 @@ function RenameInput({
   );
 }
 
-// Header of the open conversation: avatar, title + subtitle, search / notes
-// toggles and the call buttons; app chats get an explanatory strip below.
 export function ChatHeader({
   chat,
   searchOpen,
@@ -92,7 +89,7 @@ export function ChatHeader({
   onRemoveMember,
   onLeave,
   onNewChannel,
-}: ChatHeaderProps): JSX.Element {
+}: ChatHeaderProps) {
   const { statusOf, noteOf } = usePresence();
   const note = isDirect(chat) && chat.avatarMri ? noteOf(chat.avatarMri) : "";
   const [renaming, setRenaming] = useState(false);
@@ -104,7 +101,6 @@ export function ChatHeader({
   const callable = callees.length > 0 && callees.length <= MAX_CALL;
   const audioLabel = callees.length <= 1 ? t().common.audioCall : t().chat.groupAudioCall(callees.length);
   const videoLabel = callees.length <= 1 ? t().common.videoCall : t().chat.groupVideoCall(callees.length);
-  // Header subtitle: what is useful to know about the other side right now.
   const headSub = chat.isChannel
     ? chat.team
     : chat.kind === "meeting"
@@ -252,8 +248,7 @@ interface MessageSearchBarProps {
   onClose: () => void;
 }
 
-// In-conversation search box (⌘F), shown under the header while open.
-export function MessageSearchBar({ query, onQuery, matches, onClose }: MessageSearchBarProps): JSX.Element {
+export function MessageSearchBar({ query, onQuery, matches, onClose }: MessageSearchBarProps) {
   return (
     <div className="tc-msgsearch">
       <Search size={14} className="tc-search-icon" />

@@ -116,7 +116,6 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     setOlder({ id: sel, list: [] });
   }
 
-  // Messages for the selected chat: polled, plus live events for chats.
   useEffect(() => {
     if (!sel) return;
     let alive = true;
@@ -139,7 +138,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
         return { id: sel, list: [...page.filter((m) => !seen.has(m.id)), ...base] };
       });
     })();
-    const run = async (force?: boolean): Promise<void> => {
+    const run = async (force?: boolean) => {
       if (!force && isIdle()) return;
       try {
         const list = await listMessages(sel, { channel: selIsChannel, remoteLimit: INITIAL_REMOTE });
@@ -263,13 +262,13 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     return () => ro.disconnect();
     // hasView: the list mounts only once the chat is known, maybe after `sel`.
   }, [sel, hasView]);
-  const loadOlder = useCallback((): Promise<boolean> => {
+  const loadOlder = useCallback(() => {
     if (inflight.current) return inflight.current;
     if (noMore.current) return Promise.resolve(false);
     const el = scroller.current;
     const cid = sel;
     paging.current = true;
-    const run = async (): Promise<boolean> => {
+    const run = async () => {
       // Older pages can overlap what the local cache already shows; keep
       // paging (bounded) until one brings something new, or the view stays
       // stuck at top. An empty page means "nothing yet": stop, retry on the
@@ -305,7 +304,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
   // True while the message list is scrolled near the bottom; drives the
   // scroll-to-newest button (stick is a ref, so we mirror it into state here).
   const [atBottom, setAtBottom] = useState(true);
-  const scrollToBottom = (): void => {
+  const scrollToBottom = () => {
     const el = scroller.current;
     stick.current = true;
     if (el) el.scrollTop = el.scrollHeight;
@@ -316,7 +315,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
   // top of the list, so the day stays pinned while reading within it. It steps
   // aside while the next divider is close below, so two dates never stack.
   const [stickyDay, setStickyDay] = useState("");
-  const updateStickyDay = (el: HTMLDivElement): void => {
+  const updateStickyDay = (el: HTMLDivElement) => {
     const days = el.querySelectorAll<HTMLElement>(".tc-day");
     let label = "";
     const top = el.scrollTop;
@@ -331,7 +330,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     setStickyDay(label);
   };
 
-  const onScroll = (): void => {
+  const onScroll = () => {
     const el = scroller.current;
     if (!el) return;
     const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
@@ -356,12 +355,12 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
   // both the recent and the paged-older lists, then write to Teams; restore the
   // snapshot on failure. One reaction per user per message, so adding one clears
   // any other reaction of mine.
-  async function react(cid: string, messageId: string, key: string, add: boolean): Promise<void> {
+  async function react(cid: string, messageId: string, key: string, add: boolean) {
     const patch = (m: Msg): Msg => {
       if (m.id !== messageId) return m;
       const me = myMri();
       const rs = m.reactions.map((r) => ({ ...r }));
-      const drop = (r: Reaction): void => {
+      const drop = (r: Reaction) => {
         r.count = Math.max(0, r.count - 1);
         r.mine = false;
         if (r.users) r.users = r.users.filter((u) => u !== me);
@@ -393,13 +392,12 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     }
   }
 
-  // Patch one message in both the recent and paged-older lists.
-  function patchMsg(messageId: string, fn: (m: Msg) => Msg): void {
+  function patchMsg(messageId: string, fn: (m: Msg) => Msg) {
     const apply = (m: Msg): Msg => (m.id === messageId ? fn(m) : m);
     setMsgs((s) => ({ ...s, list: s.list.map(apply) }));
     setOlder((s) => ({ ...s, list: s.list.map(apply) }));
   }
-  const refetch = (): void => {
+  const refetch = () => {
     setMsgs((s) => ({ ...s, loaded: false, failed: false }));
     lastMsgSig.current = null;
     nullTicks.current = 0;
@@ -407,7 +405,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
   };
 
   // Soft-delete my message (reversible via Undo). Optimistic; refetch on failure.
-  async function remove(cid: string, messageId: string): Promise<void> {
+  async function remove(cid: string, messageId: string) {
     patchMsg(messageId, (m) => ({ ...m, deleted: true }));
     const res = await deleteMessage(cid, messageId);
     if (!res.ok) {
@@ -416,8 +414,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     }
   }
 
-  // Undo a soft-delete: refetch to pull back the restored content.
-  async function undo(cid: string, messageId: string): Promise<void> {
+  async function undo(cid: string, messageId: string) {
     const res = await undoDelete(cid, messageId);
     if (res.ok) refetch();
     else flash(t().app.undoFailed(res.reason));
@@ -425,7 +422,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
 
   // Take one file off a sent message. With no text and no files left, the
   // message would be empty, so it is deleted instead (undo stays available).
-  async function removeFile(cid: string, messageId: string, index: number): Promise<void> {
+  async function removeFile(cid: string, messageId: string, index: number) {
     const m = msgs.list.find((x) => x.id === messageId) || older.list.find((x) => x.id === messageId);
     if (!m) return;
     const keep = m.files.filter((_, i) => i !== index);
@@ -447,7 +444,7 @@ export function useMessages(sel: string | null, selChat: Chat | undefined, flash
     text: string,
     quoteHtml = "",
     picks: readonly MentionPick[] = [],
-  ): Promise<void> {
+  ) {
     const next = editedContent(text, quoteHtml, picks);
     patchMsg(messageId, (m) => ({ ...m, ...next, edited: true }));
     const res = await editMessage(cid, messageId, text, quoteHtml, picks);

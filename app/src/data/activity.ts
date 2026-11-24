@@ -3,7 +3,7 @@
 // streamofnotifications); each message carries `properties.activity`, which
 // points at the source chat and message. IndexedDB holds it as an object, the
 // chatsvc REST page as a JSON string: both are parsed.
-import type { Activity, ActivityKind, WriteResult } from "../types";
+import type { Activity, ActivityKind } from "../types";
 import { chatsvc } from "../services";
 import { getByPrefix, open } from "./idb";
 import { arr, get, isObj, obj, parsed, str, toMs, type Dict } from "./raw";
@@ -25,7 +25,7 @@ const KINDS: Record<string, ActivityKind> = {
   replyToReply: "reply",
 };
 
-function activityOf(m: Dict): Dict | null {
+function activityOf(m: Dict) {
   const a = parsed(get(m.properties, "activity"));
   return isObj(a) ? a : null;
 }
@@ -55,8 +55,7 @@ function toActivity(raw: unknown, horizon: number): Activity | null {
   };
 }
 
-/** The feed row's read horizon (ms), as Teams stores it. 0 when unknown. */
-async function feedHorizon(): Promise<number> {
+async function feedHorizon() {
   let idb = 0;
   try {
     const db = await open("conversation");
@@ -77,14 +76,14 @@ async function feedHorizon(): Promise<number> {
   return effectiveHorizon(FEED_ID, idb);
 }
 
-async function localRows(): Promise<unknown[]> {
+async function localRows() {
   const db = await open("replychain");
   const stores = [...db.objectStoreNames].filter((s) => s.startsWith("replychains"));
   const chains = (await Promise.all(stores.map((s) => getByPrefix(db, s, FEED_ID)))).flat();
   return chains.flatMap((rc) => Object.values(obj(get(rc, "messageMap"))));
 }
 
-async function remoteRows(): Promise<unknown[]> {
+async function remoteRows() {
   if (remote && Date.now() - remote.at < REMOTE_TTL) return remote.rows;
   const r = await chatsvc.getMessages(FEED_ID, LIMIT);
   if (!r.ok) return remote?.rows ?? [];
@@ -92,8 +91,7 @@ async function remoteRows(): Promise<unknown[]> {
   return remote.rows;
 }
 
-/** Newest activity first, at most 50 items. */
-export async function listActivity(): Promise<Activity[]> {
+export async function listActivity() {
   const horizon = await feedHorizon();
   let rows = await localRows().catch(() => [] as unknown[]);
   if (!rows.length) rows = await remoteRows();
@@ -105,7 +103,6 @@ export async function listActivity(): Promise<Activity[]> {
   return [...byId.values()].sort((x, y) => y.time - x.time).slice(0, LIMIT);
 }
 
-/** Mark the feed read up to its newest item. */
-export function markActivityRead(newest: number): Promise<WriteResult> {
+export function markActivityRead(newest: number) {
   return markRead(FEED_ID, newest);
 }

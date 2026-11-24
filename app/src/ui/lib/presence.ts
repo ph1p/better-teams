@@ -20,23 +20,18 @@ export type Status = "Available" | "Away" | "BeRightBack" | "Busy" | "DoNotDistu
 // aria-label (lower-cased) -> status. Covers English + German (the two locales
 // observed). Keys are matched case-insensitively.
 const LABELS: Record<string, Status> = {
-  // Available
   available: "Available",
   verfügbar: "Available",
-  // Away
   away: "Away",
   abwesend: "Away",
-  // Be right back
   "be right back": "BeRightBack",
   "bin gleich zurück": "BeRightBack",
-  // Busy
   busy: "Busy",
   "in a call": "Busy",
   "in a meeting": "Busy",
   beschäftigt: "Busy",
   "in besprechung": "Busy",
   "in einem anruf": "Busy",
-  // Do not disturb
   "do not disturb": "DoNotDisturb",
   // Self badge (me-control) uses the raw availability token, lower-cased.
   donotdisturb: "DoNotDisturb",
@@ -44,7 +39,6 @@ const LABELS: Record<string, Status> = {
   "nicht stören": "DoNotDisturb",
   presenting: "DoNotDisturb",
   focusing: "DoNotDisturb",
-  // Offline / away-from-keyboard
   offline: "Offline",
   "appears offline": "Offline",
   "als offline anzeigen": "Offline",
@@ -52,7 +46,7 @@ const LABELS: Record<string, Status> = {
   unbekannt: "Unknown",
 };
 
-const statusFromLabel = (label: string): Status => {
+const statusFromLabel = (label: string) => {
   const k = label.trim().toLowerCase();
   if (LABELS[k]) return LABELS[k];
   // Substring fallback: localised labels sometimes embed the word
@@ -75,11 +69,11 @@ const CLASS_STATUS: Record<string, Status> = {
   f14k8a89: "Away",
   f11d4kpn: "Offline",
 };
-const statusFromClass = (cls: string): Status => {
+const statusFromClass = (cls: string) => {
   for (const key in CLASS_STATUS) if (cls.indexOf(key) !== -1) return CLASS_STATUS[key];
   return "Unknown";
 };
-const statusOfBadge = (el: HTMLElement): Status => {
+const statusOfBadge = (el: HTMLElement) => {
   const byLabel = statusFromLabel(el.getAttribute("aria-label") || "");
   if (byLabel !== "Unknown") return byLabel;
   return statusFromClass(el.className || "");
@@ -88,7 +82,7 @@ const statusOfBadge = (el: HTMLElement): Status => {
 // Scrape all presence badges into an MRI -> Status map. Self badge
 // (data-tid="me-control-avatar-presence") has no MRI in its id; we skip it here
 // and expose it separately via readSelf().
-function scrape(): Map<string, Status> {
+function scrape() {
   const map = new Map<string, Status>();
   const nodes = document.querySelectorAll<HTMLElement>('[id^="presence-pill-8:"]');
   for (const el of nodes) {
@@ -99,7 +93,7 @@ function scrape(): Map<string, Status> {
   return map;
 }
 
-function readSelf(): Status {
+function readSelf() {
   const el = document.querySelector<HTMLElement>('[data-tid="me-control-avatar-presence"]');
   if (!el) return "Unknown";
   return statusOfBadge(el);
@@ -118,8 +112,7 @@ const subs = new Set<() => void>();
 let unsub: (() => void) | null = null;
 let poll: ReturnType<typeof setInterval> | 0 = 0;
 
-// Re-scrape; merge into the sticky cache. Returns true if anything changed.
-function refresh(): void {
+function refresh() {
   let changed = false;
   for (const [mri, st] of scrape()) {
     if (live.has(mri)) continue;
@@ -139,7 +132,7 @@ function refresh(): void {
 // Subscribe to presence changes. Lazily wires one MutationObserver (shared with
 // live refresh) plus a slow poll, since Teams can update a badge in place
 // without a childList mutation the observer would catch. Returns an unsubscribe.
-export function onPresence(cb: () => void): () => void {
+export function onPresence(cb: () => void) {
   subs.add(cb);
   if (!unsub) {
     refresh();
@@ -189,7 +182,7 @@ declare global {
 (() => {
   const sink: PresenceSink = {
     map: {},
-    push(mri: string, availability: string): void {
+    push(mri: string, availability: string) {
       const st = WS_STATUS[availability];
       if (!st || !mri) return;
       sink.map[mri] = st;
@@ -280,7 +273,7 @@ function setNote(mri: string, n: PresenceEvent["statusNote"]) {
   return true;
 }
 
-function onBatch(batch: PresenceEvent[]): void {
+function onBatch(batch: PresenceEvent[]) {
   let changed = false;
   for (const e of batch) {
     if (e.statusNote !== undefined && setNote(e.id, e.statusNote)) changed = true;
@@ -295,21 +288,21 @@ function onBatch(batch: PresenceEvent[]): void {
   if (changed) for (const f of subs) f();
 }
 
-function flush(): void {
+function flush() {
   flushTimer = 0;
   const ids = queue;
   queue = [];
   for (let i = 0; i < ids.length; i += BATCH) streams.push(watchPresence(ids.slice(i, i + BATCH), onBatch));
 }
 
-function want(mri: string): void {
+function want(mri: string) {
   if (wanted.has(mri) || !mri.startsWith("8:")) return;
   wanted.add(mri);
   queue.push(mri);
   if (!flushTimer) flushTimer = setTimeout(flush, FLUSH_MS);
 }
 
-function stopStreams(): void {
+function stopStreams() {
   if (flushTimer) {
     clearTimeout(flushTimer);
     flushTimer = 0;
@@ -321,8 +314,7 @@ function stopStreams(): void {
   notes.clear();
 }
 
-// Current status for an MRI (or self when mri omitted / matches self).
-export function statusOf(mri: string | undefined): Status {
+export function statusOf(mri: string | undefined) {
   if (!mri) return "Unknown";
   want(mri);
   // Own MRI: the me-control badge (selfStatus) is the freshest source.
@@ -338,13 +330,13 @@ export function noteOf(mri: string | undefined) {
   return n.text;
 }
 
-export function selfPresence(): Status {
+export function selfPresence() {
   return selfStatus;
 }
 
 // Optimistic self update after we changed our own status through Teams' menu;
 // the next scrape of the me-control badge confirms or corrects it.
-export function setSelfPresence(st: Status): void {
+export function setSelfPresence(st: Status) {
   if (st === selfStatus) return;
   selfStatus = st;
   for (const f of subs) f();
@@ -360,7 +352,7 @@ export function usePresence() {
   return { statusOf, noteOf, self: selfPresence };
 }
 
-// Ring colour per status. Matches Teams' own palette closely.
+// Matches Teams' own palette closely.
 export const STATUS_COLOR: Record<Status, string> = {
   Available: "#6bb700",
   Away: "#ffaa44",
@@ -371,5 +363,4 @@ export const STATUS_COLOR: Record<Status, string> = {
   Unknown: "transparent",
 };
 
-// Human-readable status name (sidebar footer, chat header), in the UI language.
-export const statusLabel = (s: Status): string => t().common.status[s];
+export const statusLabel = (s: Status) => t().common.status[s];

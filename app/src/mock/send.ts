@@ -10,12 +10,12 @@ import * as store from "./store";
 
 const later = <T>(v: T, ms = 150): Promise<T> => new Promise((r) => setTimeout(() => r(v), ms));
 
-function mriOf(p: PickPerson): string {
+function mriOf(p: PickPerson) {
   const hit = PEOPLE.find((x) => (p.oid && x.mri.endsWith(p.oid)) || (p.upn && x.email === p.upn.toLowerCase()));
   return hit ? hit.mri : "";
 }
 
-export async function openNativeChat(conversationId: string, _title?: string, _team?: string): Promise<boolean> {
+export async function openNativeChat(conversationId: string, _title?: string, _team?: string) {
   return !!store.getChat(conversationId);
 }
 
@@ -24,28 +24,15 @@ function callNotice(what: string): WriteResult {
   return { ok: false, reason: "mock: calls need Teams" };
 }
 
-export async function startNativeCall(
-  _conversationId: string,
-  title: string,
-  kind: "audio" | "video",
-): Promise<WriteResult> {
+export async function startNativeCall(_conversationId: string, title: string, kind: "audio" | "video") {
   return callNotice(`${kind} call with ${title}`);
 }
 
-export async function joinNativeMeeting(
-  _conversationId: string,
-  title: string,
-  _rootId: string,
-  _team?: string,
-): Promise<WriteResult> {
+export async function joinNativeMeeting(_conversationId: string, title: string, _rootId: string, _team?: string) {
   return callNotice(`join meeting in ${title}`);
 }
 
-export async function startNativeChannelMeeting(
-  _conversationId: string,
-  title: string,
-  _team?: string,
-): Promise<WriteResult> {
+export async function startNativeChannelMeeting(_conversationId: string, title: string, _team?: string) {
   return callNotice(`meet now in ${title}`);
 }
 
@@ -57,7 +44,7 @@ export async function openNativeNewChat(people: PickPerson[]): Promise<NewChatRe
   return later({ ok: true, id, draft: !store.getChat(id)?.messages.length });
 }
 
-export async function openNativeDirect(upn: string, oid?: string): Promise<NewChatResult> {
+export async function openNativeDirect(upn: string, oid?: string) {
   return openNativeNewChat([{ upn, ...(oid ? { oid } : {}) }]);
 }
 
@@ -102,9 +89,9 @@ export async function sendFiles(
 }
 
 // No native Teams client to follow in the browser.
-export function nativeThreadId(): string {
+export function nativeThreadId() {
   return "";
 }
-export function nativeDriven(): boolean {
+export function nativeDriven() {
   return false;
 }

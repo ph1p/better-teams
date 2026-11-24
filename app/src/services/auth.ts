@@ -62,7 +62,7 @@ type VaultHost = { [KEY]?: Vault };
 // so the same capture code wraps fetch/XHR wherever it is placed. A worker
 // cannot reach the page vault; it forwards a captured header with
 // ingestAuthHeader (see below).
-function g(): VaultHost {
+function g() {
   return globalThis as unknown as VaultHost;
 }
 
@@ -78,7 +78,7 @@ function sharedHost(): VaultHost | null {
   return null;
 }
 
-function realmVault(host: VaultHost): Vault {
+function realmVault(host: VaultHost) {
   let v = host[KEY];
   if (!v) {
     v = { tokens: new Map(), regions: {}, waiters: new Set(), installed: {} };
@@ -87,7 +87,7 @@ function realmVault(host: VaultHost): Vault {
   return v;
 }
 
-function vault(): Vault {
+function vault() {
   const v = realmVault(g());
   const host = sharedHost();
   if (!host) return v;
@@ -130,7 +130,7 @@ function classify(aud: string, scp: string): Audience | null {
   return null;
 }
 
-function remember(authHeader: string, url: string): void {
+function remember(authHeader: string, url: string) {
   if (!authHeader || !/^Bearer /i.test(authHeader)) return;
   const tok = authHeader.slice(7).trim();
   const c = claims(tok);
@@ -147,7 +147,7 @@ function remember(authHeader: string, url: string): void {
   notify();
 }
 
-function notify(): void {
+function notify() {
   const v = vault();
   for (const w of Array.from(v.waiters)) {
     // A waiter from a window that has since closed must not stop the others.
@@ -159,7 +159,7 @@ function notify(): void {
   }
 }
 
-function noteRegion(url: string): void {
+function noteRegion(url: string) {
   const v = vault();
   const cs = /https:\/\/([a-z]{2,4})-prod\.asyncgw/.exec(url) || /\/api\/chatsvc\/([a-z]{2,4}|consumer)\//.exec(url);
   if (cs) v.regions.chatsvc = cs[1];
@@ -170,11 +170,9 @@ function noteRegion(url: string): void {
   if (ups) v.regions.ups = ups[1];
 }
 
-// --- Capture hooks ------------------------------------------------------------
-
 type HeaderLike = Headers | Record<string, string> | [string, string][] | undefined;
 
-function authOf(headers: HeaderLike): string {
+function authOf(headers: HeaderLike) {
   if (!headers) return "";
   try {
     if (headers instanceof Headers) return headers.get("authorization") || "";
@@ -188,7 +186,7 @@ function authOf(headers: HeaderLike): string {
   }
 }
 
-function installFetch(): void {
+function installFetch() {
   const v = vault();
   const scope = globalThis as typeof globalThis;
   if (v.installed.fetch || typeof scope.fetch !== "function") return;
@@ -209,7 +207,7 @@ function installFetch(): void {
   v.installed.fetch = true;
 }
 
-function installXhr(): void {
+function installXhr() {
   const v = vault();
   if (v.installed.xhr || typeof XMLHttpRequest === "undefined") return;
   const proto = XMLHttpRequest.prototype;
@@ -237,15 +235,12 @@ function installXhr(): void {
   v.installed.xhr = true;
 }
 
-/**
- * Idempotent; safe to call from every (re-)injected build and from any realm
- * (page or worker). Teams issues several backend tokens (mt, csa/chatsvcagg,
- * presence) only from its web workers, whose fetch/XHR never cross the page
- * realm — so wrapping here in the page alone cannot see them. Running this same
- * function inside a worker captures them into that worker's vault; to make them
- * usable by page-realm service calls, forward them with ingestAuthHeader.
- */
-export function installAuthCapture(): void {
+// Idempotent; safe from every (re-)injected build and from any realm (page or
+// worker). Teams issues several backend tokens (mt, csa/chatsvcagg, presence)
+// only from its web workers, whose fetch/XHR never cross the page realm. Run
+// inside a worker, this captures them into that worker's vault; forward them to
+// the page with ingestAuthHeader.
+export function installAuthCapture() {
   if (typeof globalThis === "undefined") return;
   installFetch();
   installXhr();
@@ -259,22 +254,16 @@ export function installAuthCapture(): void {
   }
 }
 
-/**
- * File an Authorization header captured elsewhere (another realm's worker tap,
- * e.g. the CDP presence bridge) into this realm's vault, exactly as if we had
- * seen Teams use it here. Passive: nothing is sent; `header` is "Bearer <jwt>"
- * read off Teams' own request, `url` its request URL (for region detection).
- * Unknown audiences are ignored. Never throws.
- */
-export function ingestAuthHeader(header: string, url = ""): void {
+// Files an Authorization header captured in another realm (e.g. the CDP
+// presence bridge) as if seen here. Passive: nothing is sent. `header` is
+// "Bearer <jwt>" off Teams' own request, `url` its URL (for region detection).
+export function ingestAuthHeader(header: string, url = "") {
   try {
     remember(header, url);
   } catch {
     /* ignore malformed input */
   }
 }
-
-// --- Refresh through Teams' page auth handler ----------------------------------
 
 // Resources Teams' own worker requests from the page (its CDL resource keys).
 const RESOURCE: Partial<Record<Audience, string>> = {
@@ -305,7 +294,7 @@ function refresh(aud: Audience): Promise<void> | null {
   return p;
 }
 
-function refreshAad(aud: Audience, resource: string): Promise<void> {
+function refreshAad(aud: Audience, resource: string) {
   return cdlToken(resource).then((tok) => {
     const c = tok ? claims(tok) : {};
     const fresh = typeof c.exp === "number" && c.exp * 1000 - Date.now() > RENEW_MS;
@@ -316,7 +305,7 @@ function refreshAad(aud: Audience, resource: string): Promise<void> {
 
 // Consumer chatsvc takes the skype token Teams' worker gets from the page
 // (getSkypeTokens). It is opaque, so its lifetime comes with the reply.
-function refreshSkype(): Promise<void> {
+function refreshSkype() {
   return cdlSkypeToken().then((r) => {
     // A missing or nearly expired token still blocks retries for RETRY_MS.
     if (!r || (r.exp && r.exp - Date.now() <= RENEW_MS)) failedAt.set("skype", Date.now());
@@ -328,12 +317,9 @@ function refreshSkype(): Promise<void> {
   });
 }
 
-// --- Read side ----------------------------------------------------------------
-
 const SKEW_MS = 60_000;
 
-/** Current bearer for an audience, or "" if none captured / it expired. */
-export function token(aud: Audience): string {
+export function token(aud: Audience) {
   const e = vault().tokens.get(aud);
   const left = e ? (e.exp ? e.exp - Date.now() : Infinity) : 0;
   if (left < RENEW_MS) void refresh(aud);
@@ -341,10 +327,7 @@ export function token(aud: Audience): string {
   return e.tok;
 }
 
-/**
- * Resolves with a bearer as soon as one is available (or "" after `ms`). For
- * audiences we can request ourselves, waits for that request even if `ms` is 0.
- */
+// For audiences we can request ourselves, waits for that request even if `ms` is 0.
 export async function whenToken(aud: Audience, ms = 10_000): Promise<string> {
   const now = token(aud);
   if (now) return now;
@@ -356,12 +339,12 @@ export async function whenToken(aud: Audience, ms = 10_000): Promise<string> {
   }
   const v = vault();
   return new Promise((resolve) => {
-    const done = (t: string): void => {
+    const done = (t: string) => {
       v.waiters.delete(check);
       clearTimeout(timer);
       resolve(t);
     };
-    const check = (): void => {
+    const check = () => {
       const t = token(aud);
       if (t) done(t);
     };
@@ -370,14 +353,12 @@ export async function whenToken(aud: Audience, ms = 10_000): Promise<string> {
   });
 }
 
-/** Drop a token the backend just rejected (401), so callers wait for a fresh one. */
-export function invalidate(aud: Audience, tok: string): void {
+export function invalidate(aud: Audience, tok: string) {
   const v = vault();
   if (v.tokens.get(aud)?.tok === tok) v.tokens.delete(aud);
 }
 
-/** Personal (MSA) account on teams.live.com rather than a work/school tenant. */
-const consumerHost = ((): boolean => {
+const consumerHost = (() => {
   try {
     return /(^|\.)teams\.live\.com$/.test(location.hostname);
   } catch {
@@ -386,30 +367,26 @@ const consumerHost = ((): boolean => {
 })();
 // A page never switches between work and personal; cache the answer once known.
 let consumer = consumerHost;
-export function isConsumer(): boolean {
+export function isConsumer() {
   return consumer || (consumer = cdlConsumer());
 }
 
-/** Audience for chatsvc calls: AAD ic3 bearer at work, skype token on consumer. */
 export function chatAud(): Audience {
   return isConsumer() ? "skype" : "ic3";
 }
 
-export function region(kind: "chatsvc" | "mt" | "ups"): string {
+export function region(kind: "chatsvc" | "mt" | "ups") {
   const r = vault().regions[kind];
   if (r) return r;
   if (kind === "chatsvc") return isConsumer() ? "consumer" : "de";
   return "emea";
 }
 
-/**
- * Consumer account's own MRI ("8:<skype id>"), or "" at work / before known.
- * Teams keeps it in clear next to its (encrypted) cached skype token, so it is
- * readable before our first getSkypeTokens round trip.
- */
-// Teams' own cached skype token is scanned once; after that only refreshSkype fills the mri.
+// Consumer account's own MRI ("8:<skype id>"). Teams keeps it in clear next to
+// its (encrypted) cached skype token, so it is readable before our first
+// getSkypeTokens round trip. Scanned once; after that only refreshSkype fills it.
 let mriScanned = false;
-export function consumerMri(): string {
+export function consumerMri() {
   if (!isConsumer()) return "";
   const v = vault();
   if (v.regions.mri) return v.regions.mri;
@@ -432,14 +409,13 @@ export function consumerMri(): string {
   return "";
 }
 
-/** Signed-in user's object id, from the ic3 token (empty until captured). */
-export function myOid(): string {
+export function myOid() {
   const t = token("ic3");
   return t ? String(claims(t).oid || "") : "";
 }
 
-/** Diagnostics without secrets: which audiences are live and until when. */
-export function authStatus(): Record<string, { expiresIn: number; seenAgo: number }> {
+// Diagnostics without secrets.
+export function authStatus() {
   const out: Record<string, { expiresIn: number; seenAgo: number }> = {};
   for (const [k, e] of vault().tokens) {
     out[k] = {

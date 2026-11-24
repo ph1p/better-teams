@@ -1,5 +1,3 @@
-// Send layer for Better Teams.
-//
 // We deliberately do NOT replay Teams' undocumented internal POST endpoints
 // (they change and need the live auth token). Instead we drive Teams' own
 // composer: navigate the native client to the target conversation, type into
@@ -19,7 +17,7 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 const SEND_BUTTON = '[data-tid="sendMessageCommands-send"], [data-tid="newMessageCommands-send"], button[name="send"]';
 
 // Thread id the native composer currently targets, or "" if unknown.
-export function nativeThreadId(): string {
+export function nativeThreadId() {
   const b = document.querySelector("button[data-track-thread-id]");
   return (b && b.getAttribute("data-track-thread-id")) || "";
 }
@@ -39,8 +37,7 @@ async function drive<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-/** True while (or just after) the overlay drives Teams' native chat. */
-export function nativeDriven(): boolean {
+export function nativeDriven() {
   return driving > 0 || Date.now() - drivenAt < 2000;
 }
 
@@ -58,17 +55,16 @@ async function waitFor<T>(fn: () => T, ms = 2500, step = 100): Promise<T> {
 // this only works for rows Teams currently renders — favorites and expanded
 // folders. Rows carry the conversation id in data-fui-tree-item-value.
 // Channels pass their team name: a collapsed team is expanded first.
-export function openNativeChat(conversationId: string, title?: string, team?: string): Promise<boolean> {
+export function openNativeChat(conversationId: string, title?: string, team?: string) {
   return drive(() => clickNativeChat(conversationId, title, team));
 }
 
-/** Every element matching `sel` in Teams' own DOM (not inside the overlay). */
-const nativeAll = (sel: string): HTMLElement[] =>
+const nativeAll = (sel: string) =>
   [...document.querySelectorAll<HTMLElement>(sel)].filter((x) => !x.closest("#tc-root"));
 
-const firstLine = (el: HTMLElement): string => (el.innerText || "").trim().split("\n")[0].trim();
+const firstLine = (el: HTMLElement) => (el.innerText || "").trim().split("\n")[0].trim();
 
-function findNativeRow(conversationId: string, title?: string, team?: string): HTMLElement | undefined {
+function findNativeRow(conversationId: string, title?: string, team?: string) {
   const rows = nativeAll('[role="treeitem"]');
   const byId =
     rows.find((r) => (r.getAttribute("data-fui-tree-item-value") || "").includes(conversationId)) ||
@@ -94,7 +90,7 @@ function findNativeRow(conversationId: string, title?: string, team?: string): H
 
 // A channel row is only rendered while its team is expanded. Expand the team
 // row (matched by name) so the channel rows below it render.
-async function expandNativeTeam(team: string): Promise<boolean> {
+async function expandNativeTeam(team: string) {
   const head = nativeAll('[role="treeitem"][aria-expanded="false"]').find((r) => firstLine(r) === team.trim());
   if (!head) return false;
   head.scrollIntoView({ block: "center" });
@@ -102,7 +98,7 @@ async function expandNativeTeam(team: string): Promise<boolean> {
   return !!(await waitFor(() => head.getAttribute("aria-expanded") === "true", 1500));
 }
 
-async function clickNativeChat(conversationId: string, title?: string, team?: string): Promise<boolean> {
+async function clickNativeChat(conversationId: string, title?: string, team?: string) {
   if (nativeThreadId() === conversationId) return true;
   let row = findNativeRow(conversationId, title, team);
   if (!row && team && (await expandNativeTeam(team))) {
@@ -127,7 +123,7 @@ const CALL_MENU_ITEM = {
   video: '[data-tid="chat-call-video-button"], [data-tid="dropdown-video-call-btn"]',
 };
 
-function nativeButton(sel: string): HTMLElement | null {
+function nativeButton(sel: string) {
   return nativeAll(sel)[0] ?? null;
 }
 
@@ -162,12 +158,6 @@ export async function startNativeCall(
   return { ok: true, via: "native" };
 }
 
-// Teams' own "new message" flow: the left-rail New message button opens a
-// draft with a people picker ("To:"). Each pick adds a chip and the picker
-// stays open for more. Teams then shows the chat with exactly those people:
-// the existing one (its thread id appears), or an empty draft (no thread id)
-// that Teams creates on the first send. Picking yourself jumps to 48:notes.
-// Seen live 2026-11-19.
 // Join a running meeting the way the stock UI does: open the conversation in
 // Teams and press the "Join" button on that call's meeting card. Each card is
 // labelled #meeting-object-label<rootId>, so the right call is targeted even
@@ -181,7 +171,7 @@ export async function joinNativeMeeting(
   team?: string,
 ): Promise<WriteResult> {
   if (!(await openNativeChat(conversationId, title, team))) return { ok: false, reason: "chat not open in Teams" };
-  const find = (): HTMLElement | null => {
+  const find = () => {
     const card = document.getElementById("meeting-object-label" + rootId);
     const own = card?.querySelector<HTMLElement>(MEETING_JOIN);
     if (own) return own;
@@ -205,8 +195,8 @@ const CHANNEL_MEET_ITEM = '[data-tid="channel-header-meet-now-meet-btn"]';
 const LIVE_JOIN = '[data-tid^="liveJoinButton:"]';
 const ROSTER_JOIN = 'button[data-track-action-scenario="SlashCommandJoinMeetNow"]';
 
-async function joinFromChannelHeader(channelId: string, rootId: string): Promise<HTMLElement | null> {
-  const pick = (): HTMLElement | null => {
+async function joinFromChannelHeader(channelId: string, rootId: string) {
+  const pick = () => {
     const items = nativeAll(LIVE_JOIN);
     const own = items.find((b) =>
       (b.getAttribute("data-tid") || "").startsWith(`liveJoinButton:${channelId}:${rootId}`),
@@ -248,13 +238,18 @@ export async function startNativeChannelMeeting(
   return { ok: true, via: "native" };
 }
 
+// Teams' own "new message" flow: the left-rail New message button opens a
+// draft with a people picker ("To:"). Each pick adds a chip and the picker
+// stays open for more. Teams then shows the chat with exactly those people:
+// the existing one (its thread id appears), or an empty draft (no thread id)
+// that Teams creates on the first send. Picking yourself jumps to 48:notes.
+// Seen live 2026-11-19.
 const NEW_MESSAGE_BTN = '[data-testid^="simple-collab-left-rail-header-new-message"]';
 const PEOPLE_PICKER = '[data-tid="people-picker-search"]';
 const PICKER_OPTION = '[role="option"][data-tid^="people-picker-entry-"]';
 // Chip per picked person: data-tid ends with their UPN (or email).
 const PICKER_CHIP = '[data-tid^="people-picker-selected-user-"]';
 
-/** A person to add in Teams' people picker. */
 export interface PickPerson {
   /** UPN / email: Teams' option data-tid ends with it. */
   upn?: string;
@@ -264,7 +259,7 @@ export interface PickPerson {
 
 export type NewChatResult = { ok: true; id: string; draft: boolean } | { ok: false; reason: string };
 
-function chipCount(): number {
+function chipCount() {
   return nativeAll(PICKER_CHIP).length;
 }
 
@@ -273,11 +268,11 @@ function chipCount(): number {
 // reopen and even restart, so the picker can start non-empty.
 const CHIP_BUTTON = '[id^="recipient-line-entry-"]';
 
-function chipButtons(): HTMLElement[] {
+function chipButtons() {
   return nativeAll(CHIP_BUTTON);
 }
 
-function chipIs(c: HTMLElement, p: PickPerson): boolean {
+function chipIs(c: HTMLElement, p: PickPerson) {
   const key = (c.id + " " + (c.querySelector(PICKER_CHIP)?.getAttribute("data-tid") || "")).toLowerCase();
   const upn = (p.upn || "").trim().toLowerCase();
   const oid = (p.oid || "").trim().toLowerCase();
@@ -285,7 +280,7 @@ function chipIs(c: HTMLElement, p: PickPerson): boolean {
 }
 
 // Make the picker's chips exactly `list`: drop anyone else, report who is in.
-async function reconcileChips(list: PickPerson[]): Promise<Set<PickPerson>> {
+async function reconcileChips(list: PickPerson[]) {
   for (const c of chipButtons()) {
     if (list.some((p) => chipIs(c, p))) continue;
     const n = chipButtons().length;
@@ -295,15 +290,14 @@ async function reconcileChips(list: PickPerson[]): Promise<Set<PickPerson>> {
   return new Set(list.filter((p) => chipButtons().some((c) => chipIs(c, p))));
 }
 
-function matchesOption(o: Element, p: PickPerson): boolean {
+function matchesOption(o: Element, p: PickPerson) {
   const tid = (o.getAttribute("data-tid") || "").toLowerCase();
   const upn = (p.upn || "").trim().toLowerCase();
   const oid = (p.oid || "").trim().toLowerCase();
   return (!!upn && tid.endsWith(upn)) || (!!oid && tid.includes(oid));
 }
 
-// Type into the picker and click the one suggestion that matches `p`.
-async function pickPerson(p: PickPerson): Promise<boolean> {
+async function pickPerson(p: PickPerson) {
   const input = await waitFor(() => document.querySelector<HTMLInputElement>(PEOPLE_PICKER));
   if (!input) return false;
   const query = (p.upn || p.oid || "").trim();
@@ -328,7 +322,7 @@ async function pickPerson(p: PickPerson): Promise<boolean> {
 }
 
 // Thread id once Teams stops switching views: unchanged for `quiet` ms.
-async function settledThreadId(ms = 3000, quiet = 700): Promise<string> {
+async function settledThreadId(ms = 3000, quiet = 700) {
   let last = nativeThreadId();
   let since = Date.now();
   const end = Date.now() + ms;
@@ -349,7 +343,7 @@ async function settledThreadId(ms = 3000, quiet = 700): Promise<string> {
  * matches the person's UPN or object id is clicked. Never sends.
  * Resolves with the chat Teams shows: its id, or draft=true for a new chat.
  */
-export function openNativeNewChat(people: PickPerson[]): Promise<NewChatResult> {
+export function openNativeNewChat(people: PickPerson[]) {
   return drive(() => pickNewChat(people));
 }
 
@@ -384,7 +378,7 @@ async function pickNewChat(people: PickPerson[]): Promise<NewChatResult> {
 }
 
 /** Open the 1:1 chat with one person (see openNativeNewChat). */
-export async function openNativeDirect(upn: string, oid?: string): Promise<NewChatResult> {
+export async function openNativeDirect(upn: string, oid?: string) {
   return openNativeNewChat([{ upn, oid }]);
 }
 
@@ -394,10 +388,7 @@ export async function openNativeDirect(upn: string, oid?: string): Promise<NewCh
  * `people` (by UPN), so text never goes to a different set of people.
  * Resolves with the new chat's id ("" if Teams has not switched yet).
  */
-export function sendNativeDraft(
-  people: PickPerson[],
-  text: string,
-): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
+export function sendNativeDraft(people: PickPerson[], text: string) {
   return drive(() => sendDraft(people, text));
 }
 
@@ -410,7 +401,7 @@ async function sendDraft(
     .map((p) => (p.upn || "").trim().toLowerCase())
     .filter(Boolean)
     .sort();
-  const chipsOk = (): boolean => {
+  const chipsOk = () => {
     if (nativeThreadId()) return false; // an existing chat, not the draft
     const got = [...document.querySelectorAll(PICKER_CHIP)]
       .filter((c) => !c.closest("#tc-root"))
@@ -449,10 +440,10 @@ const FILE_WELL = '[data-tid="file-well"]';
 const FILE_CARD = FILE_WELL + ' [data-testid="content-card-custom-title"]';
 const FILE_REMOVE = FILE_WELL + ' [data-testid="close-button"]';
 
-const uploadedCount = (): number =>
+const uploadedCount = () =>
   [...document.querySelectorAll(FILE_CARD)].filter((e) => /https:\/\//.test(e.getAttribute("aria-label") || "")).length;
 
-function clearFileWell(): void {
+function clearFileWell() {
   document.querySelectorAll<HTMLElement>(FILE_REMOVE).forEach((b) => b.click());
 }
 
@@ -519,7 +510,7 @@ export async function sendFiles(
   return { ok: true, via: "button" };
 }
 
-function findComposer(): HTMLElement | null {
+function findComposer() {
   return (
     document.querySelector<HTMLElement>('[data-tid="ckeditor"][contenteditable="true"]') ||
     document.querySelector<HTMLElement>('[data-tid="ckeditor"] [contenteditable="true"]') ||
@@ -529,7 +520,7 @@ function findComposer(): HTMLElement | null {
 
 // Insert text into a contenteditable the way a paste does, so Teams' editor
 // picks it up through its own input handling.
-function setComposerText(el: HTMLElement, text: string): void {
+function setComposerText(el: HTMLElement, text: string) {
   el.focus();
   const sel = window.getSelection();
   if (sel) sel.selectAllChildren(el);
@@ -561,7 +552,7 @@ export async function sendMessage(conversationId: string, title: string, text: s
   if (nativeThreadId() !== conversationId) return { ok: false, reason: "wrong-chat" };
   // Teams empties its composer once the message is handed off; anything else
   // means we cannot tell whether it was sent.
-  const cleared = (): boolean => !composer.isConnected || !composer.textContent?.trim();
+  const cleared = () => !composer.isConnected || !composer.textContent?.trim();
   if (btn) {
     btn.click();
     if (!(await waitFor(() => cleared() || null, 3000))) return { ok: false, reason: "not-confirmed" };

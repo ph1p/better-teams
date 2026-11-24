@@ -1,4 +1,4 @@
-import type { JSX, MouseEvent, RefObject } from "react";
+import type { MouseEvent, RefObject } from "react";
 import { SideResize } from "./SideResize";
 import { Bell, CheckCheck, Search, SquarePen, X } from "lucide-react";
 import { Section } from "./Section";
@@ -16,7 +16,6 @@ interface SidebarProps {
   /** Inbox tab shown while the bell is on: unread chats or the activity feed. */
   inboxTab: InboxTab;
   onInboxTab: (tab: InboxTab) => void;
-  /** Bell button: turns the inbox (unread chats + activity) on and off. */
   onBell: () => void;
   activity: { items: Activity[]; unread: number; chats: Chat[]; onOpen: (a: Activity) => void };
   sel: string | null;
@@ -43,9 +42,7 @@ interface SidebarProps {
 
 export type InboxTab = "unread" | "activity";
 
-// Left column: header buttons, search + Unread filter, chat sections, the Notes
-// slot and the "me" bar.
-export function Sidebar(p: SidebarProps): JSX.Element {
+export function Sidebar(p: SidebarProps) {
   const {
     sections,
     selfSlot,

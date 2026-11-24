@@ -22,9 +22,9 @@ const ITEM: Record<SettableStatus, string> = {
 };
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
-const q = (tid: string): HTMLElement | null => document.querySelector<HTMLElement>(`[data-tid="${tid}"]`);
+const q = (tid: string) => document.querySelector<HTMLElement>(`[data-tid="${tid}"]`);
 
-async function waitTid(tid: string, ms = 2000): Promise<HTMLElement | null> {
+async function waitTid(tid: string, ms = 2000) {
   for (let t = 0; t < ms; t += 80) {
     const el = q(tid);
     if (el) return el;
@@ -34,7 +34,7 @@ async function waitTid(tid: string, ms = 2000): Promise<HTMLElement | null> {
 }
 
 // Fluent menus close on Escape at the focused element, one level per press.
-async function closeMenus(): Promise<void> {
+async function closeMenus() {
   for (let i = 0; i < 3 && q("me-control-menu-dialog"); i++) {
     (document.activeElement || document.body).dispatchEvent(
       new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, bubbles: true }),
@@ -74,8 +74,7 @@ async function viaMenu(status: SettableStatus): Promise<WriteResult> {
   }
 }
 
-// --- Status message ("custom status") ----------------------------------------
-// API only (Teams' worker mutation): Teams' status-message dialog is a rich
+// Status message ("custom status"): API only (Teams' worker mutation): Teams' status-message dialog is a rich
 // editor, too brittle to drive through the DOM.
 
 export type NoteExpiry = "never" | "1h" | "4h" | "today" | "week";
@@ -90,7 +89,7 @@ const EXPIRY: Record<NoteExpiry, presence.Expiry> = {
 
 // Local estimate of when the note lapses, only for myNote(); the server
 // computes the real one from the enum.
-function expiryDate(e: NoteExpiry): Date | undefined {
+function expiryDate(e: NoteExpiry) {
   const d = new Date();
   if (e === "1h") return new Date(d.getTime() + 3_600_000);
   if (e === "4h") return new Date(d.getTime() + 4 * 3_600_000);
@@ -109,7 +108,7 @@ export interface MyNote {
 let lastNote: MyNote | null = null;
 
 /** The note we last set from the overlay (Teams' own value isn't read yet). */
-export function myNote(): MyNote | null {
+export function myNote() {
   if (lastNote && lastNote.until && lastNote.until < Date.now()) lastNote = null;
   return lastNote;
 }

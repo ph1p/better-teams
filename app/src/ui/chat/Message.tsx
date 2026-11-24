@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState, type JSX } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../../i18n";
 import { personName, useNameFormat } from "../../names";
 import { profile } from "../../teamsData";
@@ -53,13 +53,12 @@ interface ForwardCardProps {
   onOpenMessage?: (cid: string, mid: string) => void;
 }
 
-// A forwarded message as Teams shows it: a bordered card with the original
-// sender and send time on top; clicking it opens the original in its chat.
-function ForwardCard({ m, body, onOpenProfile, onOpenMessage }: ForwardCardProps): JSX.Element {
+// Mirrors Teams' forwarded-message card.
+function ForwardCard({ m, body, onOpenProfile, onOpenMessage }: ForwardCardProps) {
   const f = m.forwarded;
   const s = t().chat;
   const name = f ? personName(profile(f.senderMri), f.sender, f.senderMri) : "";
-  const open = f?.threadId && onOpenMessage ? (): void => onOpenMessage(f.threadId, f.messageId) : undefined;
+  const open = f?.threadId && onOpenMessage ? () => onOpenMessage(f.threadId, f.messageId) : undefined;
   const canOpen = !!open;
   const When = canOpen ? "button" : "span";
   return (
@@ -136,16 +135,11 @@ interface MessageProps {
   onOpenTeamsLink?: (link: TeamsLink) => boolean;
   /** Channels only: answer in this message's thread. */
   onThreadReply?: (m: Msg) => void;
-  /** Forward this message to another chat or channel. */
   onForward?: (m: Msg) => void;
   /** Card buttons that post back to a bot hand off to Teams. */
   onOpenInTeams?: () => void;
 }
 
-// One rendered message: avatar + meta on the first of a group, content (rich
-// HTML or linkified text), files, reactions, and a hover toolbar (react / quote
-// / edit / delete). Edit swaps the content for the shared MessageEditor with a
-// quote chip.
 export const Message = memo(function Message({
   m,
   first,
@@ -166,7 +160,7 @@ export const Message = memo(function Message({
   onOpenInTeams,
   onOpenMessage,
   onOpenTeamsLink,
-}: MessageProps): JSX.Element {
+}: MessageProps) {
   useNameFormat();
   const { statusOf } = usePresence();
   const [pick, setPick] = useState(false);
@@ -181,9 +175,7 @@ export const Message = memo(function Message({
   // Quote preserved while editing: the verbatim leading blockquote HTML, or ""
   // once the user removes it. null = message has no quote.
   const [editQuote, setEditQuote] = useState<string | null>(null);
-  // Brief "copied" tick after copying the message text to the clipboard.
   const [copied, copy] = useCopied();
-  // Close the reaction popover when clicking anywhere outside this message.
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!pick) return;
@@ -214,7 +206,7 @@ export const Message = memo(function Message({
     const text = htmlToMarkdown(bodyHtml, em.mark);
     return { text, picks: em.picks() };
   };
-  const startEdit = (back?: () => void): void => {
+  const startEdit = (back?: () => void) => {
     const src = editSource();
     setDraft(src.text);
     setEditPicks(src.picks);
@@ -223,16 +215,15 @@ export const Message = memo(function Message({
     setEditing(true);
     setPick(false);
   };
-  const endEdit = (): void => {
+  const endEdit = () => {
     setEditing(false);
     editBack.current?.();
     editBack.current = undefined;
   };
-  const saveEdit = (): void => {
+  const saveEdit = () => {
     const v = draft.trim();
     endEdit();
     const keptQuote = editQuote || "";
-    // Save if the body changed, or the quote was removed.
     if ((v && v !== editSource().text.trim()) || keptQuote !== (origQuote || "")) {
       if (v) onEdit(cid, m.id, v, keptQuote, editPicks);
     }
@@ -243,7 +234,7 @@ export const Message = memo(function Message({
   useEffect(() => {
     if (editing) editInput.current?.closest(".tc-msg")?.scrollIntoView({ block: "nearest" });
   }, [editing]);
-  const copyText = (): void => copy(bodyText || text);
+  const copyText = () => copy(bodyText || text);
   return (
     <div
       ref={root}
@@ -354,21 +345,18 @@ export const Message = memo(function Message({
                   return;
                 }
               }
-              // Click a quoted reply's blockquote to jump to the original.
               const bq = (e.target as Element).closest?.("blockquote.tc-reply");
               if (bq) {
                 const id = bq.getAttribute("data-reply-id");
                 if (id) onJumpTo?.(id);
               }
-              // Click a person @mention to open their profile (tag/channel/team
-              // mentions have no person behind them).
+              // Tag/channel/team mentions have no person behind them.
               const at = (e.target as Element).closest?.(".tc-mention[data-mention-id]");
               if (at) {
                 const id = Number(at.getAttribute("data-mention-id"));
                 const ref = m.mentions?.find((x) => x.itemid === id);
                 if (ref && ref.mentionType === "person" && ref.mri) onOpenProfile(ref.mri);
               }
-              // Click an inline image to view it large, with the message's other images.
               const img = (e.target as Element).closest?.("img.tc-inline-img");
               if (img) {
                 const all = [...e.currentTarget.querySelectorAll<HTMLImageElement>("img.tc-inline-img")];

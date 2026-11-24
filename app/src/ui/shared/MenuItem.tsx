@@ -20,7 +20,7 @@ export function MenuItem({
   close?: () => void;
   danger?: boolean;
   armed?: boolean;
-}): JSX.Element {
+}) {
   return (
     <button
       className={"tc-menu-item" + (danger ? " danger" : "") + (armed ? " armed" : "")}

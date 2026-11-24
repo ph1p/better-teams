@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useChanged } from "./lib/changed";
 import { useLatest } from "./lib/latest";
 import { forwardMessage, markRead } from "../teamsData";
@@ -32,7 +32,7 @@ import { t, useLang } from "../i18n";
 import { useNameFormat } from "../names";
 import { useMessageNav } from "./hooks/useMessageNav";
 
-export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
+export default function App({ onHide }: { onHide?: () => void }) {
   // Re-render everything on a language switch; tag the overlay for screen readers.
   const uiLang = useLang();
   useNameFormat();
@@ -45,18 +45,12 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   // Sidebar "Unread" filter. Chats opened while it is on stay listed (keep) so
   // they don't vanish the moment they are read; leaving the filter drops them.
   const [unreadOnly, setUnreadOnly] = useState(false);
-  // Sidebar density: compact one-line rows (default) or name + preview.
-  const [compact, setCompact] = usePref<boolean>("compact", true);
+  const [compact, setCompact] = usePref("compact", true);
   const [keep, setKeep] = useState<Set<string>>(() => new Set());
   const [profileMri, setProfileMri] = useState<string | null>(null);
-  // Notes drawer (local scratchpad). Open on first run, then
-  // remembers whether it was left open or closed.
-  const [notesOpen, setNotesOpen] = usePref<boolean>("notesOpen", true);
-  // Right-click chat menu: {x, y, chat} or null.
+  const [notesOpen, setNotesOpen] = usePref("notesOpen", true);
   const [menu, setMenu] = useState<Menu | null>(null);
-  // A team label's show/hide channel list, under its button.
   const [teamMenu, setTeamMenu] = useState<TeamMenu | null>(null);
-  // In-conversation message search: open flag + query string.
   const [msgSearch, setMsgSearch] = useState("");
   const [msgSearchOpen, setMsgSearchOpen] = useState(false);
   // Channel threads whose older replies are expanded (by root id).
@@ -65,7 +59,6 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   // expand a collapsed thread before scrolling.
   const msgRoot = useRef<Map<string, string>>(new Map());
   const search = useRef<HTMLInputElement>(null);
-  // Forward dialog: the message and the conversation it came from.
   const [fwd, setFwd] = useState<{ msg: Msg; from: string } | null>(null);
 
   const selChat = chats.find((c) => c.id === sel);
@@ -76,7 +69,6 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   // Refs pulled out, so reading the rest during render is plainly not a ref read.
   const { scroller, content, noMore, loadOlder, unstick, ...m } = messages;
 
-  // A new conversation starts with search closed and threads collapsed.
   const switched = useChanged(sel + "|" + selIsChannel);
   if (switched && sel) {
     setMsgSearch("");
@@ -108,7 +100,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   const [jumpSeq, setJumpSeq] = useState(0);
 
   const pick = useCallback(
-    (id: string): void => {
+    (id: string) => {
       setSel(id);
       if (unreadOnly) setKeep((k) => (k.has(id) ? k : new Set(k).add(id)));
       // Opening a chat marks it read in Teams, same as the native client. Fire the
@@ -134,7 +126,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   // unless the open one is unread itself; an already-read open chat is not
   // carried into the filter.
   const setUnreadFilter = useCallback(
-    (on: boolean): void => {
+    (on: boolean) => {
       setUnreadOnly(on);
       const cur = chatsRef.current.find((c) => c.id === sel);
       setKeep(new Set(on && cur && cur.unread ? [cur.id] : []));
@@ -148,11 +140,11 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     [sel, pick, chatsRef],
   );
 
-  const closeMsgSearch = (): void => {
+  const closeMsgSearch = () => {
     setMsgSearch("");
     setMsgSearchOpen(false);
   };
-  const toggleNotes = (): void => {
+  const toggleNotes = () => {
     setProfileMri(null);
     setNotesOpen((o) => !o);
   };
@@ -188,7 +180,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     [selRef],
   );
   const doForward = useCallback(
-    async (target: Chat, comment: string): Promise<string | null> => {
+    async (target: Chat, comment: string) => {
       if (!fwd) return null;
       const r = await forwardMessage(target.id, fwd.from, fwd.msg.id, comment);
       if (!r.ok) return t().app.forwardFailed(r.reason);
@@ -199,18 +191,18 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     [fwd, flash],
   );
 
-  async function openInTeams(): Promise<void> {
+  async function openInTeams() {
     if (!selChat) return;
     onHide?.();
     const ok = await openNativeChat(selChat.id, selChat.title, selChat.team);
     if (!ok) console.info("better-teams: chat row not rendered in Teams sidebar:", selChat.title);
   }
 
-  const openProfile = useCallback((mri: string): void => {
+  const openProfile = useCallback((mri: string) => {
     if (mri) setProfileMri(mri);
   }, []);
 
-  const toggleThread = useCallback((rootId: string): void => {
+  const toggleThread = useCallback((rootId: string) => {
     setOpenThreads((s) => {
       const n = new Set(s);
       if (n.has(rootId)) n.delete(rootId);
@@ -222,9 +214,9 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   // Jump to a quoted message: scroll it into view and flash a highlight. If it's
   // not in the DOM (scrolled out / not paged in yet), page older until found.
   const onJumpTo = useCallback(
-    (mid: string): void => {
+    (mid: string) => {
       const target = String(mid);
-      const tryScroll = (): boolean => {
+      const tryScroll = () => {
         const el = scroller.current?.querySelector(`.tc-msg[data-mid="${CSS.escape(target)}"]`);
         if (!el) return false;
         // Else a late resize (paged-in content) re-pins the bottom mid-scroll.
@@ -249,7 +241,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
       // Not loaded: page older up to a few times, then scroll.
       const startSel = selRef.current;
       let misses = 0;
-      const pump = async (): Promise<void> => {
+      const pump = async () => {
         // Stop on a chat switch, at history's end, or after a few loads that
         // brought nothing new (the message may simply not exist any more).
         if (selRef.current !== startSel || noMore.current || misses > 3) return;
@@ -272,16 +264,15 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
 
   // Bell: on opens the inbox (Activity tab when only the feed has news), off
   // goes back to all chats.
-  const toggleInbox = (): void => {
+  const toggleInbox = () => {
     if (unreadOnly) return setUnreadFilter(false);
     setQuery("");
     setInboxTab(!unreadCount && feed.unread ? "activity" : "unread");
     setUnreadFilter(true);
   };
 
-  // Switch to a chat and jump to `mid` (if any) once it has loaded.
   const jumpToMessage = useCallback(
-    (cid: string, mid: string | undefined): void => {
+    (cid: string, mid: string | undefined) => {
       pendingJump.current = mid ? { cid, mid } : null;
       setJumpSeq((n) => n + 1);
       pick(cid);
@@ -289,7 +280,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     [pick],
   );
   const openActivityItem = useCallback(
-    (item: Activity): void => jumpToMessage(item.threadId, item.messageId),
+    (item: Activity) => jumpToMessage(item.threadId, item.messageId),
     [jumpToMessage],
   );
   // Open a message by conversation + id (a forwarded message's original):
@@ -297,7 +288,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   // Reads sel/chats through refs so the handler stays stable for memoized
   // messages across chat-list refreshes.
   const openMessage = useCallback(
-    (cid: string, mid: string): void => {
+    (cid: string, mid: string) => {
       if (cid === selRef.current) {
         if (mid) onJumpTo(mid);
         return;
@@ -313,7 +304,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   // A Teams deep link inside a message: open it here when we have that chat,
   // else let the browser follow it.
   const openTeamsLink = useCallback(
-    (link: TeamsLink): boolean => {
+    (link: TeamsLink) => {
       if (link.cid !== selRef.current && !chatsRef.current.some((c) => c.id === link.cid)) return false;
       openMessage(link.cid, link.mid);
       return true;
@@ -327,22 +318,19 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     requestAnimationFrame(() => onJumpTo(j.mid));
   }, [jumpSeq, m.ready, sel, onJumpTo]);
 
-  // Open the right-click menu for a chat row.
-  const openMenu = useCallback((e: MouseEvent, chat: Chat): void => {
+  const openMenu = useCallback((e: MouseEvent, chat: Chat) => {
     e.preventDefault();
     setMenu({ x: e.clientX, y: e.clientY, chat });
   }, []);
 
-  // Every chat the current user shares with `mri`: 1:1s and group chats whose
-  // member list includes that MRI. Newest first (chats is already sorted).
+  // Newest first: chats is already sorted.
   const sharedChats = useMemo(() => {
     if (!profileMri) return [];
     return chats.filter((c) => (c.members || []).includes(profileMri));
   }, [chats, profileMri]);
 
-  // In-conversation search: filter the rendered messages to those whose text
-  // (or sender) matches the query. Day separators and grouping recompute over
-  // the filtered set so the result reads naturally.
+  // Day separators and grouping recompute over the filtered set so the result
+  // reads naturally.
   const mq = msgSearchOpen ? msgSearch.toLowerCase().trim() : "";
   const visible = mq
     ? m.shown.filter(

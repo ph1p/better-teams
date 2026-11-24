@@ -1,13 +1,13 @@
 // chatsvc: messages and conversation properties — the backend Teams' chat UI
 // reads and writes. Every route and body below was captured from the native
-// client (Nov 2026). Returns raw payloads; normalizing is teamsData.ts' job.
+// client (Nov 2026). Returns raw payloads.
 
 import { chatAud, region } from "./auth";
-import { call, type Res } from "./http";
+import { call } from "./http";
 
-const base = (): string => `/api/chatsvc/${region("chatsvc")}/v1/users/ME/conversations`;
-const conv = (cid: string): string => `${base()}/${encodeURIComponent(cid)}`;
-const msg = (cid: string, mid: string): string => `${conv(cid)}/messages/${encodeURIComponent(mid)}`;
+const base = () => `/api/chatsvc/${region("chatsvc")}/v1/users/ME/conversations`;
+const conv = (cid: string) => `${base()}/${encodeURIComponent(cid)}`;
+const msg = (cid: string, mid: string) => `${conv(cid)}/messages/${encodeURIComponent(mid)}`;
 
 // Teams sends this on every chatsvc write; without it some errors come back as
 // redirects instead of status codes.
@@ -18,8 +18,8 @@ export interface MessagePage {
   _metadata?: { backwardLink?: string; syncState?: string };
 }
 
-/** Newest page of a conversation. chatsvc caps pageSize at 200. */
-export function getMessages(cid: string, pageSize = 30): Promise<Res<MessagePage>> {
+// chatsvc caps pageSize at 200.
+export function getMessages(cid: string, pageSize = 30) {
   const n = Math.max(1, Math.min(pageSize, 200));
   return call<MessagePage>(
     chatAud(),
@@ -27,18 +27,16 @@ export function getMessages(cid: string, pageSize = 30): Promise<Res<MessagePage
   );
 }
 
-/** Follow a page's _metadata.backwardLink (absolute URL) to the next older page. */
-export function getMessagesByLink(link: string): Promise<Res<MessagePage>> {
+// `link` is a page's _metadata.backwardLink (absolute URL).
+export function getMessagesByLink(link: string) {
   return call<MessagePage>(chatAud(), link);
 }
 
-/** Post a message. `payload` is the full native message body. */
-export function postMessage(cid: string, payload: Record<string, unknown>): Promise<Res> {
+export function postMessage(cid: string, payload: Record<string, unknown>) {
   return call(chatAud(), `${conv(cid)}/messages`, { method: "POST", headers: WRITE, body: payload });
 }
 
-/** Replace a message's content (edit). */
-export function putMessage(cid: string, mid: string, content: string): Promise<Res> {
+export function putMessage(cid: string, mid: string, content: string) {
   return call(chatAud(), msg(cid, mid), {
     method: "PUT",
     headers: WRITE,
@@ -46,16 +44,15 @@ export function putMessage(cid: string, mid: string, content: string): Promise<R
   });
 }
 
-/** Soft delete. The ?behavior=softDelete query is REQUIRED: bare DELETE hard-removes. */
-export function softDeleteMessage(cid: string, mid: string): Promise<Res> {
+// The ?behavior=softDelete query is REQUIRED: bare DELETE hard-removes.
+export function softDeleteMessage(cid: string, mid: string) {
   return call(chatAud(), `${msg(cid, mid)}?behavior=softDelete`, {
     method: "DELETE",
     headers: { ...WRITE, "content-type": "application/json" },
   });
 }
 
-/** Undo a soft delete by clearing the deletetime property. */
-export function undoSoftDelete(cid: string, mid: string): Promise<Res> {
+export function undoSoftDelete(cid: string, mid: string) {
   return call(chatAud(), `${msg(cid, mid)}/properties?name=deletetime`, {
     method: "DELETE",
     headers: WRITE,
@@ -63,11 +60,9 @@ export function undoSoftDelete(cid: string, mid: string): Promise<Res> {
   });
 }
 
-/**
- * Add/remove a reaction. The ?name=emotions sub-resource is REQUIRED: a bare
- * DELETE on the message route deletes the whole message.
- */
-export function putReaction(cid: string, mid: string, key: string, add: boolean): Promise<Res> {
+// The ?name=emotions sub-resource is REQUIRED: a bare DELETE on the message
+// route deletes the whole message.
+export function putReaction(cid: string, mid: string, key: string, add: boolean) {
   return call(chatAud(), `${msg(cid, mid)}/properties?name=emotions`, {
     method: add ? "PUT" : "DELETE",
     headers: WRITE,
@@ -75,8 +70,8 @@ export function putReaction(cid: string, mid: string, key: string, add: boolean)
   });
 }
 
-/** Replace one message property, e.g. "files" (a JSON string, like Teams stores it). */
-export function putMessageProperty(cid: string, mid: string, name: string, value: string): Promise<Res> {
+// e.g. "files" (a JSON string, like Teams stores it).
+export function putMessageProperty(cid: string, mid: string, name: string, value: string) {
   return call(chatAud(), `${msg(cid, mid)}/properties?name=${encodeURIComponent(name)}`, {
     method: "PUT",
     headers: WRITE,
@@ -84,8 +79,8 @@ export function putMessageProperty(cid: string, mid: string, name: string, value
   });
 }
 
-/** Set one conversation property (consumptionhorizon, consumptionHorizonBookmark, …). */
-export function putConversationProperty(cid: string, name: string, value: string): Promise<Res> {
+// e.g. consumptionhorizon, consumptionHorizonBookmark.
+export function putConversationProperty(cid: string, name: string, value: string) {
   return call(chatAud(), `${conv(cid)}/properties?name=${encodeURIComponent(name)}`, {
     method: "PUT",
     headers: WRITE,

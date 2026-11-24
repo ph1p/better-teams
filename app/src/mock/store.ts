@@ -27,7 +27,6 @@ interface MockChat {
   hidden: boolean;
   /** Channels: hidden in the team's channel list. */
   channelHidden?: boolean;
-  /** A chat request not yet accepted or blocked. */
   request?: boolean;
   muted?: boolean;
   left?: boolean;
@@ -43,18 +42,18 @@ interface MockChat {
 }
 
 const t0 = Date.now();
-const at = (agoMin: number): number => t0 - agoMin * 60_000;
+const at = (agoMin: number) => t0 - agoMin * 60_000;
 let idSeq = 0;
-const nextId = (time: number): string => String(time) + String(++idSeq).padStart(3, "0");
+const nextId = (time: number) => String(time) + String(++idSeq).padStart(3, "0");
 
 export const profiles: Record<string, Profile> = {};
 for (const { mri, ...p } of [...PEOPLE, ...APPS]) profiles[mri] = p;
-export const nameOf = (mri: string): string => profiles[mri]?.displayName || "Unknown";
+export const nameOf = (mri: string) => profiles[mri]?.displayName || "Unknown";
 
 /** Who reacted with what, per message id; Message.reactions is derived from it. */
 const reactors = new Map<string, Map<string, Set<string>>>();
 
-function reactionsOf(id: string): Reaction[] {
+function reactionsOf(id: string) {
   const byKey = reactors.get(id);
   if (!byKey) return [];
   const out: Reaction[] = [];
@@ -66,7 +65,7 @@ function reactionsOf(id: string): Reaction[] {
 
 // Seeded HTML carries only the mention spans; Teams also stores who each span
 // names (properties.mentions). Rebuild that from the span text.
-function seedMentions(html: string): MentionRef[] | undefined {
+function seedMentions(html: string) {
   const out: MentionRef[] = [];
   for (const [, id, name] of html.matchAll(/schema\.skype\.com\/Mention"[^>]*itemid="(\d+)">([^<]*)</g)) {
     const who = PEOPLE.find((x) => x.displayName === name);
@@ -154,15 +153,13 @@ for (const seed of CHATS) {
   });
 }
 
-export const getChat = (id: string): MockChat | undefined => chats.get(id);
-const withReactions = (m: Message): Message => ({ ...m, reactions: reactionsOf(m.id) });
+export const getChat = (id: string) => chats.get(id);
+const withReactions = (m: Message) => ({ ...m, reactions: reactionsOf(m.id) });
 
-function sortThread(list: Message[], channel: boolean): Message[] {
+function sortThread(list: Message[], channel: boolean) {
   if (!channel) return [...list].sort((a, b) => a.time - b.time);
   return [...list].sort((a, b) => a.rootTime - b.rootTime || Number(a.isReply) - Number(b.isReply) || a.time - b.time);
 }
-
-// --- Subscriptions ---------------------------------------------------------
 
 type ChatEventCb = (convId: string, type: string, messageId?: string) => void;
 const chatSubs = new Set<ChatEventCb>();
@@ -174,7 +171,7 @@ export function onChatEvent(cb: ChatEventCb): () => void {
 // The UI re-reads on DOM changes outside its root (ui/lib/live.ts), which is
 // how it notices Teams' own writes. Touch a hidden node to give it that cue.
 let beacon: HTMLElement | null = null;
-function poke(): void {
+function poke() {
   if (!beacon) {
     beacon = document.createElement("div");
     beacon.hidden = true;
@@ -184,7 +181,7 @@ function poke(): void {
   beacon.textContent = String(Date.now());
 }
 
-function emit(convId: string, type: string, messageId?: string): void {
+function emit(convId: string, type: string, messageId?: string) {
   for (const cb of chatSubs) cb(convId, type, messageId);
   poke();
 }
@@ -196,8 +193,8 @@ export function onTyping(cb: TypingCb): () => void {
   typingSubs.add(cb);
   return () => typingSubs.delete(cb);
 }
-export const typingIn = (convId: string): string[] => typingNow.get(convId) || [];
-function setTyping(convId: string, users: string[]): void {
+export const typingIn = (convId: string) => typingNow.get(convId) || [];
+function setTyping(convId: string, users: string[]) {
   typingNow.set(convId, users);
   for (const cb of typingSubs) cb(convId, users);
 }
@@ -209,12 +206,10 @@ export function onPresence(cb: PresenceCb): () => void {
   presenceSubs.add(cb);
   return () => presenceSubs.delete(cb);
 }
-export function setPresence(mri: string, availability: string): void {
+export function setPresence(mri: string, availability: string) {
   presence[mri] = availability;
   for (const cb of presenceSubs) cb(mri, availability);
 }
-
-// --- Reads -----------------------------------------------------------------
 
 export function listChats(): Chat[] {
   const out: Chat[] = [];
@@ -237,7 +232,6 @@ export function listChats(): Chat[] {
     const nameTitle = (seed.kind === "chat" || seed.kind === "meeting") && !seed.topic && others.length > 0;
     const lastFromMe = !!last && last.fromMri === ME;
     const general = seed.kind === "channel" && isGeneral(seed.id);
-    // A message newer than the hide time brings a hidden chat back, as in Teams.
     out.push({
       ...(c.liveCall ? { liveCall: c.liveCall } : {}),
       id: seed.id,
@@ -251,7 +245,6 @@ export function listChats(): Chat[] {
       app: seed.kind === "chat" && others.length === 1 && isAppMri(others[0]),
       favorite: c.favorite,
       pinned: c.pinned,
-      // A hidden channel leaves the sidebar, except General (shown in italics).
       hidden: c.hidden,
       ...(seed.kind === "channel"
         ? {
@@ -284,7 +277,7 @@ export function recent(convId: string): Message[] | null {
   return sortThread(c.messages.slice(c.floor).map(withReactions), c.seed.kind === "channel");
 }
 
-export function resetPaging(convId: string): void {
+export function resetPaging(convId: string) {
   const c = chats.get(convId);
   if (c) c.cursor = c.floor;
 }
@@ -299,21 +292,13 @@ export function older(convId: string): Message[] | null {
   return sortThread(page, c.seed.kind === "channel");
 }
 
-// --- Writes ----------------------------------------------------------------
-
-function find(convId: string, messageId: string): { c: MockChat; m: Message } | null {
+function find(convId: string, messageId: string) {
   const c = chats.get(convId);
   const m = c?.messages.find((x) => x.id === messageId);
   return c && m ? { c, m } : null;
 }
 
-export function post(
-  convId: string,
-  from: string,
-  html: string,
-  rootId?: string,
-  files: FileRef[] = [],
-): Message | null {
+export function post(convId: string, from: string, html: string, rootId?: string, files: FileRef[] = []) {
   const c = chats.get(convId);
   if (!c) return null;
   const time = Date.now();
@@ -327,6 +312,7 @@ export function post(
     c.readMs = time + 1;
     c.marked = false;
   }
+  // A message newer than the hide time brings a hidden chat back, as in Teams.
   if (time > c.readMs || from === ME) c.hidden = false;
   emit(convId, "NewMessage", m.id);
   if (from === ME) scheduleReply(c, root?.id);
@@ -336,7 +322,7 @@ export function post(
 // Forward: post the original into `convId` as a Forward block under the
 // optional comment, with its origin as `forwarded` (what the live normalizers
 // read from originalMessageContext / forwardedMessageContext).
-export function forward(convId: string, fromConvId: string, messageId: string, commentHtml: string): Message | null {
+export function forward(convId: string, fromConvId: string, messageId: string, commentHtml: string) {
   const src = find(fromConvId, messageId);
   if (!src || !chats.has(convId)) return null;
   const block = `<blockquote itemtype="http://schema.skype.com/Forward">${src.m.content}</blockquote>`;
@@ -352,7 +338,7 @@ export function forward(convId: string, fromConvId: string, messageId: string, c
   return m;
 }
 
-export function edit(convId: string, messageId: string, html: string, mentions: MentionRef[] = []): boolean {
+export function edit(convId: string, messageId: string, html: string, mentions: MentionRef[] = []) {
   const hit = find(convId, messageId);
   if (!hit || !hit.m.mine) return false;
   hit.m.content = html;
@@ -362,7 +348,7 @@ export function edit(convId: string, messageId: string, html: string, mentions: 
   return true;
 }
 
-export function setFiles(convId: string, messageId: string, files: FileRef[]): boolean {
+export function setFiles(convId: string, messageId: string, files: FileRef[]) {
   const hit = find(convId, messageId);
   if (!hit || !hit.m.mine) return false;
   hit.m.files = files;
@@ -370,7 +356,7 @@ export function setFiles(convId: string, messageId: string, files: FileRef[]): b
   return true;
 }
 
-export function setDeleted(convId: string, messageId: string, deleted: boolean): boolean {
+export function setDeleted(convId: string, messageId: string, deleted: boolean) {
   const hit = find(convId, messageId);
   if (!hit || !hit.m.mine) return false;
   hit.m.deleted = deleted;
@@ -378,7 +364,7 @@ export function setDeleted(convId: string, messageId: string, deleted: boolean):
   return true;
 }
 
-export function react(convId: string, messageId: string, key: string, add: boolean, who = ME): boolean {
+export function react(convId: string, messageId: string, key: string, add: boolean, who = ME) {
   if (!find(convId, messageId)) return false;
   let byKey = reactors.get(messageId);
   if (!byKey) reactors.set(messageId, (byKey = new Map()));
@@ -390,7 +376,7 @@ export function react(convId: string, messageId: string, key: string, add: boole
   return true;
 }
 
-export function setRead(convId: string, read: boolean): boolean {
+export function setRead(convId: string, read: boolean) {
   const c = chats.get(convId);
   if (!c) return false;
   if (read) {
@@ -403,7 +389,7 @@ export function setRead(convId: string, read: boolean): boolean {
   return true;
 }
 
-export function setFavorite(convId: string, fav: boolean): boolean {
+export function setFavorite(convId: string, fav: boolean) {
   const c = chats.get(convId);
   if (!c) return false;
   c.favorite = fav;
@@ -411,7 +397,7 @@ export function setFavorite(convId: string, fav: boolean): boolean {
 }
 
 /** Accept moves a chat request into the list; Block drops it. */
-export function answerRequest(convId: string, action: "Accept" | "Block"): boolean {
+export function answerRequest(convId: string, action: "Accept" | "Block") {
   const c = chats.get(convId);
   if (!c) return false;
   c.request = false;
@@ -419,15 +405,14 @@ export function answerRequest(convId: string, action: "Accept" | "Block"): boole
   return true;
 }
 
-export function setHidden(convId: string, hidden: boolean): boolean {
+export function setHidden(convId: string, hidden: boolean) {
   const c = chats.get(convId);
   if (!c) return false;
   c.hidden = hidden;
   return true;
 }
 
-/** Group chat management, as the worker's resolvers do it. */
-export function setTopic(convId: string, topic: string): boolean {
+export function setTopic(convId: string, topic: string) {
   const c = chats.get(convId);
   if (!c?.group && c?.seed.kind !== "channel") return false;
   c.seed.topic = topic;
@@ -435,7 +420,7 @@ export function setTopic(convId: string, topic: string): boolean {
   return true;
 }
 
-export function setMembers(convId: string, add: string[], remove: string[]): boolean {
+export function setMembers(convId: string, add: string[], remove: string[]) {
   const c = chats.get(convId);
   if (!c?.group) return false;
   c.seed.members = [...new Set([...c.seed.members.filter((m) => !remove.includes(m)), ...add])];
@@ -447,7 +432,7 @@ export function setMembers(convId: string, add: string[], remove: string[]): boo
   return true;
 }
 
-export function setMuted(convId: string, muted: boolean): boolean {
+export function setMuted(convId: string, muted: boolean) {
   const c = chats.get(convId);
   if (!c || c.seed.kind === "channel") return false;
   c.muted = muted;
@@ -455,20 +440,19 @@ export function setMuted(convId: string, muted: boolean): boolean {
   return true;
 }
 
-export function channelPreset(convId: string, preset?: string): string | null {
+export function channelPreset(convId: string, preset?: string) {
   const c = chats.get(convId);
   if (!c || c.seed.kind !== "channel") return null;
   if (preset) c.preset = preset;
   return c.preset || "ALL_NEW_MSGS";
 }
 
-/** A channel's type from its seed; undefined for a standard channel or no channel. */
-export function channelType(convId: string): SeedChat["channelType"] {
+export function channelType(convId: string) {
   return chats.get(convId)?.seed.channelType;
 }
 
 /** A channel's members; with `add`/`remove` changes them first. Null for no channel. */
-export function channelMembers(convId: string, add: string[] = [], remove: string[] = []): string[] | null {
+export function channelMembers(convId: string, add: string[] = [], remove: string[] = []) {
   const c = chats.get(convId);
   if (!c || c.seed.kind !== "channel") return null;
   if (add.length || remove.length) {
@@ -478,23 +462,23 @@ export function channelMembers(convId: string, add: string[] = [], remove: strin
   return c.seed.members;
 }
 
-const isGeneral = (id: string): boolean => /-general@/.test(id);
+const isGeneral = (id: string) => /-general@/.test(id);
 
 /** A team's thread id: its General channel's id, as in Teams. */
-function teamIdOf(team: string): string {
+function teamIdOf(team: string) {
   for (const x of chats.values())
     if (x.seed.kind === "channel" && x.seed.team === team && isGeneral(x.seed.id)) return x.seed.id;
   return "";
 }
 
 /** Every channel of the team with this thread id, hidden ones included. */
-export function teamChannels(teamId: string): MockChat[] {
+export function teamChannels(teamId: string) {
   const team = chats.get(teamId)?.seed.team;
   if (!team) return [];
   return [...chats.values()].filter((x) => x.seed.kind === "channel" && x.seed.team === team);
 }
 
-export function setChannelShown(convId: string, shown: boolean): boolean {
+export function setChannelShown(convId: string, shown: boolean) {
   const c = chats.get(convId);
   if (!c || c.seed.kind !== "channel") return false;
   c.channelHidden = !shown;
@@ -503,7 +487,7 @@ export function setChannelShown(convId: string, shown: boolean): boolean {
 }
 
 /** Leave a channel, or with `team` every channel of its team. */
-export function leaveChannel(convId: string, team: boolean): boolean {
+export function leaveChannel(convId: string, team: boolean) {
   const c = chats.get(convId);
   if (!c || c.seed.kind !== "channel") return false;
   for (const [id, x] of chats) {
@@ -514,7 +498,7 @@ export function leaveChannel(convId: string, team: boolean): boolean {
 }
 
 /** Add a channel to the team of channel `convId`; its id, or "" for no team. */
-export function addChannel(convId: string, topic: string, isPrivate: boolean): string {
+export function addChannel(convId: string, topic: string, isPrivate: boolean) {
   const c = chats.get(convId);
   if (!c || c.seed.kind !== "channel") return "";
   const id = `19:mock-${isPrivate ? "private-" : ""}${Date.now().toString(36)}@thread.tacv2`;
@@ -536,7 +520,7 @@ export function addChannel(convId: string, topic: string, isPrivate: boolean): s
 }
 
 /** The 1:1 or group chat with exactly these people, created if there is none yet. */
-export function chatWith(mris: string[]): string {
+export function chatWith(mris: string[]) {
   const want = [...new Set(mris.filter((m) => m && m !== ME))].sort().join(",");
   for (const c of chats.values()) {
     if (c.seed.kind === "chat" && !c.group && [...c.seed.members].sort().join(",") === want) return c.seed.id;
@@ -558,12 +542,10 @@ export function chatWith(mris: string[]): string {
   return id;
 }
 
-// --- Simulation ------------------------------------------------------------
-
-const pick = <T>(xs: readonly T[]): T => xs[Math.floor(Math.random() * xs.length)];
+const pick = <T>(xs: readonly T[]) => xs[Math.floor(Math.random() * xs.length)];
 
 /** After I write in a chat (not a channel), someone in it types, then answers. */
-function scheduleReply(c: MockChat, rootId?: string): void {
+function scheduleReply(c: MockChat, rootId?: string) {
   if (c.seed.kind === "notes") return;
   const others = c.seed.members.filter((m) => m !== ME);
   if (!others.length) return;
@@ -593,7 +575,7 @@ function scheduleReply(c: MockChat, rootId?: string): void {
 
 let started = false;
 /** Background life: a stray message every ~45 s and presence drift every ~20 s. */
-export function startSimulation(): void {
+export function startSimulation() {
   if (started) return;
   started = true;
   setInterval(() => {
@@ -610,12 +592,10 @@ export function startSimulation(): void {
   }, 20_000);
 }
 
-// --- Activity feed -----------------------------------------------------------
-
 /** Feed read horizon, ms. Starts six hours back so the seed shows an unread item. */
 let feedReadMs = at(6 * 60);
 
-const plain = (html: string): string =>
+const plain = (html: string) =>
   html
     .replace(/<blockquote[\s\S]*?<\/blockquote>/g, "")
     .replace(/<\/(p|div)>|<br\s*\/?>/g, " ")
@@ -627,7 +607,7 @@ const plain = (html: string): string =>
 export function activity(): Activity[] {
   const me = nameOf(ME);
   const out: Activity[] = [];
-  const add = (a: Omit<Activity, "id" | "unread" | "count"> & { count?: number }): void => {
+  const add = (a: Omit<Activity, "id" | "unread" | "count"> & { count?: number }) => {
     out.push({ count: 1, ...a, id: `${a.kind}:${a.messageId}:${a.subtype}`, unread: a.time > feedReadMs });
   };
   for (const c of chats.values()) {
@@ -667,6 +647,6 @@ export function activity(): Activity[] {
   return out.sort((a, b) => b.time - a.time).slice(0, 50);
 }
 
-export function setFeedRead(ms: number): void {
+export function setFeedRead(ms: number) {
   feedReadMs = Math.max(feedReadMs, ms);
 }

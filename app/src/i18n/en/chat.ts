@@ -1,4 +1,3 @@
-// The open conversation: header, options menu, members, timeline, messages.
 export const chat = {
   // Header
   name: "Chat name",

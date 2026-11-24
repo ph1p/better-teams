@@ -31,7 +31,6 @@ export const CODE_LANGS: readonly (readonly [id: string, label: string])[] = [
   ["yaml", "YAML"],
 ];
 
-// Short names people type after ``` mapped to the list's ids.
 const ALIAS: Record<string, string> = {
   plaintext: "",
   text: "",
@@ -59,14 +58,12 @@ const ALIAS: Record<string, string> = {
   yml: "yaml",
 };
 
-/** A fence's language as a list id; an unknown one comes back lowercased as is. */
-export function codeLangId(lang: string): string {
+export function codeLangId(lang: string) {
   const l = lang.trim().toLowerCase();
   return ALIAS[l] ?? l;
 }
 
-/** A fence language's display name ("ts" → "TypeScript"); unknown ones as given. */
-export function codeLangLabel(lang: string): string {
+export function codeLangLabel(lang: string) {
   const id = codeLangId(lang);
   return (id && CODE_LANGS.find(([x]) => x === id)?.[1]) || lang;
 }

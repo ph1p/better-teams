@@ -1,5 +1,3 @@
-// CDL client: talk to Teams' backends exactly the way the Teams UI does.
-//
 // The Teams UI never calls its backends directly. It posts GraphQL envelopes
 // (as JSON strings) to its main web worker; the worker runs the REST calls with
 // its own tokens and posts the result back (docs/cdl-api.md). Both Worker
@@ -59,7 +57,7 @@ type HostWin = Window & typeof globalThis & { [KEY]?: State };
 // The realm that owns Teams' workers: the host page. Falls back to this window
 // (e.g. if Teams ever stops using window.open), where install() then finds no
 // GraphQL traffic and ready() stays false.
-function hostWin(): HostWin {
+function hostWin() {
   try {
     const o = window.opener as HostWin | null;
     if (o && o.location.origin === location.origin && typeof o.Worker === "function") return o;
@@ -69,7 +67,7 @@ function hostWin(): HostWin {
   return window as HostWin;
 }
 
-function state(): State {
+function state() {
   const h = hostWin();
   let s = h[KEY];
   if (!s) {
@@ -83,7 +81,7 @@ function state(): State {
 // our own replies pay for JSON.parse.
 const ID_RE = /^\{"requestId":"([^"]+)"/;
 
-function route(s: State, d: unknown): void {
+function route(s: State, d: unknown) {
   let id = "";
   if (typeof d === "string") id = ID_RE.exec(d)?.[1] || "";
   else if (d && typeof d === "object") id = String((d as { requestId?: unknown }).requestId || "");
@@ -100,7 +98,7 @@ function route(s: State, d: unknown): void {
 // router the newest build installed, so re-injection picks up new routing.
 // (A listener left by an older build only resolves `pending`, which is harmless:
 // whichever runs first deletes the entry.)
-function listen(s: State, w: Worker): void {
+function listen(s: State, w: Worker) {
   s.route = (d) => route(s, d);
   s.routed ??= new WeakSet();
   s.listening.add(w);
@@ -115,7 +113,7 @@ function listen(s: State, w: Worker): void {
   });
 }
 
-function learn(s: State, w: Worker, msg: unknown): void {
+function learn(s: State, w: Worker, msg: unknown) {
   if (typeof msg !== "string" || msg.indexOf('"type":"graphql"') < 0 || msg.indexOf("cdlOperationCustomContext") < 0)
     return;
   const m = JSON.parse(msg) as {
@@ -140,7 +138,7 @@ const WRAP = 2;
 
 // True if `msg` answers one of our auth requests; it is then consumed here and
 // must not reach the worker (which would drop it and log it to telemetry).
-function takeAuth(s: State, msg: unknown): boolean {
+function takeAuth(s: State, msg: unknown) {
   if (typeof msg !== "string" || !msg.startsWith(AUTH_HEAD)) return false;
   const id = ID_RE.exec(msg)?.[1] || "";
   const done = s.auth?.get(id);
@@ -151,8 +149,8 @@ function takeAuth(s: State, msg: unknown): boolean {
   return true;
 }
 
-/** Idempotent; safe from every (re-)injected build and every child window. */
-export function installCdl(): void {
+// Idempotent; safe from every (re-)injected build and every child window.
+export function installCdl() {
   const s = state();
   // A re-injected build installs its own router on the already-known worker.
   if (s.ctx) listen(s, s.ctx.worker);
@@ -175,39 +173,37 @@ export function installCdl(): void {
   } as typeof P.postMessage;
 }
 
-/** True once Teams has sent one GraphQL request we could learn from. */
-export function cdlReady(): boolean {
+// True once Teams has sent one GraphQL request we could learn from.
+export function cdlReady() {
   return !!state().ctx;
 }
 
-/** Object id of the account this Teams window is signed in as, once learned. */
 type AuthUser = { profile?: { objectId?: unknown }; type?: unknown; cloud?: unknown };
-const authUser = (): AuthUser | undefined => state().ctx?.authenticationUser as AuthUser | undefined;
+const authUser = () => state().ctx?.authenticationUser as AuthUser | undefined;
 
-export function cdlAccountOid(): string {
+export function cdlAccountOid() {
   const oid = authUser()?.profile?.objectId;
   return typeof oid === "string" ? oid : "";
 }
 
-/** Resolves true when ready, false after `ms`. */
 export function whenCdl(ms = 10_000): Promise<boolean> {
   installCdl();
   const s = state();
   if (s.ctx) return Promise.resolve(true);
   return new Promise((resolve) => {
-    const done = (v: boolean): void => {
+    const done = (v: boolean) => {
       s.waiters.delete(ok);
       clearTimeout(t);
       resolve(v);
     };
-    const ok = (): void => done(true);
+    const ok = () => done(true);
     const t = setTimeout(() => done(false), ms);
     s.waiters.add(ok);
   });
 }
 
 // Teams counts from ~1000 per session; a high base keeps us clear of its ids.
-function nextId(s: State, kind: "q" | "m" | "s"): string {
+function nextId(s: State, kind: "q" | "m" | "s") {
   return `${kind}-${900_000 + ++s.seq}`;
 }
 
@@ -233,11 +229,11 @@ function envelope(
   };
 }
 
-/** `errors`: GraphQL errors that came back next to partial data. */
+// `errors`: GraphQL errors that came back next to partial data.
 export type CdlRes<T> = { ok: true; data: T; errors?: unknown[] } | { ok: false; reason: string };
 
-/** Short reason from a GraphQL error (resolver rejections carry extraInfo/serverResponse). */
-export function errorReason(e: unknown): string {
+// Resolver rejections carry extraInfo/serverResponse.
+export function errorReason(e: unknown) {
   if (!e || typeof e !== "object") return String(e ?? "");
   const o = e as Record<string, unknown>;
   const ext = (o.extensions ?? {}) as Record<string, unknown>;
@@ -248,10 +244,8 @@ export function errorReason(e: unknown): string {
   return parts.length ? [...new Set(parts)].join(" · ").slice(0, 200) : JSON.stringify(e).slice(0, 200);
 }
 
-/**
- * Pick one mutation/query result field. A missing field, or one whose
- * __typename matches `bad` (Teams' `...Error` types), turns into a failure.
- */
+// Pick one result field. A missing field, or one whose __typename matches
+// `bad` (Teams' `...Error` types), turns into a failure.
 export function check<T>(r: CdlRes<Record<string, unknown>>, field: string, bad?: RegExp): CdlRes<T> {
   if (!r.ok) return r;
   const v = r.data[field] as
@@ -269,11 +263,8 @@ export function check<T>(r: CdlRes<Record<string, unknown>>, field: string, bad?
   return { ok: true, data: v as T };
 }
 
-/**
- * Run one GraphQL query or mutation through Teams' worker. `query` must be the
- * document Teams itself sends for `operationName` (see docs/cdl-catalog.json).
- * Never throws.
- */
+// `query` must be the document Teams itself sends for `operationName`
+// (see docs/cdl-catalog.json). Never throws.
 export async function cdl<T = Record<string, unknown>>(
   operationName: string,
   query: string,
@@ -313,19 +304,12 @@ export async function cdl<T = Record<string, unknown>>(
   return { ok: true, data: reply.response.data as T, ...(errs?.length ? { errors: errs } : {}) };
 }
 
-/**
- * Ask Teams' page for an AAD access token for `resource` (e.g.
- * "https://ic3.teams.office.com"), exactly as its worker does when its own
- * token runs out: the page's CDL auth handler serves it from MSAL, renewing it
- * silently when due. The request is dispatched on the worker object, so the
- * page's own message handler takes it; it carries a rendererId of its own,
- * because the page treats messages with its own rendererId as responses.
- * The token stays in memory; the caller files it in the vault. Resolves "" on
- * failure or after `ms`. Never throws.
- */
 // One request to the page auth handler Teams' worker uses (requestOperationtype
-// is the worker's own op name). Resolves with the reply, or null on timeout.
-async function authOp(op: string, context: Record<string, unknown>, ms: number): Promise<AuthReply | null> {
+// is the worker's own op name). It is dispatched on the worker object, so the
+// page's own message handler takes it; it carries a rendererId of its own,
+// because the page treats messages with its own rendererId as responses.
+// Resolves with the reply, or null on timeout.
+async function authOp(op: string, context: Record<string, unknown>, ms: number) {
   if (!(await whenCdl(Math.min(ms, 5_000)))) return null;
   installCdl();
   const s = state();
@@ -359,14 +343,18 @@ async function authOp(op: string, context: Record<string, unknown>, ms: number):
   });
 }
 
-export async function cdlToken(resource: string, ms = 8_000): Promise<string> {
+// AAD token for `resource` (e.g. "https://ic3.teams.office.com"), exactly as
+// the worker gets one when its own runs out: the page's CDL auth handler serves
+// it from MSAL, renewing silently when due. The token stays in memory; the
+// caller files it in the vault. "" on failure or after `ms`.
+export async function cdlToken(resource: string, ms = 8_000) {
   const reply = await authOp("aadGetToken", { resource, options: {} }, ms);
   const tok = reply?.response?.data?.token;
   return typeof tok === "string" ? tok : "";
 }
 
-/** Personal (MSA, teams.live.com) account: chatsvc takes a skype token, not an AAD bearer. */
-export function cdlConsumer(): boolean {
+// Personal (MSA, teams.live.com) account: chatsvc takes a skype token, not an AAD bearer.
+export function cdlConsumer() {
   const au = authUser();
   return au?.type === "MsaLife" || au?.cloud === "life";
 }
@@ -379,10 +367,7 @@ export interface SkypeToken {
   mri: string;
 }
 
-/**
- * The skype token Teams' worker uses for consumer chatsvc (getSkypeTokens),
- * with the account's MRI. null if Teams gave none.
- */
+// The skype token Teams' worker uses for consumer chatsvc (getSkypeTokens).
 export async function cdlSkypeToken(ms = 8_000): Promise<SkypeToken | null> {
   const reply = await authOp("getSkypeTokens", { resource: "", forceRenew: false, options: {} }, ms);
   const d = reply?.response?.data;
@@ -395,21 +380,18 @@ export async function cdlSkypeToken(ms = 8_000): Promise<SkypeToken | null> {
   };
 }
 
-/**
- * Start a GraphQL subscription through Teams' worker. The worker answers
- * repeatedly under one `s-` requestId; `onData` gets each `response.data`.
- * The returned function stops it the way Teams does: same requestId with
- * `graphqlQuery:"GQL_STOP"` (no custom context, as recorded). Never throws.
- */
+// The worker answers repeatedly under one `s-` requestId. The returned function
+// stops it the way Teams does: same requestId with `graphqlQuery:"GQL_STOP"`
+// (no custom context, as recorded). Never throws.
 export function cdlSubscribe<T = Record<string, unknown>>(
   operationName: string,
   query: string,
   variables: unknown,
   onData: (data: T) => void,
   opts: { callerInfo?: string } = {},
-): () => void {
+) {
   let stopped = false;
-  let stop = (): void => {
+  let stop = () => {
     stopped = true;
   };
   void untilReady(whenCdl, () => stopped).then((ok) => {
@@ -436,7 +418,7 @@ export function cdlSubscribe<T = Record<string, unknown>>(
       s.subs.delete(requestId);
       return;
     }
-    stop = (): void => {
+    stop = () => {
       if (!s.subs?.delete(requestId)) return;
       try {
         s.post!.call(

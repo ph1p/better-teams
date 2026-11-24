@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type JSX, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { Check, CornerDownLeft, X } from "lucide-react";
 import { highlightLines, initHighlighter, onHighlighterReady } from "../../highlight";
@@ -16,16 +16,13 @@ interface CodeDialogProps {
   code: string;
   /** Its fence language; null for a new block (the last used one then). */
   lang: string | null;
-  /** Called with the finished block; the dialog then closes. */
   onDone: (code: string, lang: string) => void;
   onClose: () => void;
 }
 
-// Code block editor for the composer and inline edits: a language picker and
-// a monospace field with live highlighting, line numbers, Tab indent and
-// auto-indent. The result goes back into the draft as a ``` fence, so it is
-// sent like a typed one (markdown.ts).
-export function CodeDialog(p: CodeDialogProps): JSX.Element {
+// The result goes back into the draft as a ``` fence, so it is sent like a
+// typed one (markdown.ts).
+export function CodeDialog(p: CodeDialogProps) {
   const { closing, close } = useModalExit(p.onClose);
   const [code, setCode] = useState(p.code);
   const [lang, setLang] = useState(() => (p.lang === null ? read(LAST_LANG, "") : codeLangId(p.lang)));
@@ -49,7 +46,7 @@ export function CodeDialog(p: CodeDialogProps): JSX.Element {
   const lines = code.split("\n");
 
   // The textarea scrolls; the highlighted copy and the line numbers follow it.
-  const sync = (): void => {
+  const sync = () => {
     const el = ta.current;
     if (!el) return;
     if (back.current) back.current.style.transform = `translate(${-el.scrollLeft}px, ${-el.scrollTop}px)`;
@@ -57,14 +54,14 @@ export function CodeDialog(p: CodeDialogProps): JSX.Element {
   };
   useEffect(sync, [code]);
 
-  const done = (): void => {
+  const done = () => {
     if (!code.trim()) return;
     write(LAST_LANG, lang);
     p.onDone(code, lang);
     close();
   };
 
-  const onKey = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
+  const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing) return;
     const el = e.currentTarget;
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {

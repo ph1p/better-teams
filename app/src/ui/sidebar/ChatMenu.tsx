@@ -8,7 +8,6 @@ import { t } from "../../i18n";
 import { ChannelLeaveItem, ChannelPresets } from "../chat/ChannelItems";
 import { MenuItem } from "../shared/MenuItem";
 
-// Right-click chat menu position + target.
 export interface Menu {
   x: number;
   y: number;
@@ -27,9 +26,6 @@ interface ChatMenuProps {
   flash: Flash;
 }
 
-// The right-click menu for a chat row: read state and favorite, then mute and
-// hide/unhide. Channels get their notification presets (whose "Off" mutes),
-// then the channel and team items of ChannelItems.tsx.
 export function ChatMenu({
   menu,
   onClose,
@@ -40,12 +36,11 @@ export function ChatMenu({
   onLeave,
   onNewChannel,
   flash,
-}: ChatMenuProps): JSX.Element {
-  // Close the menu on any click, scroll, Escape, or resize.
+}: ChatMenuProps) {
   useDismiss(true, "#tc-root .tc-menu", onClose);
   const s = t().sidebar;
   const c = menu.chat;
-  const item = (icon: JSX.Element, label: string, fn: () => void): JSX.Element => (
+  const item = (icon: JSX.Element, label: string, fn: () => void) => (
     <MenuItem icon={icon} close={onClose} onPick={fn}>
       {label}
     </MenuItem>

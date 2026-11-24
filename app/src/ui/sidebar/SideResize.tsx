@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type JSX } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { usePref } from "../lib/prefs";
 import { t } from "../../i18n";
 
@@ -8,20 +8,20 @@ const MAX = 520;
 /** Keep at least this much room for the chat column. */
 const CHAT_MIN = 420;
 
-const clamp = (w: number): number => Math.round(Math.max(MIN, Math.min(w, MAX, window.innerWidth - CHAT_MIN)));
+const clamp = (w: number) => Math.round(Math.max(MIN, Math.min(w, MAX, window.innerWidth - CHAT_MIN)));
 
 // Drag handle on the sidebar's right edge. The width lives in a pref and in the
 // --tc-side-w var on #tc-root, which the grid columns read. While dragging only
 // the var changes; the pref is written once on release.
-export function SideResize(): JSX.Element {
+export function SideResize() {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = usePref("sidebarWidth", DEFAULT);
-  const root = (): HTMLElement | null => ref.current?.closest<HTMLElement>("#tc-root") ?? null;
+  const root = () => ref.current?.closest<HTMLElement>("#tc-root") ?? null;
   const apply = (w: number): void => root()?.style.setProperty("--tc-side-w", `${w}px`);
 
   // Re-clamp when the window shrinks so the chat column keeps its room.
   useLayoutEffect(() => {
-    const fit = (): void => apply(clamp(width));
+    const fit = () => apply(clamp(width));
     fit();
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
@@ -48,11 +48,11 @@ export function SideResize(): JSX.Element {
         let w = startW;
         el.setPointerCapture(e.pointerId);
         root()?.classList.add("tc-resizing");
-        const move = (ev: PointerEvent): void => {
+        const move = (ev: PointerEvent) => {
           w = clamp(startW + ev.clientX - startX);
           apply(w);
         };
-        const up = (): void => {
+        const up = () => {
           el.removeEventListener("pointermove", move);
           el.removeEventListener("pointerup", up);
           el.removeEventListener("pointercancel", up);

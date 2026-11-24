@@ -10,7 +10,7 @@ interface MessageNav {
   selectLast: () => boolean;
 }
 
-const typing = (t: EventTarget | null): boolean =>
+const typing = (t: EventTarget | null) =>
   t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 
 // Keyboard message picking: Arrow Up in the empty composer picks the newest
@@ -23,7 +23,7 @@ export function useMessageNav(
   chatId: string | null,
 ): MessageNav {
   const [selected, setSelected] = useState<string | null>(null);
-  const ids = (): string[] =>
+  const ids = () =>
     [...(list.current?.querySelectorAll<HTMLElement>(".tc-msg[data-mid]") ?? [])].map((el) => el.dataset.mid!);
 
   // Chat switch drops the pick; reset during render, not in an effect.
@@ -36,11 +36,11 @@ export function useMessageNav(
   useEffect(() => {
     if (!selected) return;
     list.current?.querySelector(`.tc-msg[data-mid="${CSS.escape(selected)}"]`)?.scrollIntoView({ block: "nearest" });
-    const back = (): void => {
+    const back = () => {
       setSelected(null);
       composer.current?.focus();
     };
-    const onKey = (e: KeyboardEvent): void => {
+    const onKey = (e: KeyboardEvent) => {
       if (isIdle() || viewerOpen() || typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
       const all = ids();
       const i = all.indexOf(selected);
@@ -60,7 +60,7 @@ export function useMessageNav(
       e.preventDefault();
       e.stopPropagation();
     };
-    const onDown = (): void => setSelected(null);
+    const onDown = () => setSelected(null);
     window.addEventListener("keydown", onKey, true);
     window.addEventListener("mousedown", onDown, true);
     return () => {

@@ -1,4 +1,4 @@
-import { useEffect, useState, type JSX, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Contact, Languages, RefreshCw, Rows3, X } from "lucide-react";
 import { NAME_FORMATS, nameFormat, setNameFormat, type NameFormat } from "../../names";
 import { Select } from "../shared/Select";
@@ -12,14 +12,13 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
-// Small settings dialog (language, name format, chat list density), opened from the status menu so
-// the menu itself stays short.
-export function SettingsModal({ compact, onCompact, onClose }: SettingsModalProps): JSX.Element {
+// Opened from the status menu so the menu itself stays short.
+export function SettingsModal({ compact, onCompact, onClose }: SettingsModalProps) {
   const { closing, close } = useModalExit(onClose);
   const c = t().common;
   const [updates, setUpdates] = useState(updateCheckOn);
   const [checked, setChecked] = useState<UpdateResult | "checking" | null>(null);
-  const checkNow = (): void => {
+  const checkNow = () => {
     if (checked === "checking") return;
     setChecked("checking");
     void checkForUpdate(true).then(setChecked);
@@ -35,7 +34,7 @@ export function SettingsModal({ compact, onCompact, onClose }: SettingsModalProp
             ? c.upToDate(__VERSION__)
             : c.updateFailed;
   useEffect(() => {
-    const key = (e: KeyboardEvent): void => {
+    const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
     };
     document.addEventListener("keydown", key, true);
@@ -141,7 +140,6 @@ export function SettingsModal({ compact, onCompact, onClose }: SettingsModalProp
   );
 }
 
-/** One preference: icon, label with a short hint, and its control on the right. */
 function Row({
   icon,
   label,
@@ -152,7 +150,7 @@ function Row({
   label: string;
   hint: ReactNode;
   children: ReactNode;
-}): JSX.Element {
+}) {
   return (
     <label className="tc-settings-row">
       <span className="tc-settings-icon">{icon}</span>

@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
 
-// Minimum gap between a popup menu and the window edges.
 export const MENU_MARGIN = 8;
 
 /**

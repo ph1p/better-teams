@@ -1,4 +1,3 @@
-// Teams IndexedDB plumbing: find and open Teams' own databases, read rows.
 import { consumerMri } from "../services/auth";
 import { cdlAccountOid, whenCdl } from "../services/cdl";
 import { get } from "./raw";
@@ -6,8 +5,8 @@ import { get } from "./raw";
 const DB_CACHE: Record<string, IDBDatabase> = {};
 
 // Teams:<store>:react-web-client:<tenant>:<oid>:<locale>
-const oidOf = (name: string): string => name.split(":").at(-2) ?? "";
-const localeOf = (name: string): string => (name.split(":").at(-1) ?? "").toLowerCase();
+const oidOf = (name: string) => name.split(":").at(-2) ?? "";
+const localeOf = (name: string) => (name.split(":").at(-1) ?? "").toLowerCase();
 
 // The origin keeps a DB set per account that ever signed in there, and one
 // per UI locale. Pick the signed-in account (from Teams' worker context),
@@ -27,7 +26,7 @@ async function findDb(fragment: string): Promise<string | undefined> {
   return hits.find((n) => localeOf(n) === lang) ?? hits[0];
 }
 
-export async function open(fragment: string): Promise<IDBDatabase> {
+export async function open(fragment: string) {
   const cached = DB_CACHE[fragment];
   if (cached) return cached;
   const name = await findDb(fragment);
@@ -52,7 +51,7 @@ export async function open(fragment: string): Promise<IDBDatabase> {
 export let CURRENT_OID = "";
 // Work accounts are "8:orgid:<oid>"; personal (MSA) ones "8:<skype id>", which
 // the oid does not encode.
-export const myMri = (): string => consumerMri() || (CURRENT_OID ? "8:orgid:" + CURRENT_OID : "");
+export const myMri = () => consumerMri() || (CURRENT_OID ? "8:orgid:" + CURRENT_OID : "");
 
 function req(r: IDBRequest): Promise<unknown[]> {
   return new Promise((res) => {
@@ -66,8 +65,7 @@ export function getAll(db: IDBDatabase, store: string, limit?: number): Promise<
   return req(db.transaction(store).objectStore(store).getAll(null, limit));
 }
 
-// All rows of `store` whose compound key/index starts with `prefix`.
-export function getByPrefix(db: IDBDatabase, store: string, prefix: string): Promise<unknown[]> {
+export function getByPrefix(db: IDBDatabase, store: string, prefix: string) {
   const os = db.transaction(store).objectStore(store);
   const range = IDBKeyRange.bound([prefix], [prefix, []]);
   for (const ix of os.indexNames) {

@@ -23,7 +23,7 @@ describe("splitQuote", () => {
 });
 
 describe("splitForward", () => {
-  const fwd = (inner: string): string => `<blockquote itemtype="http://schema.skype.com/Forward">${inner}</blockquote>`;
+  const fwd = (inner: string) => `<blockquote itemtype="http://schema.skype.com/Forward">${inner}</blockquote>`;
 
   it("returns null for a non-forward", () => {
     expect(splitForward("<p>hi</p>")).toBeNull();

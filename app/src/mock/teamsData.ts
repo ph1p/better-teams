@@ -1,6 +1,6 @@
 // Mock of src/teamsData.ts: same exports, backed by the in-memory store instead
 // of Teams' IndexedDB and chatsvc. parity.ts keeps the signatures in sync.
-import type { Activity, Chat, FileRef, Message, Profile, Quote, WriteResult } from "../types";
+import type { Chat, FileRef, Message, Profile, Quote, WriteResult } from "../types";
 import { parseMentions, type MentionPick } from "../mentions";
 import { formatMessage } from "../markdown";
 import { buildQuoteHtml } from "../quote";
@@ -21,14 +21,14 @@ const fail = (reason: string): WriteResult => ({ ok: false, reason });
 const later = <T>(v: T, ms = 120): Promise<T> => new Promise((r) => setTimeout(() => r(v), ms));
 
 export let CURRENT_OID = ME_OID;
-export const myMri = (): string => (CURRENT_OID ? "8:orgid:" + CURRENT_OID : "");
+export const myMri = () => (CURRENT_OID ? "8:orgid:" + CURRENT_OID : "");
 
 /** No photos in the mock: the UI falls back to initials. */
-export function profilePhotoUrl(_mri: string): string {
+export function profilePhotoUrl(_mri: string) {
   return "";
 }
 
-export async function loadProfiles(): Promise<Record<string, Profile>> {
+export async function loadProfiles() {
   return store.profiles;
 }
 
@@ -40,30 +40,26 @@ const EMPTY_PROFILE: Profile = {
   department: "",
   officeLocation: "",
 };
-export function profile(mri: string): Profile {
+export function profile(mri: string) {
   return store.profiles[mri] || EMPTY_PROFILE;
 }
 
-export async function listChats(): Promise<Chat[]> {
+export async function listChats() {
   return store.listChats();
 }
 
 export async function listMessages(
   conversationId: string,
   _opts: { channel?: boolean; limit?: number; remoteLimit?: number } = {},
-): Promise<Message[] | null> {
+) {
   return store.recent(conversationId);
 }
 
-export async function fetchOlderRemote(
-  conversationId: string,
-  _channel = false,
-  _before?: string,
-): Promise<Message[] | null> {
+export async function fetchOlderRemote(conversationId: string, _channel = false, _before?: string) {
   return later(store.older(conversationId), 300);
 }
 
-export function resetPaging(_conversationId: string): void {}
+export function resetPaging(_conversationId: string) {}
 
 export async function primeRemote(conversationId: string, _channel = false): Promise<Message[] | null> {
   store.resetPaging(conversationId);
@@ -76,7 +72,7 @@ export async function sendRemote(
   quote: Quote | null,
   mentions: readonly MentionPick[] = [],
   rootId?: string,
-): Promise<WriteResult> {
+) {
   const body = (text || "").trim();
   if (!body) return fail("empty");
   const mc = formatMessage(body, mentions);
@@ -86,12 +82,7 @@ export async function sendRemote(
   return m ? ok : fail("unknown chat");
 }
 
-export async function forwardMessage(
-  targetId: string,
-  fromConversationId: string,
-  messageId: string,
-  text = "",
-): Promise<WriteResult> {
+export async function forwardMessage(targetId: string, fromConversationId: string, messageId: string, text = "") {
   await later(null);
   const body = text.trim();
   return store.forward(targetId, fromConversationId, messageId, body ? formatMessage(body, []).html : "")
@@ -117,49 +108,44 @@ export async function searchPeople(query: string, size = 8): Promise<PeopleHit[]
   return later(hits, 200);
 }
 
-export async function setChatFavorite(conversationId: string, fav: boolean): Promise<WriteResult> {
+export async function setChatFavorite(conversationId: string, fav: boolean) {
   return store.setFavorite(conversationId, fav) ? ok : fail("unknown chat");
 }
 
-export async function answerChatRequest(c: Chat, action: "Accept" | "Block"): Promise<WriteResult> {
+export async function answerChatRequest(c: Chat, action: "Accept" | "Block") {
   return store.answerRequest(c.id, action) ? ok : fail("unknown chat");
 }
 
-export async function setChatHidden(conversationId: string, hidden: boolean): Promise<WriteResult> {
+export async function setChatHidden(conversationId: string, hidden: boolean) {
   return store.setHidden(conversationId, hidden) ? ok : fail("unknown chat");
 }
 
-export async function markRead(conversationId: string, _lastMessageMs?: number): Promise<WriteResult> {
+export async function markRead(conversationId: string, _lastMessageMs?: number) {
   return store.setRead(conversationId, true) ? ok : fail("unknown chat");
 }
 
-export async function listActivity(): Promise<Activity[]> {
+export async function listActivity() {
   return store.activity();
 }
 
-export async function markActivityRead(newest: number): Promise<WriteResult> {
+export async function markActivityRead(newest: number) {
   store.setFeedRead(newest + 1);
   return ok;
 }
 
-export async function markUnread(conversationId: string, _lastMessageMs?: number): Promise<WriteResult> {
+export async function markUnread(conversationId: string, _lastMessageMs?: number) {
   return store.setRead(conversationId, false) ? ok : fail("unknown chat");
 }
 
-export async function setReaction(
-  conversationId: string,
-  messageId: string,
-  key: string,
-  add: boolean,
-): Promise<WriteResult> {
+export async function setReaction(conversationId: string, messageId: string, key: string, add: boolean) {
   return store.react(conversationId, messageId, key, add) ? ok : fail("unknown message");
 }
 
-export async function deleteMessage(conversationId: string, messageId: string): Promise<WriteResult> {
+export async function deleteMessage(conversationId: string, messageId: string) {
   return store.setDeleted(conversationId, messageId, true) ? ok : fail("not yours");
 }
 
-export async function removeFiles(conversationId: string, messageId: string, keep: FileRef[]): Promise<WriteResult> {
+export async function removeFiles(conversationId: string, messageId: string, keep: FileRef[]) {
   return store.setFiles(conversationId, messageId, keep) ? ok : fail("not yours");
 }
 
@@ -169,43 +155,38 @@ export async function editMessage(
   text: string,
   quoteHtml = "",
   picks: readonly MentionPick[] = [],
-): Promise<WriteResult> {
+) {
   const mc = formatMessage(text, picks);
   return store.edit(conversationId, messageId, quoteHtml + mc.html, parseMentions(mc.mentions))
     ? ok
     : fail("not yours");
 }
 
-export async function undoDelete(conversationId: string, messageId: string): Promise<WriteResult> {
+export async function undoDelete(conversationId: string, messageId: string) {
   return store.setDeleted(conversationId, messageId, false) ? ok : fail("not yours");
 }
 
-// Group chat management and notifications (src/data/groups.ts).
 export type { ChannelNotifications, ChannelPreset, ChannelActions, ChannelMember, CreateResult, TeamChannel };
 
-export async function renameChat(conversationId: string, title: string): Promise<WriteResult> {
+export async function renameChat(conversationId: string, title: string) {
   const t = title.trim();
   if (!t) return fail("empty name");
   return later(store.setTopic(conversationId, t) ? ok : fail("not a group chat"));
 }
 
-export async function addChatMembers(
-  conversationId: string,
-  mris: string[],
-  _shareHistoryDays = 0,
-): Promise<WriteResult> {
+export async function addChatMembers(conversationId: string, mris: string[], _shareHistoryDays = 0) {
   return later(store.setMembers(conversationId, mris, []) ? ok : fail("not a group chat"));
 }
 
-export async function removeChatMember(conversationId: string, mri: string): Promise<WriteResult> {
+export async function removeChatMember(conversationId: string, mri: string) {
   return later(store.setMembers(conversationId, [], [mri]) ? ok : fail("not a group chat"));
 }
 
-export async function leaveChat(conversationId: string): Promise<WriteResult> {
+export async function leaveChat(conversationId: string) {
   return later(store.setMembers(conversationId, [], [ME]) ? ok : fail("not a group chat"));
 }
 
-export async function setChatMuted(conversationId: string, muted: boolean): Promise<WriteResult> {
+export async function setChatMuted(conversationId: string, muted: boolean) {
   return later(store.setMuted(conversationId, muted) ? ok : fail("unknown chat"));
 }
 
@@ -218,7 +199,7 @@ export async function setChannelNotifications(
   channelId: string,
   preset: ChannelPreset,
   _current?: ChannelNotifications | null,
-): Promise<WriteResult> {
+) {
   return later(store.channelPreset(channelId, preset) ? ok : fail("not a channel"));
 }
 
@@ -248,7 +229,7 @@ export async function getChannelActions(channelId: string): Promise<ChannelActio
   );
 }
 
-export async function deleteChannel(a: ChannelActions): Promise<WriteResult> {
+export async function deleteChannel(a: ChannelActions) {
   if (!a.delete) return later(fail("can't delete this channel"));
   return later(store.leaveChannel(a.channelId, false) ? ok : fail("not a channel"));
 }
@@ -266,7 +247,7 @@ export async function createChannel(
   return later(id ? { ok: true, id } : { ok: false, reason: "can't add a channel here" });
 }
 
-export async function leaveChannel(a: ChannelActions): Promise<WriteResult> {
+export async function leaveChannel(a: ChannelActions) {
   if (!a.channel) return later(fail("can't leave this channel"));
   if (a.channel === "hide") return setChannelShown(a.channelId, false);
   return later(store.leaveChannel(a.channelId, false) ? ok : fail("not a channel"));
@@ -287,11 +268,11 @@ export async function getTeamChannels(teamId: string): Promise<TeamChannel[] | n
   );
 }
 
-export async function setChannelShown(channelId: string, shown: boolean): Promise<WriteResult> {
+export async function setChannelShown(channelId: string, shown: boolean) {
   return later(store.setChannelShown(channelId, shown) ? ok : fail("not a channel"));
 }
 
-export async function leaveTeam(a: ChannelActions): Promise<WriteResult> {
+export async function leaveTeam(a: ChannelActions) {
   return later(store.leaveChannel(a.channelId, true) ? ok : fail("not a channel"));
 }
 
@@ -318,12 +299,12 @@ export async function listChannelMembers(a: ChannelActions): Promise<ChannelMemb
   );
 }
 
-export async function addChannelMembers(a: ChannelActions, mris: string[]): Promise<WriteResult> {
+export async function addChannelMembers(a: ChannelActions, mris: string[]) {
   if (!a.addMembers) return later(fail("can't add members here"));
   return later(store.channelMembers(a.channelId, mris) ? ok : fail("not a channel"), 400);
 }
 
-export async function removeChannelMember(a: ChannelActions, m: ChannelMember): Promise<WriteResult> {
+export async function removeChannelMember(a: ChannelActions, m: ChannelMember) {
   if (!a.removeMembers) return later(fail("can't remove members here"));
   return later(store.channelMembers(a.channelId, [], [m.mri]) ? ok : fail("not a channel"), 400);
 }

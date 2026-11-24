@@ -2,7 +2,7 @@ import type { Messages } from "../en";
 
 export const composer: Messages["composer"] = {
   jumpToNewest: "Zur neuesten Nachricht",
-  replyInThread: (from: string) => `Im Thread antworten · ${from}`,
+  replyInThread: (from) => `Im Thread antworten · ${from}`,
   postAsNew: "Als neue Unterhaltung posten (Esc)",
   cancelThreadReply: "Thread-Antwort abbrechen",
   cancelQuote: "Zitat abbrechen",
@@ -20,14 +20,14 @@ export const composer: Messages["composer"] = {
   codePlain: "Nur Text",
   codeInsert: "Einfügen",
   placeholderThread: "Im Thread antworten…",
-  placeholderChannel: (channel: string) => `Neuen Beitrag in #${channel} beginnen`,
-  placeholderChat: (title: string) => `Nachricht an ${title}`,
+  placeholderChannel: (channel) => `Neuen Beitrag in #${channel} beginnen`,
+  placeholderChat: (title) => `Nachricht an ${title}`,
   sendTitle: "Senden (Eingabe) · Umschalt+Eingabe für neue Zeile",
   searchEmoji: "Emoji suchen",
   noEmoji: "Kein Emoji",
   filesWithQuote:
     "Dateien können noch nicht mit einem Zitat oder einer Thread-Antwort gesendet werden. Brich es ab, um zu senden.",
-  sendFailed: (reason: string) => `Senden fehlgeschlagen: ${reason}`,
+  sendFailed: (reason) => `Senden fehlgeschlagen: ${reason}`,
   sendErrors: {
     "chat-not-open":
       "Teams zeigt keine Zeile für diesen Chat. Öffne ihn einmal in Teams (⌥⌘T) und versuch es dann erneut.",

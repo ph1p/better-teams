@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type JSX } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowDown, MessageSquareReply, Paperclip, Reply, Send, X } from "lucide-react";
 import { chatTitle } from "../lib/format";
 import { useLatest } from "../lib/latest";
@@ -10,25 +10,21 @@ import type { ComposerState } from "../hooks/useComposerState";
 import type { Chat } from "../../types";
 import { t } from "../../i18n";
 
-const fmtSize = (n: number): string =>
+const fmtSize = (n: number) =>
   n < 1024 ? n + " B" : n < 1048576 ? Math.round(n / 1024) + " KB" : (n / 1048576).toFixed(1) + " MB";
 
-const hasFiles = (e: DragEvent): boolean => !!e.dataTransfer && [...e.dataTransfer.types].includes("Files");
+const hasFiles = (e: DragEvent) => !!e.dataTransfer && [...e.dataTransfer.types].includes("Files");
 
 interface ComposerProps {
   chat: Chat;
   cs: ComposerState;
-  /** Message list scrolled near the bottom (hides the jump button). */
   atBottom: boolean;
   onScrollToBottom: () => void;
   /** Arrow Up in the empty composer (picks the newest message); true when handled. */
   onUpEmpty?: () => boolean;
 }
 
-// The message box of the open chat: typing indicator, thread / quote chips,
-// the shared MessageEditor (markdown, @mentions, emoji; see MessageEditor.tsx)
-// and files staged to send (attach button, paste, or drop on the chat pane).
-export function Composer({ chat, cs, atBottom, onScrollToBottom, onUpEmpty }: ComposerProps): JSX.Element {
+export function Composer({ chat, cs, atBottom, onScrollToBottom, onUpEmpty }: ComposerProps) {
   const { composer: composerRef, draft, setDraft, quote, setQuote, threadTo, setThreadTo } = cs;
   const fileInput = useRef<HTMLInputElement>(null);
   const [dropping, setDropping] = useState(false);
@@ -43,7 +39,7 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom, onUpEmpty }: Co
       const t = e.target instanceof Element ? e.target : null;
       return t?.closest("#tc-root .tc-main") ? "pane" : t?.closest("#tc-root") ? "overlay" : null;
     };
-    const onOver = (e: DragEvent): void => {
+    const onOver = (e: DragEvent) => {
       const w = where(e);
       if (!w || !hasFiles(e)) return;
       e.preventDefault();
@@ -54,7 +50,7 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom, onUpEmpty }: Co
       clearTimeout(clear);
       clear = window.setTimeout(() => setDropping(false), 150);
     };
-    const onDrop = (e: DragEvent): void => {
+    const onDrop = (e: DragEvent) => {
       const w = where(e);
       if (!w || !hasFiles(e)) return;
       e.preventDefault();
@@ -76,11 +72,10 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom, onUpEmpty }: Co
     };
   }, [addFiles, composerRef]);
 
-  const send = (): void => void cs.send();
+  const send = () => void cs.send();
 
   return (
     <div className={"tc-composer" + (dropping ? " dropping" : "")}>
-      {/* Floats above the box so typing never shifts the layout. */}
       {chat.isChannel ? null : <TypingIndicator chatId={chat.id} />}
       {!atBottom ? (
         <button
