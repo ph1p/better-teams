@@ -120,7 +120,6 @@ export function PeoplePicker({
   const pick = (p: PeopleHit) => {
     setPicked((s) => [...s, p]);
     setQ("");
-    setHi(0);
     input.current?.focus();
   };
   const { hi, setHi, onKey } = usePickerKeys(shown, pick, () => setQ(""));
@@ -170,7 +169,10 @@ export function PeoplePicker({
               ref={i === hi ? scrollNear : undefined}
               onMouseEnter={() => setHi(i)}
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => pick(p)}
+              onClick={() => {
+                pick(p);
+                setHi(0);
+              }}
             >
               <Avatar name={p.displayName} uri={avatarUri(p.mri)} mri={p.mri} small />
               <span className="tc-newchat-hit">

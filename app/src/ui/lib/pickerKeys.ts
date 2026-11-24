@@ -10,8 +10,10 @@ export function usePickerKeys<T>(hits: readonly T[], pick: (hit: T) => void, clo
   const onKey = (e: KeyboardEvent) => {
     const n = hits.length;
     if ((e.key === "ArrowDown" || e.key === "ArrowUp") && n) setHi((hi + (e.key === "ArrowDown" ? 1 : n - 1)) % n);
-    else if (e.key === "Enter" && hits[hi]) pick(hits[hi]);
-    else if (e.key === "Escape") close();
+    else if (e.key === "Enter" && hits[hi]) {
+      pick(hits[hi]);
+      setHi(0);
+    } else if (e.key === "Escape") close();
     else return false;
     e.preventDefault();
     return true;
