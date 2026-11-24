@@ -27,7 +27,15 @@ export { CURRENT_OID, myMri } from "./data/idb";
 export { profilePhotoUrl, loadProfiles, profile } from "./data/profiles";
 export { answerChatRequest, listChats, setChatFavorite } from "./data/chats";
 export { listMessages, fetchOlderRemote, primeRemote, resetPaging } from "./data/messages";
-export { sendRemote, setReaction, deleteMessage, editMessage, undoDelete, removeFiles } from "./data/writes";
+export {
+  sendRemote,
+  forwardMessage,
+  setReaction,
+  deleteMessage,
+  editMessage,
+  undoDelete,
+  removeFiles,
+} from "./data/writes";
 export { searchPeople, type PeopleHit } from "./data/people";
 export { setChatHidden, markRead, markUnread } from "./data/readState";
 export { listActivity, markActivityRead } from "./data/activity";
@@ -42,6 +50,9 @@ export {
   type ChannelNotifications,
   type ChannelPreset,
   getChannelActions,
+  getTeamChannels,
+  setChannelShown,
+  type TeamChannel,
   leaveChannel,
   leaveTeam,
   deleteChannel,

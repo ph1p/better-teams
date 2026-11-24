@@ -121,6 +121,10 @@ export interface SeedChat {
   favorite?: boolean;
   pinned?: boolean;
   hidden?: boolean;
+  /** Channels: hidden in the team's channel list. */
+  channelHidden?: boolean;
+  /** Channels: shown to members by default (Teams' "Recommended"). */
+  recommended?: boolean;
   /** A chat request from someone outside your contacts. */
   request?: boolean;
   /** Messages newer than this many minutes ago count as unread. */
@@ -405,6 +409,7 @@ export const CHATS: SeedChat[] = [
     kind: "channel",
     topic: "deployments",
     team: "Platform",
+    recommended: true,
     members: [maya.mri, jonas.mri, tom.mri],
     readAgo: 60,
     liveCall: 1,
@@ -416,7 +421,17 @@ export const CHATS: SeedChat[] = [
     ],
   },
   {
+    id: "19:platform-random@thread.tacv2",
+    kind: "channel",
+    topic: "random",
+    team: "Platform",
+    channelHidden: true,
+    members: [maya.mri, jonas.mri, tom.mri],
+    messages: [{ from: jonas.mri, ago: 2 * D, html: p("Anyone up for lunch on Friday?") }],
+  },
+  {
     id: "19:design-general@thread.tacv2",
+    channelHidden: true,
     kind: "channel",
     topic: "General",
     team: "Design Guild",

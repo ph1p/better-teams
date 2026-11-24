@@ -1,10 +1,10 @@
 import { t } from "../../i18n";
 import { useState, type JSX } from "react";
-import { BellOff, Blocks, Hash, MessageSquareText, Phone, Search, StickyNote, Video, X } from "lucide-react";
+import { BellOff, Blocks, MessageSquareText, Phone, Search, StickyNote, Video, X } from "lucide-react";
 import { profile, type PeopleHit } from "../../teamsData";
 import { isAppMri } from "../../apps";
-import { Avatar, GroupAvatar } from "../shared/Avatar";
-import { avatarUri, chatTitle, isDirect } from "../lib/format";
+import { ChatIcon } from "../shared/Avatar";
+import { chatTitle, isDirect } from "../lib/format";
 import { statusLabel, usePresence } from "../lib/presence";
 import { MAX_CALL } from "../lib/constants";
 import type { Flash } from "../lib/toast";
@@ -124,21 +124,7 @@ export function ChatHeader({
   return (
     <>
       <div className="tc-main-head">
-        {chat.isChannel ? (
-          <div className="tc-av tc-hash">
-            <Hash size={18} />
-          </div>
-        ) : chat.group ? (
-          <GroupAvatar members={chat.members} />
-        ) : (
-          <Avatar
-            name={chat.title}
-            uri={avatarUri(chat.avatarMri)}
-            mri={chat.avatarMri}
-            status={statusOf(chat.avatarMri)}
-            onOpen={onOpenProfile}
-          />
-        )}
+        <ChatIcon chat={chat} size={18} onOpen={onOpenProfile} />
         <div className="tc-head-text">
           <span className="tc-head-title">
             {renaming ? (

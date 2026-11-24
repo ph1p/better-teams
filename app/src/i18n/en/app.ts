@@ -24,6 +24,11 @@ export const app = {
     hidden ? `Couldn't hide the chat (${reason})` : `Couldn't unhide the chat (${reason})`,
   favoriteFailed: (favorite: boolean, reason: string) =>
     favorite ? `Couldn't add to favorites (${reason})` : `Couldn't remove from favorites (${reason})`,
+  channelShownFailed: (shown: boolean, reason: string) =>
+    shown ? `Couldn't show the channel (${reason})` : `Couldn't hide the channel (${reason})`,
+  forwarded: (name: string) => `Forwarded to ${name}.`,
+  forwardFailed: (reason: string) => `Couldn't forward (${reason})`,
+  originalMissing: "The original message isn't in your chats.",
   requestFailed: (reason: string) => `Couldn't answer the chat request (${reason})`,
   chatHidden: "Chat hidden. Search finds it; a new message brings it back.",
   renameFailed: (reason: string) => `Couldn't rename (${reason})`,

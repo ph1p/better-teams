@@ -25,6 +25,8 @@ interface MockChat {
   readMs: number;
   marked: boolean;
   hidden: boolean;
+  /** Channels: hidden in the team's channel list. */
+  channelHidden?: boolean;
   /** A chat request not yet accepted or blocked. */
   request?: boolean;
   muted?: boolean;
@@ -62,8 +64,20 @@ function reactionsOf(id: string): Reaction[] {
   return out;
 }
 
+// Seeded HTML carries only the mention spans; Teams also stores who each span
+// names (properties.mentions). Rebuild that from the span text.
+function seedMentions(html: string): MentionRef[] | undefined {
+  const out: MentionRef[] = [];
+  for (const [, id, name] of html.matchAll(/schema\.skype\.com\/Mention"[^>]*itemid="(\d+)">([^<]*)</g)) {
+    const who = PEOPLE.find((x) => x.displayName === name);
+    if (who) out.push({ itemid: Number(id), mri: who.mri, name, mentionType: "person" });
+  }
+  return out.length ? out : undefined;
+}
+
 function makeMessage(from: string, html: string, time: number, extra: Partial<Message> = {}): Message {
   const id = nextId(time);
+  const mentions = seedMentions(html);
   return {
     id,
     rootId: id,
@@ -81,6 +95,7 @@ function makeMessage(from: string, html: string, time: number, extra: Partial<Me
     reactions: [],
     files: [],
     time,
+    ...(mentions ? { mentions } : {}),
     ...extra,
   };
 }
@@ -129,6 +144,7 @@ for (const seed of CHATS) {
     readMs: at(seed.readAgo ?? 0) + 1,
     marked: false,
     hidden: !!seed.hidden,
+    ...(seed.channelHidden ? { channelHidden: true } : {}),
     ...(seed.request ? { request: true } : {}),
     favorite: !!seed.favorite,
     pinned: !!seed.pinned,
@@ -220,6 +236,7 @@ export function listChats(): Chat[] {
                 .join(", "));
     const nameTitle = (seed.kind === "chat" || seed.kind === "meeting") && !seed.topic && others.length > 0;
     const lastFromMe = !!last && last.fromMri === ME;
+    const general = seed.kind === "channel" && isGeneral(seed.id);
     // A message newer than the hide time brings a hidden chat back, as in Teams.
     out.push({
       ...(c.liveCall ? { liveCall: c.liveCall } : {}),
@@ -234,7 +251,15 @@ export function listChats(): Chat[] {
       app: seed.kind === "chat" && others.length === 1 && isAppMri(others[0]),
       favorite: c.favorite,
       pinned: c.pinned,
+      // A hidden channel leaves the sidebar, except General (shown in italics).
       hidden: c.hidden,
+      ...(seed.kind === "channel"
+        ? {
+            teamId: teamIdOf(seed.team || ""),
+            ...(general ? { general } : {}),
+            ...(c.channelHidden ? { channelHidden: true } : {}),
+          }
+        : {}),
       ...(c.request ? { request: true, inviter: others[0] } : {}),
       muted: !!c.muted,
       group: c.group,
@@ -304,6 +329,25 @@ export function post(
   if (time > c.readMs || from === ME) c.hidden = false;
   emit(convId, "NewMessage", m.id);
   if (from === ME) scheduleReply(c, root?.id);
+  return m;
+}
+
+// Forward: post the original into `convId` as a Forward block under the
+// optional comment, with its origin as `forwarded` (what the live normalizers
+// read from originalMessageContext / forwardedMessageContext).
+export function forward(convId: string, fromConvId: string, messageId: string, commentHtml: string): Message | null {
+  const src = find(fromConvId, messageId);
+  if (!src || !chats.has(convId)) return null;
+  const block = `<blockquote itemtype="http://schema.skype.com/Forward">${src.m.content}</blockquote>`;
+  const m = post(convId, ME, commentHtml + block);
+  if (m)
+    m.forwarded = {
+      senderMri: src.m.fromMri,
+      sender: src.m.from,
+      time: src.m.time,
+      messageId: src.m.id,
+      threadId: fromConvId,
+    };
   return m;
 }
 
@@ -426,6 +470,30 @@ export function channelMembers(convId: string, add: string[] = [], remove: strin
     poke();
   }
   return c.seed.members;
+}
+
+const isGeneral = (id: string): boolean => /-general@/.test(id);
+
+/** A team's thread id: its General channel's id, as in Teams. */
+function teamIdOf(team: string): string {
+  for (const x of chats.values())
+    if (x.seed.kind === "channel" && x.seed.team === team && isGeneral(x.seed.id)) return x.seed.id;
+  return "";
+}
+
+/** Every channel of the team with this thread id, hidden ones included. */
+export function teamChannels(teamId: string): MockChat[] {
+  const team = chats.get(teamId)?.seed.team;
+  if (!team) return [];
+  return [...chats.values()].filter((x) => x.seed.kind === "channel" && x.seed.team === team);
+}
+
+export function setChannelShown(convId: string, shown: boolean): boolean {
+  const c = chats.get(convId);
+  if (!c || c.seed.kind !== "channel") return false;
+  c.channelHidden = !shown;
+  poke();
+  return true;
 }
 
 /** Leave a channel, or with `team` every channel of its team. */

@@ -36,6 +36,7 @@ interface SidebarProps {
   onOpenProfile: (mri: string) => void;
   onMenu: (e: MouseEvent, chat: Chat) => void;
   onAddChannel: (chat: Chat) => void;
+  onTeamChannels: (e: MouseEvent<HTMLElement>, chat: Chat) => void;
   onHide?: () => void;
   onError: (msg: string) => void;
 }
@@ -68,6 +69,7 @@ export function Sidebar(p: SidebarProps): JSX.Element {
     onOpenProfile,
     onMenu,
     onAddChannel,
+    onTeamChannels,
     onHide,
     onError,
   } = p;
@@ -176,6 +178,7 @@ export function Sidebar(p: SidebarProps): JSX.Element {
             onOpenProfile={onOpenProfile}
             onMenu={onMenu}
             onAddChannel={onAddChannel}
+            onTeamChannels={onTeamChannels}
           />
         ))}
         {!error && !sections.length && !showActivity ? (

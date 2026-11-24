@@ -18,6 +18,7 @@ import {
   renameChat,
   sendRemote,
   setChatFavorite,
+  setChannelShown as writeChannelShown,
   setChatHidden,
   setChatMuted,
   type PeopleHit,
@@ -216,7 +217,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
     async (rootId: string): Promise<void> => {
       const c = chatsRef.current.find((x) => x.id === sel);
       if (!c) return;
-      const res = await joinNativeMeeting(c.id, c.title, rootId);
+      const res = await joinNativeMeeting(c.id, c.title, rootId, c.team);
       if (!res.ok) flash(t().app.joinFailed(res.reason), 4000);
     },
     [sel, flash, chatsRef],
@@ -226,7 +227,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   const meetNow = useCallback(async (): Promise<void> => {
     const c = chatsRef.current.find((x) => x.id === sel);
     if (!c) return;
-    const res = await startNativeChannelMeeting(c.id, c.title);
+    const res = await startNativeChannelMeeting(c.id, c.title, c.team);
     if (!res.ok) flash(t().app.meetingFailed(res.reason), 4000);
   }, [sel, flash, chatsRef]);
 
@@ -305,6 +306,21 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
         (r) => t().app.favoriteFailed(favorite, r),
       ),
     [optimistic],
+  );
+
+  // Show or hide a channel in its team's list (the team label's channel menu).
+  // A channel not in our list yet (never synced) is written without a patch.
+  const setChannelShown = useCallback(
+    async (channelId: string, shown: boolean): Promise<boolean> => {
+      const write = (): Promise<WriteResult> => writeChannelShown(channelId, shown);
+      const failed = (r: string): string => t().app.channelShownFailed(shown, r);
+      const chat = chatsRef.current.find((c) => c.id === channelId);
+      if (chat) return optimistic(chat, { channelHidden: !shown }, write, failed);
+      const res = await write();
+      if (!res.ok) flash(failed(res.reason), 4000);
+      return res.ok;
+    },
+    [optimistic, chatsRef, flash],
   );
 
   const rename = useCallback(
@@ -466,6 +482,7 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
     setHidden,
     answerRequest,
     setFavorite,
+    setChannelShown,
     rename,
     setMuted,
     addMembers,

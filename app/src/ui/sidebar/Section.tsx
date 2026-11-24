@@ -1,5 +1,5 @@
 import { useState, type JSX, type MouseEvent } from "react";
-import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, ListChecks, Plus } from "lucide-react";
 import { Row } from "./Row";
 import { RECENT_MS, SECTION_CAP, SECTION_MIN } from "../lib/constants";
 import { usePref } from "../lib/prefs";
@@ -25,6 +25,8 @@ interface SectionProps {
   onMenu: (e: MouseEvent, chat: Chat) => void;
   // With groupByTeam: the label's hover "+" adds a channel to the team of the given row.
   onAddChannel?: (chat: Chat) => void;
+  // With groupByTeam: the label's channel button opens the team's show/hide list.
+  onTeamChannels?: (e: MouseEvent<HTMLElement>, chat: Chat) => void;
 }
 
 // A collapsible sidebar group; an empty title renders the rows alone, without a
@@ -45,6 +47,7 @@ export function Section({
   onOpenProfile,
   onMenu,
   onAddChannel,
+  onTeamChannels,
 }: SectionProps): JSX.Element {
   const [collapsed, setCollapsed] = usePref<boolean>("sec:" + id, defaultCollapsed);
   const [all, setAll] = useState(false);
@@ -67,6 +70,17 @@ export function Section({
       body.push(
         <div key={"t:" + c.team} className="tc-team-label">
           <span>{name}</span>
+          {onTeamChannels && c.teamId ? (
+            <button
+              className="tc-team-add tc-team-chans"
+              title={t().sidebar.teamChannels}
+              aria-label={t().sidebar.teamChannels + ": " + name}
+              aria-haspopup="dialog"
+              onClick={(e) => onTeamChannels(e, c)}
+            >
+              <ListChecks size={13} />
+            </button>
+          ) : null}
           {onAddChannel && c.team ? (
             <button
               className="tc-team-add"

@@ -16,7 +16,7 @@ const chatSig = (list: Chat[]): string =>
   list
     .map(
       (c) =>
-        `${c.id}:${c.time}:${c.unread}:${c.hidden}:${c.title}:${c.liveCall || ""}:${c.muted ? 1 : 0}:${c.group ? 1 : 0}:${c.left ? 1 : 0}:${c.members.length}`,
+        `${c.id}:${c.time}:${c.unread}:${c.hidden}:${c.channelHidden ? 1 : 0}:${c.title}:${c.liveCall || ""}:${c.muted ? 1 : 0}:${c.group ? 1 : 0}:${c.left ? 1 : 0}:${c.members.length}`,
     )
     .join("|");
 

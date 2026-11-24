@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState, type JSX } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { t } from "../../i18n";
 import { personName, useNameFormat } from "../../names";
 import { profile } from "../../teamsData";
@@ -13,15 +13,16 @@ import {
   Copy,
   Check,
   MessageSquareReply,
+  Forward,
 } from "lucide-react";
-import { splitQuote } from "../../quote";
+import { splitForward, splitQuote } from "../../quote";
 import { RichHtml } from "../../richText";
 import { Avatar } from "../shared/Avatar";
 import { Attachments } from "./Attachments";
 import { Cards } from "./Cards";
 import { isAppMri } from "../../apps";
 import { Linkified } from "../shared/Linkified";
-import { avatarUri, fmtClock, fmtFull, htmlToText, isHtmlMsg, messageText, oneLine } from "../lib/format";
+import { avatarUri, fmtClock, fmtFull, fmtStamp, htmlToText, isHtmlMsg, messageText, oneLine } from "../lib/format";
 import { useEditRequest } from "../lib/editRequest";
 import { MessageEditor } from "./MessageEditor";
 import { editMentions, type MentionPick } from "../../mentions";
@@ -31,6 +32,74 @@ import { glyphFor, PICKER } from "../lib/reactions";
 import { imageItem, openViewer } from "../lib/files";
 import { useCopied } from "../lib/clipboard";
 import type { Chat, Message as Msg } from "../../types";
+
+interface ForwardCardProps {
+  m: Msg;
+  /** The original message's HTML (inside the Forward blockquote). */
+  body: string;
+  onOpenProfile: (mri: string) => void;
+  onOpenMessage?: (cid: string, mid: string) => void;
+}
+
+// A forwarded message as Teams shows it: a bordered card with the original
+// sender and send time on top; clicking it opens the original in its chat.
+function ForwardCard({ m, body, onOpenProfile, onOpenMessage }: ForwardCardProps): JSX.Element {
+  const f = m.forwarded;
+  const s = t().chat;
+  const name = f ? personName(profile(f.senderMri), f.sender, f.senderMri) : "";
+  const open = f?.threadId && onOpenMessage ? (): void => onOpenMessage(f.threadId, f.messageId) : undefined;
+  const canOpen = !!open;
+  const When = canOpen ? "button" : "span";
+  return (
+    <div
+      className={"tc-fwd" + (canOpen ? " open" : "")}
+      role={canOpen ? "button" : undefined}
+      tabIndex={canOpen ? 0 : undefined}
+      title={canOpen ? s.openOriginal : undefined}
+      onClick={(e) => {
+        // Links, images, mentions and buttons inside keep their own click.
+        if ((e.target as Element).closest?.("a, img, button, .tc-mention, .tc-av-btn")) return;
+        e.stopPropagation();
+        open?.();
+      }}
+      onKeyDown={(e) => {
+        if (open && (e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+          e.preventDefault();
+          open();
+        }
+      }}
+    >
+      <div className="tc-fwd-head">
+        <Forward size={14} className="tc-fwd-icon" aria-label={s.forwardedFrom} />
+        {f && name ? (
+          <>
+            <Avatar
+              name={name}
+              uri={avatarUri(f.senderMri)}
+              mri={f.senderMri}
+              small
+              className="xs"
+              onOpen={onOpenProfile}
+            />
+            <button className="tc-fwd-who" onClick={() => onOpenProfile(f.senderMri)}>
+              {name}
+            </button>
+          </>
+        ) : (
+          <span className="tc-fwd-who">{s.forwardedFrom}</span>
+        )}
+        {f?.time ? (
+          <When className="tc-fwd-when" title={fmtFull(f.time)} onClick={open}>
+            {fmtStamp(f.time)}
+          </When>
+        ) : null}
+      </div>
+      <div className="tc-fwd-body">
+        <RichHtml html={body} />
+      </div>
+    </div>
+  );
+}
 
 interface MessageProps {
   m: Msg;
@@ -49,8 +118,12 @@ interface MessageProps {
   onOpenProfile: (mri: string) => void;
   onQuote: (m: Msg) => void;
   onJumpTo?: (mid: string) => void;
+  /** Open a message in its conversation (a forward's original). */
+  onOpenMessage?: (cid: string, mid: string) => void;
   /** Channels only: answer in this message's thread. */
   onThreadReply?: (m: Msg) => void;
+  /** Forward this message to another chat or channel. */
+  onForward?: (m: Msg) => void;
   /** Card buttons that post back to a bot hand off to Teams. */
   onOpenInTeams?: () => void;
 }
@@ -75,7 +148,9 @@ export const Message = memo(function Message({
   onQuote,
   onJumpTo,
   onThreadReply,
+  onForward,
   onOpenInTeams,
+  onOpenMessage,
 }: MessageProps): JSX.Element {
   useNameFormat();
   const { statusOf } = usePresence();
@@ -106,12 +181,15 @@ export const Message = memo(function Message({
   const html = !m.deleted && isHtmlMsg(m);
   const text = m.deleted ? "" : messageText(m);
   const cards = !m.deleted && m.cards?.length ? m.cards : null;
+  const fwd = useMemo(() => (html ? splitForward(m.content) : null), [html, m.content]);
   // A card message's text is only the card's summary: the card shows it already.
   const cardOnly = !!cards && /Media_Card/i.test(m.messageType);
   // Split any leading Skype Reply blockquote off the content so the textarea
   // holds just the reply body; the quote shows as a removable chip.
-  const { quoteHtml: origQuote, body: bodyHtml } = splitQuote(m.content);
-  const bodyText = htmlToText(bodyHtml);
+  const { origQuote, bodyHtml, bodyText } = useMemo(() => {
+    const q = splitQuote(m.content);
+    return { origQuote: q.quoteHtml, bodyHtml: q.body, bodyText: htmlToText(q.body) };
+  }, [m.content]);
   // The editor works in the composer's markdown-lite so formatting survives.
   // Only editing needs the Markdown form, so compute it on demand. Mention
   // spans come back as "@Name" with their picks, so mentions survive the edit.
@@ -255,6 +333,14 @@ export const Message = memo(function Message({
                 const id = bq.getAttribute("data-reply-id");
                 if (id) onJumpTo?.(id);
               }
+              // Click a person @mention to open their profile (tag/channel/team
+              // mentions have no person behind them).
+              const at = (e.target as Element).closest?.(".tc-mention[data-mention-id]");
+              if (at) {
+                const id = Number(at.getAttribute("data-mention-id"));
+                const ref = m.mentions?.find((x) => x.itemid === id);
+                if (ref && ref.mentionType === "person" && ref.mri) onOpenProfile(ref.mri);
+              }
               // Click an inline image to view it large, with the message's other images.
               const img = (e.target as Element).closest?.("img.tc-inline-img");
               if (img) {
@@ -266,7 +352,16 @@ export const Message = memo(function Message({
               }
             }}
           >
-            {cardOnly ? null : html ? <RichHtml html={m.content} /> : <Linkified text={text} />}
+            {cardOnly ? null : fwd ? (
+              <>
+                {fwd.comment ? <RichHtml html={fwd.comment} /> : null}
+                <ForwardCard m={m} body={fwd.body} onOpenProfile={onOpenProfile} onOpenMessage={onOpenMessage} />
+              </>
+            ) : html ? (
+              <RichHtml html={m.content} />
+            ) : (
+              <Linkified text={text} />
+            )}
             {m.edited ? <span className="tc-edited">{t().chat.edited}</span> : null}
           </div>
         )}
@@ -309,6 +404,11 @@ export const Message = memo(function Message({
             <button className="tc-tool" title={t().chat.replyQuote} onClick={() => onQuote(m)}>
               <Reply size={16} />
             </button>
+            {onForward ? (
+              <button className="tc-tool" title={t().chat.forward} onClick={() => onForward(m)}>
+                <Forward size={16} />
+              </button>
+            ) : null}
             {m.mine ? (
               <button className="tc-tool" title={t().chat.edit} onClick={() => startEdit()}>
                 <Pencil size={15} />

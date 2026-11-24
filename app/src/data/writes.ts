@@ -28,6 +28,30 @@ function mentionInputs(json: string): chat.MentionInput[] {
   }
 }
 
+// Forward a message into another chat or channel, the way Teams' Forward dialog
+// does: the send carries forwardMessageIds + forwardMessageOriginalConvId and the
+// worker posts the original (with its sender and cards) into the target. `text`
+// is an optional comment shown above it. Worker only: there is no REST fallback,
+// a plain chatsvc post would lose the forward card.
+export async function forwardMessage(
+  targetId: string,
+  fromConversationId: string,
+  messageId: string,
+  text = "",
+): Promise<WriteResult> {
+  const body = text.trim();
+  const r = await chat.sendMessage({
+    convId: targetId,
+    content: body ? formatMessage(body, []).html : "",
+    clientMessageId: chat.newClientMessageId(),
+    channel: isChannelId(targetId),
+    forward: { ids: [messageId], fromConvId: fromConversationId },
+  });
+  if (!r.ok) return { ok: false, reason: r.reason };
+  remoteCache.delete(targetId);
+  return { ok: true, via: "cdl" };
+}
+
 // Send a text message through the exact chatsvc endpoint Teams itself POSTs to,
 // with Teams' own live token. Mirrors the captured native-send body 1:1. Returns
 // { ok, reason? }. Returns { ok:false, reason:"no-token" } when no bearer is

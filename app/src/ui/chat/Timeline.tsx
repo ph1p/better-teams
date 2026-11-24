@@ -51,7 +51,9 @@ interface TimelineProps {
   onOpenProfile: (mri: string) => void;
   onQuote: (m: Msg) => void;
   onJumpTo: (mid: string) => void;
+  onOpenMessage: (cid: string, mid: string) => void;
   onThreadReply: (m: Msg) => void;
+  onForward: (m: Msg) => void;
   onJoinCall: (rootId: string) => void;
 }
 
@@ -119,7 +121,9 @@ export function Timeline(p: TimelineProps): JSX.Element {
       onOpenProfile={p.onOpenProfile}
       onQuote={p.onQuote}
       onJumpTo={p.onJumpTo}
+      onOpenMessage={p.onOpenMessage}
       onThreadReply={channel ? p.onThreadReply : undefined}
+      onForward={p.onForward}
       onOpenInTeams={p.onOpenInTeams}
     />
   );

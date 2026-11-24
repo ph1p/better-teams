@@ -4,31 +4,19 @@
 // - CDL messages: a `cards` array of {contentType, content (JSON string)};
 // - chatsvc REST / IDB: properties.cards, the same array as a JSON string.
 // All three end up as Card[] on the message; the UI renders them.
+import { isObj, parsed } from "./data/raw";
 
 export interface Card {
   contentType: string;
   content: Record<string, unknown>;
 }
 
-type Dict = Record<string, unknown>;
-
-const isDict = (v: unknown): v is Dict => typeof v === "object" && v !== null && !Array.isArray(v);
-
-function json(v: unknown): unknown {
-  if (typeof v !== "string") return v;
-  try {
-    return JSON.parse(v);
-  } catch {
-    return null;
-  }
-}
-
 function fromList(list: unknown): Card[] {
   const out: Card[] = [];
   for (const a of Array.isArray(list) ? list : []) {
-    if (!isDict(a)) continue;
-    const content = json(a.content);
-    if (!isDict(content)) continue;
+    if (!isObj(a)) continue;
+    const content = parsed(a.content);
+    if (!isObj(content)) continue;
     out.push({ contentType: typeof a.contentType === "string" ? a.contentType : "", content });
   }
   return out;
@@ -39,8 +27,8 @@ function fromSwift(content: string): Card[] {
   if (!m) return [];
   try {
     const bytes = Uint8Array.from(atob(m[1]), (c) => c.charCodeAt(0));
-    const swift = json(new TextDecoder().decode(bytes));
-    return isDict(swift) ? fromList(swift.attachments) : [];
+    const swift = parsed(new TextDecoder().decode(bytes));
+    return isObj(swift) ? fromList(swift.attachments) : [];
   } catch {
     return [];
   }
@@ -49,7 +37,7 @@ function fromSwift(content: string): Card[] {
 /** Cards of one message: from its Swift content, else from its cards list (array or JSON string). */
 export function parseCards(content: string, cards?: unknown): Card[] {
   const swift = fromSwift(content);
-  return swift.length ? swift : fromList(json(cards));
+  return swift.length ? swift : fromList(parsed(cards));
 }
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
@@ -75,7 +63,7 @@ function adaptiveTexts(el: unknown, out: string[]): void {
     for (const x of el) adaptiveTexts(x, out);
     return;
   }
-  if (!isDict(el) || el.isVisible === false) return;
+  if (!isObj(el) || el.isVisible === false) return;
   if (el.type === "TextBlock" || el.type === "TextRun") out.push(str(el.text));
   else if (el.type === "RichTextBlock") adaptiveTexts(el.inlines, out);
   else if (el.type === "FactSet")
@@ -84,7 +72,7 @@ function adaptiveTexts(el: unknown, out: string[]): void {
   for (const k of ["body", "items", "columns", "rows", "cells"]) adaptiveTexts(el[k], out);
 }
 
-const get = (o: unknown, k: string): unknown => (isDict(o) ? o[k] : undefined);
+const get = (o: unknown, k: string): unknown => (isObj(o) ? o[k] : undefined);
 
 /** Short text of a card list ("title · line · line"), "" when nothing readable. */
 export function cardSummary(cards: readonly Card[]): string {

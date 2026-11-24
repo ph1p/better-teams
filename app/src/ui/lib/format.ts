@@ -52,6 +52,7 @@ function formatters(loc: string) {
     dayMonth: new Intl.DateTimeFormat(loc, { day: "2-digit", month: "2-digit" }),
     long: new Intl.DateTimeFormat(loc, { weekday: "long", day: "numeric", month: "long" }),
     longYear: new Intl.DateTimeFormat(loc, { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
+    stamp: new Intl.DateTimeFormat(loc, { dateStyle: "short", timeStyle: "short" }),
     full: new Intl.DateTimeFormat(loc, { dateStyle: "medium", timeStyle: "medium" }),
     rel: new Intl.RelativeTimeFormat(loc, { numeric: "auto" }),
   };
@@ -71,6 +72,8 @@ export function fmtTime(ts: number): string {
 
 export const fmtClock = (ts: number): string => (ts ? fmt().clock.format(ts) : "");
 
+/** Short date + time ("23.11.26, 19:32"), as Teams shows on forwarded messages. */
+export const fmtStamp = (ts: number): string => (ts ? fmt().stamp.format(ts) : "");
 /** Full date and time, for tooltips. */
 export const fmtFull = (ts: number): string => (ts ? fmt().full.format(ts) : "");
 

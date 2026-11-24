@@ -49,6 +49,8 @@ export interface SendInput {
   channel?: boolean;
   /** Channel thread root id: reply in that thread instead of a new post. */
   replyChainId?: string;
+  /** Forward these messages from `fromConvId` into `convId`; `content` is the optional comment. */
+  forward?: { ids: string[]; fromConvId: string };
 }
 
 /** Send (or edit) a message: Teams' `autoSendMessage`, action Create/Update. */
@@ -82,12 +84,14 @@ export async function sendMessage(i: SendInput): Promise<CdlRes<{ id: string; or
     meeting: null,
     scheduledSendTime: null,
     targetedMsgRecipientId: null,
-    forwardMessageIds: [],
-    forwardMessageOriginalConvId: null,
+    // The worker routes to postForwardMessageToConversation when both are set.
+    forwardMessageIds: i.forward?.ids ?? [],
+    forwardMessageOriginalConvId: i.forward?.fromConvId ?? null,
     forwardedMessageContext: null,
-    forwardMessageRecipients: [],
+    forwardMessageRecipients: i.forward ? [i.convId] : [],
     forwardAppIdsToInstall: [],
-    forwardMessageCardContents: null,
+    forwardMessageCardContents: i.forward ? {} : null,
+    ...(i.forward ? { forwardMessageCardsCount: 0 } : {}),
     forwardPrivateReply: false,
     forwardTeamId: null,
     isForwardedMessage: false,

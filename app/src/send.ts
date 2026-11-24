@@ -12,6 +12,7 @@
 
 import type { WriteResult } from "./types";
 import { formatMessage } from "./markdown";
+import { isChannelId } from "./data/state";
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
@@ -56,20 +57,57 @@ async function waitFor<T>(fn: () => T, ms = 2500, step = 100): Promise<T> {
 // row. The native list is virtualized (collapsed folders render no rows), so
 // this only works for rows Teams currently renders — favorites and expanded
 // folders. Rows carry the conversation id in data-fui-tree-item-value.
-export function openNativeChat(conversationId: string, title?: string): Promise<boolean> {
-  return drive(() => clickNativeChat(conversationId, title));
+// Channels pass their team name: a collapsed team is expanded first.
+export function openNativeChat(conversationId: string, title?: string, team?: string): Promise<boolean> {
+  return drive(() => clickNativeChat(conversationId, title, team));
 }
 
-async function clickNativeChat(conversationId: string, title?: string): Promise<boolean> {
-  if (nativeThreadId() === conversationId) return true;
-  const rows = [...document.querySelectorAll('[role="treeitem"]')] as HTMLElement[];
-  // The title is a last resort and only when it names one row: every team has
-  // a "General", and clicking another team's switched native Teams there.
-  const byTitle = title ? rows.filter((r) => (r.innerText || "").trim().split("\n")[0].trim() === title.trim()) : [];
-  const row =
+/** Every element matching `sel` in Teams' own DOM (not inside the overlay). */
+const nativeAll = (sel: string): HTMLElement[] =>
+  [...document.querySelectorAll<HTMLElement>(sel)].filter((x) => !x.closest("#tc-root"));
+
+const firstLine = (el: HTMLElement): string => (el.innerText || "").trim().split("\n")[0].trim();
+
+function findNativeRow(conversationId: string, title?: string, team?: string): HTMLElement | undefined {
+  const rows = nativeAll('[role="treeitem"]');
+  const byId =
     rows.find((r) => (r.getAttribute("data-fui-tree-item-value") || "").includes(conversationId)) ||
-    rows.find((r) => (r.outerHTML || "").includes(conversationId)) ||
-    (byTitle.length === 1 ? byTitle[0] : undefined);
+    rows.find((r) => (r.outerHTML || "").includes(conversationId));
+  if (byId) return byId;
+  // The title is a last resort and only when it names one row: every team has
+  // a "General", and clicking another team's switched native Teams there. With
+  // a team name we only look at rows nested under that team's row.
+  if (!title) return undefined;
+  // innerText forces layout: read each team row's label once, not per child.
+  const label = new Map<HTMLElement, string>();
+  const scope = team
+    ? rows.filter((r) => {
+        const parent = r.parentElement?.closest<HTMLElement>('[role="treeitem"]');
+        if (!parent) return false;
+        if (!label.has(parent)) label.set(parent, firstLine(parent));
+        return label.get(parent) === team.trim();
+      })
+    : rows;
+  const byTitle = scope.filter((r) => firstLine(r) === title.trim());
+  return byTitle.length === 1 ? byTitle[0] : undefined;
+}
+
+// A channel row is only rendered while its team is expanded. Expand the team
+// row (matched by name) so the channel rows below it render.
+async function expandNativeTeam(team: string): Promise<boolean> {
+  const head = nativeAll('[role="treeitem"][aria-expanded="false"]').find((r) => firstLine(r) === team.trim());
+  if (!head) return false;
+  head.scrollIntoView({ block: "center" });
+  head.click();
+  return !!(await waitFor(() => head.getAttribute("aria-expanded") === "true", 1500));
+}
+
+async function clickNativeChat(conversationId: string, title?: string, team?: string): Promise<boolean> {
+  if (nativeThreadId() === conversationId) return true;
+  let row = findNativeRow(conversationId, title, team);
+  if (!row && team && (await expandNativeTeam(team))) {
+    row = await waitFor(() => findNativeRow(conversationId, title, team), 1500);
+  }
   if (!row) return false;
   row.scrollIntoView({ block: "center" });
   row.click();
@@ -90,8 +128,7 @@ const CALL_MENU_ITEM = {
 };
 
 function nativeButton(sel: string): HTMLElement | null {
-  const b = [...document.querySelectorAll<HTMLElement>(sel)].find((x) => !x.closest("#tc-root"));
-  return b || null;
+  return nativeAll(sel)[0] ?? null;
 }
 
 /**
@@ -137,35 +174,76 @@ export async function startNativeCall(
 // with several cards on screen. No deep link (it would replace the Teams page).
 const MEETING_JOIN = '[data-testid="meeting-object-join"]';
 
-export async function joinNativeMeeting(conversationId: string, title: string, rootId: string): Promise<WriteResult> {
-  if (!(await openNativeChat(conversationId, title))) return { ok: false, reason: "chat not open in Teams" };
+export async function joinNativeMeeting(
+  conversationId: string,
+  title: string,
+  rootId: string,
+  team?: string,
+): Promise<WriteResult> {
+  if (!(await openNativeChat(conversationId, title, team))) return { ok: false, reason: "chat not open in Teams" };
   const find = (): HTMLElement | null => {
     const card = document.getElementById("meeting-object-label" + rootId);
     const own = card?.querySelector<HTMLElement>(MEETING_JOIN);
     if (own) return own;
     // Fallback: exactly one join button on screen is unambiguous.
-    const all = [...document.querySelectorAll<HTMLElement>(MEETING_JOIN)].filter((b) => !b.closest("#tc-root"));
+    const all = nativeAll(MEETING_JOIN);
     return all.length === 1 ? all[0] : null;
   };
-  const btn = await waitFor(find, 4000);
+  let btn = await waitFor(find, isChannelId(conversationId) ? 2500 : 4000);
+  // Channels: the meeting card may be scrolled out of the (virtualized) posts
+  // list. The channel header lists live meetings behind its Meet button, each
+  // with a Join button keyed `liveJoinButton:<channelId>:<rootId>`.
+  if (!btn && isChannelId(conversationId)) btn = await joinFromChannelHeader(conversationId, rootId);
   if (!btn) return { ok: false, reason: "no Join button in Teams" };
   if (nativeThreadId() !== conversationId) return { ok: false, reason: "Teams switched chats" };
   btn.click();
   return { ok: true, via: "native" };
 }
 
-// Start a channel meeting ("Meet now") with the channel header's own button.
-// Teams then shows its pre-join screen; the call-window guard hides the overlay.
 const CHANNEL_MEET = '[data-tid="channel-meet-header-main-btn"]';
+const CHANNEL_MEET_ITEM = '[data-tid="channel-header-meet-now-meet-btn"]';
+const LIVE_JOIN = '[data-tid^="liveJoinButton:"]';
+const ROSTER_JOIN = 'button[data-track-action-scenario="SlashCommandJoinMeetNow"]';
 
-export async function startNativeChannelMeeting(conversationId: string, title: string): Promise<WriteResult> {
-  if (!(await openNativeChat(conversationId, title))) return { ok: false, reason: "channel not open in Teams" };
-  const btn = await waitFor(() => nativeButton(CHANNEL_MEET), 4000);
+async function joinFromChannelHeader(channelId: string, rootId: string): Promise<HTMLElement | null> {
+  const pick = (): HTMLElement | null => {
+    const items = nativeAll(LIVE_JOIN);
+    const own = items.find((b) =>
+      (b.getAttribute("data-tid") || "").startsWith(`liveJoinButton:${channelId}:${rootId}`),
+    );
+    if (own) return own;
+    if (items.length === 1) return items[0];
+    const roster = nativeAll(ROSTER_JOIN);
+    return roster.length === 1 ? roster[0] : null;
+  };
+  const ready = pick();
+  if (ready) return ready;
+  const trigger = nativeButton("#meeting-button") || nativeButton(CHANNEL_MEET);
+  // No live meeting means the header shows plain "Meet now": never press it here.
+  if (!trigger || trigger.getAttribute("aria-haspopup") == null) return null;
+  trigger.click();
+  return waitFor(pick, 2500);
+}
+
+export async function startNativeChannelMeeting(
+  conversationId: string,
+  title: string,
+  team?: string,
+): Promise<WriteResult> {
+  if (!(await openNativeChat(conversationId, title, team))) return { ok: false, reason: "channel not open in Teams" };
+  let btn = await waitFor(() => nativeButton(CHANNEL_MEET), 4000);
   if (!btn) return { ok: false, reason: "no Meet button in Teams" };
+  if (nativeThreadId() !== conversationId) return { ok: false, reason: "Teams switched chats" };
+  // While meetings run in the channel the header button opens a menu (live
+  // meetings + "Meet now") instead of starting one; pick its Meet now item.
+  if (btn.getAttribute("aria-haspopup") != null) {
+    btn.click();
+    btn = await waitFor(() => nativeButton(CHANNEL_MEET_ITEM), 2500);
+    if (!btn) return { ok: false, reason: "no Meet now in Teams' meeting menu" };
+  }
   if (btn.hasAttribute("disabled") || btn.getAttribute("aria-disabled") === "true") {
     return { ok: false, reason: "Teams has meetings disabled for this channel" };
   }
-  if (nativeThreadId() !== conversationId) return { ok: false, reason: "Teams switched chats" };
   btn.click();
   return { ok: true, via: "native" };
 }
@@ -187,7 +265,7 @@ export interface PickPerson {
 export type NewChatResult = { ok: true; id: string; draft: boolean } | { ok: false; reason: string };
 
 function chipCount(): number {
-  return [...document.querySelectorAll(PICKER_CHIP)].filter((c) => !c.closest("#tc-root")).length;
+  return nativeAll(PICKER_CHIP).length;
 }
 
 // Chip button per picked person: id "recipient-line-entry-<mri>"; clicking it
@@ -196,7 +274,7 @@ function chipCount(): number {
 const CHIP_BUTTON = '[id^="recipient-line-entry-"]';
 
 function chipButtons(): HTMLElement[] {
-  return [...document.querySelectorAll<HTMLElement>(CHIP_BUTTON)].filter((c) => !c.closest("#tc-root"));
+  return nativeAll(CHIP_BUTTON);
 }
 
 function chipIs(c: HTMLElement, p: PickPerson): boolean {

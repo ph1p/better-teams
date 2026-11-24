@@ -331,6 +331,37 @@ export async function setChannelVisibility(channelId: string, show: boolean): Pr
   );
 }
 
+// Every channel of a team, hidden ones included, as Teams' own channel
+// management lists them. isShownByDefault is the team owner's "Recommended"
+// (shown to members by default); isShown is this user's own choice.
+const TEAM_CHANNELS = `query ComponentsCreateChannelGetTeamQuery($teamThreadId: ID!, $activitiesFromWorker: Boolean!) {
+  team(teamThreadId: $teamThreadId, activitiesFromWorker: $activitiesFromWorker) {
+    id
+    channels { id displayName isGeneral isShownByDefault isShown isDeleted }
+  }
+}`;
+
+export interface TeamChannelInfo {
+  id: string;
+  displayName: string;
+  isGeneral: boolean;
+  isShownByDefault: boolean;
+  isShown: boolean;
+}
+
+/** A team's channels with their visibility; deleted ones are left out. */
+export async function getTeamChannels(teamThreadId: string): Promise<CdlRes<TeamChannelInfo[]>> {
+  const r = await cdl<{ team?: { channels?: (TeamChannelInfo & { isDeleted?: boolean })[] } | null }>(
+    "ComponentsCreateChannelGetTeamQuery",
+    TEAM_CHANNELS,
+    { teamThreadId, activitiesFromWorker: false },
+  );
+  if (!r.ok) return r;
+  const list = r.data.team?.channels;
+  if (!Array.isArray(list)) return { ok: false, reason: "no team" };
+  return { ok: true, data: list.filter((c) => c && c.id && !c.isDeleted) };
+}
+
 /** Rename a channel (Teams' "Edit channel", name only). */
 export async function renameChannel(channelId: string, displayName: string): Promise<CdlRes<true>> {
   const r = check<{ success?: boolean }>(

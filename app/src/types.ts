@@ -63,6 +63,16 @@ export interface Chat {
   pinned: boolean;
   /** Hidden from the chat list (Teams' "Hide"); search still finds it. */
   hidden: boolean;
+  /** Channels: the team's thread id (General's own id). */
+  teamId?: string;
+  /** Channels: the team's General channel. */
+  general?: boolean;
+  /**
+   * Channels: hidden in the team's channel list (Teams' channel "Hide"). Such a
+   * channel leaves the sidebar (sections.ts listed), except General, which
+   * Teams keeps listed (in italics).
+   */
+  channelHidden?: boolean;
   /** Notifications muted (Teams' "Mute"). Chats only; channels have presets. */
   muted: boolean;
   /** A group chat (not 1:1): can be renamed, has a roster you can change and leave. */
@@ -82,6 +92,17 @@ export interface Chat {
 }
 
 /** A normalized message ready to render. */
+export interface ForwardRef {
+  senderMri: string;
+  /** Original sender's display name ("" when unknown). */
+  sender: string;
+  /** Original send time, ms. */
+  time: number;
+  /** Original message id and its conversation (chat or channel thread id). */
+  messageId: string;
+  threadId: string;
+}
+
 export interface Message {
   id: string;
   /** Thread root id (channels); equals `id` for top-level posts. */
@@ -107,6 +128,8 @@ export interface Message {
   mentions?: MentionRef[];
   /** Message time, ms since epoch. */
   time: number;
+  /** Forwarded message: where the original came from (its body is the Forward blockquote in `content`). */
+  forwarded?: ForwardRef;
   /** Channel meeting event: the thread root ("start") or its end marker. */
   call?: "start" | "end";
 }

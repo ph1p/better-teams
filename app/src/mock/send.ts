@@ -15,7 +15,7 @@ function mriOf(p: PickPerson): string {
   return hit ? hit.mri : "";
 }
 
-export async function openNativeChat(conversationId: string, _title?: string): Promise<boolean> {
+export async function openNativeChat(conversationId: string, _title?: string, _team?: string): Promise<boolean> {
   return !!store.getChat(conversationId);
 }
 
@@ -32,11 +32,20 @@ export async function startNativeCall(
   return callNotice(`${kind} call with ${title}`);
 }
 
-export async function joinNativeMeeting(_conversationId: string, title: string, _rootId: string): Promise<WriteResult> {
+export async function joinNativeMeeting(
+  _conversationId: string,
+  title: string,
+  _rootId: string,
+  _team?: string,
+): Promise<WriteResult> {
   return callNotice(`join meeting in ${title}`);
 }
 
-export async function startNativeChannelMeeting(_conversationId: string, title: string): Promise<WriteResult> {
+export async function startNativeChannelMeeting(
+  _conversationId: string,
+  title: string,
+  _team?: string,
+): Promise<WriteResult> {
   return callNotice(`meet now in ${title}`);
 }
 

@@ -5,8 +5,8 @@ import { isAppMri } from "../apps";
 import { getAll, myMri, open } from "./idb";
 import { shortName } from "../names";
 import { profile } from "./profiles";
-import { arr, get, mriOf, obj, str, toMs, type Dict } from "./raw";
-import { isDeparted, withPending } from "./groups";
+import { arr, get, mriOf, obj, parsed, str, toMs, type Dict } from "./raw";
+import { effectiveShown, isDeparted, withPending } from "./groups";
 import { effectiveHidden, effectiveHorizon, effectiveMarked, flushPendingHorizons } from "./readState";
 import { isOneToOneId, lastByConv } from "./state";
 
@@ -115,12 +115,7 @@ function liveCallRoot(tp: Dict): string {
   const now = Date.now();
   for (const [k, v] of Object.entries(tp)) {
     if (!k.startsWith("awareness_conversationLiveState:")) continue;
-    let j: Dict;
-    try {
-      j = obj(typeof v === "string" ? JSON.parse(v) : v);
-    } catch {
-      continue;
-    }
+    const j = obj(parsed(v));
     if (j.status === "Active" && Number(j.expiration) * 1000 > now) return k.slice(k.indexOf(":") + 1);
   }
   return "";
@@ -186,16 +181,15 @@ export async function listChats(): Promise<Chat[]> {
     // but chatsvc refuses them with 403 AclCheckFailed, so they could never
     // load. Teams no longer lists them either.
     if (kind === "channel" && (left || (team && hasLeft(teamTp)) || isDeparted(str(c.id), teamKey))) continue;
-    // Hidden standard channel (Teams' "Hide"): Teams lists a channel other
-    // than General only while its favorite property is "true". A missing one
-    // is kept, to stay on the safe side.
-    if (
+    // Hidden channel (Teams' channel "Hide"): Teams lists a channel only while
+    // its favorite property is "true"; a missing one counts as shown. General
+    // stays listed when hidden (in italics); the others drop out of the
+    // sidebar (sections.ts listed) but stay in the list, so the team's
+    // show/hide menu can bring them back.
+    const general = kind === "channel" && c.id === teamKey;
+    const channelHidden =
       kind === "channel" &&
-      c.id !== teamKey &&
-      props.favorite != null &&
-      String(props.favorite).toLowerCase() !== "true"
-    )
-      continue;
+      !effectiveShown(str(c.id), props.favorite == null || String(props.favorite).toLowerCase() === "true");
     // Hidden (Teams' "Hide"): the worker keeps the hide time in the user
     // property unpinnedTime; a newer message brings the chat back.
     const hiddenAt = Number(props.unpinnedTime) || 0;
@@ -217,6 +211,9 @@ export async function listChats(): Promise<Chat[]> {
         ...(isNameTitle(c, kind, others) ? { nameTitle: true } : {}),
         team: teamName,
         isChannel: kind === "channel",
+        ...(kind === "channel"
+          ? { teamId: teamKey, ...(general ? { general } : {}), ...(channelHidden ? { channelHidden } : {}) }
+          : {}),
         // 1:1 chats get the other person's photo.
         avatarMri: kind === "chat" && others.length === 1 ? others[0] : "",
         // Other participants' MRIs — powers the "chats with this user" panel.

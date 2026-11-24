@@ -6,6 +6,7 @@ import { avatarUri } from "../lib/format";
 import { usePeopleSearch } from "../lib/peopleSearch";
 import { t } from "../../i18n";
 import { useModalExit } from "../lib/modalExit";
+import { usePickerKeys } from "../lib/pickerKeys";
 
 /** Outcome of a start attempt, reported back by App. */
 export type NewChatOutcome =
@@ -33,7 +34,6 @@ export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewC
   const { closing, close } = useModalExit(onClose);
   const [picked, setPicked] = useState<PeopleHit[]>(initial || []);
   const [q, setQ] = useState("");
-  const [hi, setHi] = useState(0);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [isDraft, setIsDraft] = useState(!!initialDraft);
@@ -68,6 +68,7 @@ export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewC
     setPicked((s) => s.filter((p) => p.mri !== mri));
     changed();
   };
+  const { hi, setHi, onKey } = usePickerKeys(shown, add, close);
 
   const submit = async (): Promise<void> => {
     if (!picked.length || busy) return;
@@ -86,21 +87,11 @@ export function NewChat({ onStart, onClose, initial, initialDraft, known }: NewC
   };
 
   const onInputKey = (e: KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === "ArrowDown" && shown.length) {
+    if (onKey(e)) return;
+    if (e.key === "Enter") {
       e.preventDefault();
-      setHi((i) => (i + 1) % shown.length);
-    } else if (e.key === "ArrowUp" && shown.length) {
-      e.preventDefault();
-      setHi((i) => (i - 1 + shown.length) % shown.length);
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      if (shown[hi]) add(shown[hi]);
-      else if (!q && picked.length) msg.current?.focus();
+      if (!q && picked.length) msg.current?.focus();
     } else if (e.key === "Backspace" && !q && picked.length) remove(picked[picked.length - 1].mri);
-    else if (e.key === "Escape") {
-      e.preventDefault();
-      close();
-    }
   };
 
   const s = t().sidebar;

@@ -34,6 +34,11 @@ export const app: Messages["app"] = {
     favorite
       ? `Zu Favoriten hinzufügen fehlgeschlagen (${reason})`
       : `Aus Favoriten entfernen fehlgeschlagen (${reason})`,
+  channelShownFailed: (shown, reason) =>
+    shown ? `Kanal konnte nicht eingeblendet werden (${reason})` : `Kanal konnte nicht ausgeblendet werden (${reason})`,
+  forwarded: (name) => `An ${name} weitergeleitet.`,
+  forwardFailed: (reason) => `Weiterleiten fehlgeschlagen (${reason})`,
+  originalMissing: "Die Originalnachricht ist nicht in deinen Chats.",
   requestFailed: (reason) => `Chat-Anfrage konnte nicht beantwortet werden (${reason})`,
   chatHidden: "Chat ausgeblendet. Die Suche findet ihn; eine neue Nachricht holt ihn zurück.",
   renameFailed: (reason) => `Umbenennen fehlgeschlagen (${reason})`,

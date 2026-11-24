@@ -133,12 +133,61 @@ export async function leaveChat(conversationId: string): Promise<WriteResult> {
   return { ok: true, via: "cdl" };
 }
 
-// Channels we left or hid and teams we left this session. IndexedDB shows it
+// Channel visibility set this session (true = shown). IndexedDB carries it in
+// the channel's favorite property only after a sync; until it agrees (or
+// OVERRIDE_MS passes) this value wins.
+const shownOverride = new Map<string, { at: number; shown: boolean }>();
+
+/** A channel's visibility in its team's list, with this session's toggles applied. */
+export function effectiveShown(convId: string, idbShown: boolean): boolean {
+  const ov = shownOverride.get(convId);
+  if (!ov) return idbShown;
+  if (ov.shown === idbShown || Date.now() - ov.at > OVERRIDE_MS) {
+    shownOverride.delete(convId);
+    return idbShown;
+  }
+  return ov.shown;
+}
+
+/** One channel in a team's show/hide list. */
+export interface TeamChannel {
+  id: string;
+  name: string;
+  general: boolean;
+  /** The team owner shows it to members by default (Teams' "Recommended"). */
+  recommended: boolean;
+  shown: boolean;
+}
+
+/** All channels of a team for the show/hide list; null when Teams doesn't answer. */
+export async function getTeamChannels(teamId: string): Promise<TeamChannel[] | null> {
+  const r = await groups.getTeamChannels(teamId);
+  if (!r.ok) return null;
+  return r.data.map((c) => ({
+    id: c.id,
+    name: c.displayName,
+    general: c.isGeneral || c.id === teamId,
+    recommended: c.isShownByDefault,
+    shown: effectiveShown(c.id, c.isShown !== false),
+  }));
+}
+
+/** Show or hide a channel in its team's list (Teams' channel "Show" / "Hide"). */
+export async function setChannelShown(channelId: string, shown: boolean): Promise<WriteResult> {
+  const r = await groups.setChannelVisibility(channelId, shown);
+  if (r.ok) {
+    shownOverride.set(channelId, { at: Date.now(), shown });
+    actionsCache.delete(channelId);
+  }
+  return toWrite(r, "cdl");
+}
+
+// Channels we left and teams we left this session. IndexedDB shows it
 // (lastleaveat, the favorite property) only after a sync; until then
 // listChats skips them here.
 const departed = new Set<string>();
 
-/** True when we left or hid this channel, or left the team with this thread id, just now. */
+/** True when we left this channel, or left the team with this thread id, just now. */
 export function isDeparted(convId: string, teamId?: string): boolean {
   return departed.has(convId) || (!!teamId && departed.has(teamId));
 }
@@ -188,10 +237,9 @@ export async function getChannelActions(channelId: string): Promise<ChannelActio
 /** Leave or hide the channel itself, as getChannelActions decided. */
 export async function leaveChannel(a: ChannelActions): Promise<WriteResult> {
   if (!a.channel) return { ok: false, reason: "can't leave this channel" };
-  const r =
-    a.channel === "leave"
-      ? await groups.leaveChannel(a.channelId, a.teamId)
-      : await groups.setChannelVisibility(a.channelId, false);
+  // A hidden channel stays listed (hidden), so it can be shown again.
+  if (a.channel === "hide") return setChannelShown(a.channelId, false);
+  const r = await groups.leaveChannel(a.channelId, a.teamId);
   if (r.ok) {
     departed.add(a.channelId);
     actionsCache.delete(a.channelId);

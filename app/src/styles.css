@@ -259,11 +259,25 @@
     0 0 0 1px var(--tc-bg),
     0 0 0 2px var(--tc-ring);
 }
-/* Offline: thin grey hairline, quieter than a coloured status. */
+/* Offline: thin grey hairline, and the face itself greyed out and faded so
+   offline people read as absent at a glance. Hover brings the face back.
+   Group faces (.tc-av-group) share the fade. */
+#tc-root .tc-av-ring.is-offline .tc-av,
+#tc-root .tc-av-group .tc-av.tc-face-ring.is-offline {
+  filter: grayscale(1);
+  opacity: 0.5;
+  transition:
+    opacity 0.15s,
+    filter 0.15s;
+}
 #tc-root .tc-av-ring.is-offline .tc-av {
   box-shadow:
     0 0 0 1.5px var(--tc-bg),
     0 0 0 2.5px var(--tc-ring);
+}
+#tc-root .tc-av-ring.is-offline .tc-av-btn:hover {
+  filter: none;
+  opacity: 1;
 }
 #tc-root .tc-av-ring.is-offline.sm .tc-av {
   box-shadow:
@@ -323,6 +337,20 @@
 }
 #tc-root .tc-av-group.sm .tc-av {
   font-size: 8px;
+}
+/* Member presence: a border inside each face, so the back face's mask keeps
+   it (a box-shadow ring sits outside the border box and would be clipped). */
+#tc-root .tc-av-group .tc-av.tc-face-ring {
+  box-sizing: border-box;
+  border: 2px solid var(--tc-ring);
+  /* Gap in the background colour around the status border. */
+  box-shadow: 0 0 0 var(--g) var(--tc-bg);
+}
+#tc-root .tc-av-group.sm .tc-av.tc-face-ring {
+  border-width: 1.5px;
+}
+#tc-root .tc-av-group .tc-av.tc-face-ring.is-offline {
+  border-width: 1px;
 }
 #tc-root .tc-row-body {
   @apply flex-1;
@@ -637,6 +665,86 @@
 #tc-root .tc-msg-content blockquote.tc-reply strong {
   color: var(--tc-fg);
   font-weight: 600;
+}
+/* Forwarded message: bordered card with the original sender + time on top;
+   the whole card opens the original (.open). */
+#tc-root .tc-fwd {
+  margin: 4px 0 2px;
+  padding: 8px 12px 10px;
+  border: 1px solid var(--tc-line);
+  border-radius: 8px;
+  max-width: 560px;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+#tc-root .tc-fwd.open {
+  cursor: pointer;
+}
+#tc-root .tc-fwd.open:hover {
+  background: color-mix(in srgb, var(--tc-accent) 6%, transparent);
+  border-color: color-mix(in srgb, var(--tc-accent) 40%, var(--tc-line));
+}
+#tc-root .tc-fwd:focus-visible {
+  outline: 2px solid var(--tc-accent);
+  outline-offset: 1px;
+}
+#tc-root .tc-fwd-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--tc-fg2);
+  min-width: 0;
+}
+#tc-root .tc-fwd-icon {
+  flex: none;
+}
+#tc-root .tc-fwd-head .tc-av.xs {
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
+  flex: none;
+}
+#tc-root .tc-fwd-who {
+  font: inherit;
+  font-weight: 600;
+  color: var(--tc-fg);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#tc-root span.tc-fwd-who {
+  cursor: inherit;
+  font-weight: 500;
+  color: var(--tc-fg2);
+}
+#tc-root button.tc-fwd-who:hover {
+  text-decoration: underline;
+}
+#tc-root .tc-fwd-when {
+  font: inherit;
+  color: var(--tc-fg2);
+  background: none;
+  border: 0;
+  padding: 0;
+  white-space: nowrap;
+}
+#tc-root button.tc-fwd-when {
+  color: var(--tc-accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+#tc-root .tc-fwd-body > :first-child {
+  margin-top: 0;
+}
+#tc-root .tc-fwd-body > :last-child {
+  margin-bottom: 0;
 }
 #tc-root .tc-msg-content img {
   max-width: 360px;
@@ -1277,6 +1385,17 @@
   font-size: 15px;
   font-weight: 700;
   padding: 2px 0 8px;
+}
+#tc-root .tc-fwd-preview {
+  @apply flex flex-col gap-0.5;
+  border-left: 3px solid var(--tc-line);
+  padding: 2px 0 2px 10px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--tc-fg2);
+}
+#tc-root .tc-fwd-preview span {
+  @apply line-clamp-2;
 }
 #tc-root .tc-newchat-to {
   @apply flex flex-wrap items-center gap-1.5;
@@ -2272,6 +2391,12 @@
   border-radius: 5px;
   padding: 0 3px;
 }
+#tc-root .tc-mention[data-mention-id] {
+  cursor: pointer;
+}
+#tc-root .tc-mention[data-mention-id]:hover {
+  text-decoration: underline;
+}
 #tc-root .tc-quote {
   border-left: 3px solid var(--tc-line);
   margin: 4px 0;
@@ -2802,6 +2927,8 @@
   box-shadow:
     0 0 0 3px var(--tc-bg),
     0 0 0 4.5px var(--tc-ring);
+  filter: grayscale(1);
+  opacity: 0.6;
 }
 #tc-root .tc-profile-av {
   @apply grid place-items-center overflow-hidden;
@@ -2819,11 +2946,6 @@
 #tc-root .tc-profile-name {
   font-size: 18px;
   font-weight: 700;
-}
-#tc-root .tc-profile-mail {
-  font-size: 12.5px;
-  color: var(--tc-fg2);
-  margin-top: 2px;
 }
 #tc-root .tc-profile-details {
   @apply flex flex-col gap-2;
@@ -3231,6 +3353,58 @@
   color: var(--tc-fg);
 }
 #tc-root .tc-section + .tc-section {
+  margin-top: 4px;
+}
+/* A hidden channel Teams still lists (General): italics, dimmed. */
+#tc-root .tc-row.ghost .tc-name {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+/* Team label's channel list: show or hide each channel. */
+#tc-root .tc-team-menu {
+  width: 270px;
+  padding: 4px;
+}
+#tc-root .tc-team-menu-head {
+  @apply truncate;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tc-fg2);
+  padding: 6px 10px 4px;
+}
+#tc-root .tc-team-menu-list {
+  max-height: min(360px, 60vh);
+  overflow-y: auto;
+}
+#tc-root .tc-team-chan {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+#tc-root .tc-team-chan input {
+  margin: 0;
+  accent-color: var(--tc-accent);
+  cursor: pointer;
+}
+#tc-root .tc-team-chan.off .tc-team-chan-name {
+  color: var(--tc-fg2);
+}
+#tc-root .tc-team-chan-name {
+  @apply truncate flex-1 min-w-0;
+}
+#tc-root .tc-team-chan-rec {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--tc-fg2);
+  padding: 1px 6px;
+  border: 1px solid var(--tc-line);
+  border-radius: 999px;
+}
+#tc-root .tc-team-menu-hint {
+  font-size: 11px;
+  color: var(--tc-fg2);
+  padding: 6px 10px 4px;
+  border-top: 1px solid var(--tc-line);
   margin-top: 4px;
 }
 

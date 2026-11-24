@@ -1,7 +1,7 @@
 import type { JSX, MouseEvent } from "react";
-import { BellOff, Hash, CalendarDays, NotebookPen, Video } from "lucide-react";
-import { Avatar, GroupAvatar } from "../shared/Avatar";
-import { avatarUri, chatTitle, fmtTime, oneLine } from "../lib/format";
+import { BellOff, Video } from "lucide-react";
+import { ChatIcon } from "../shared/Avatar";
+import { chatTitle, fmtTime, oneLine } from "../lib/format";
 import { usePresence } from "../lib/presence";
 import type { Chat } from "../../types";
 import { t } from "../../i18n";
@@ -37,35 +37,19 @@ export function Row({
   onOpenProfile,
   onMenu,
 }: RowProps): JSX.Element {
-  const { statusOf } = usePresence();
+  // Subscribed so the avatar's presence ring stays live.
+  usePresence();
   const prev = preview(chat);
-  const icon = chat.isChannel ? (
-    <div className="tc-av tc-hash">
-      <Hash size={compact ? 13 : 16} />
-    </div>
-  ) : chat.kind === "meeting" ? (
-    <div className="tc-av tc-hash">
-      <CalendarDays size={compact ? 13 : 16} />
-    </div>
-  ) : chat.kind === "notes" ? (
-    <div className="tc-av tc-hash">
-      <NotebookPen size={compact ? 13 : 16} />
-    </div>
-  ) : chat.group ? (
-    <GroupAvatar members={chat.members} small={compact} />
-  ) : (
-    <Avatar
-      name={chat.title}
-      uri={avatarUri(chat.avatarMri)}
-      mri={chat.avatarMri}
-      small={compact}
-      status={statusOf(chat.avatarMri)}
-      onOpen={onOpenProfile}
-    />
-  );
+  const icon = <ChatIcon chat={chat} small={compact} size={compact ? 13 : 16} onOpen={onOpenProfile} />;
   return (
     <div
-      className={"tc-row" + (compact ? " compact" : "") + (selected ? " sel" : "") + (chat.unread ? " unread" : "")}
+      className={
+        "tc-row" +
+        (compact ? " compact" : "") +
+        (selected ? " sel" : "") +
+        (chat.unread ? " unread" : "") +
+        (chat.channelHidden ? " ghost" : "")
+      }
       onClick={onClick}
       onContextMenu={onMenu ? (e) => onMenu(e, chat) : undefined}
       title={compact ? chatTitle(chat) + "\n" + prev : undefined}

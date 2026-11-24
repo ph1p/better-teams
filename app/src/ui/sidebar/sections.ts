@@ -4,6 +4,12 @@ import { isDirect } from "../lib/format";
 import type { Messages } from "../../i18n";
 
 /** A headed section; its title comes from t().sidebar.sections at render time. */
+/**
+ * Whether a chat shows in the sidebar outside search: not hidden itself, and
+ * not a hidden channel (General stays listed, in italics, as in Teams).
+ */
+export const listed = (c: Chat): boolean => !c.hidden && !(c.channelHidden && !c.general);
+
 export type SectionId = keyof Messages["sidebar"]["sections"];
 
 // One sidebar group as built by buildSections; rendered by <Section>. Search
@@ -40,7 +46,7 @@ export function buildSections(
     return list.length ? [{ id: "search", rows: list, capped: false }] : [];
   }
   // Hidden chats leave the list, as in Teams; search still finds them.
-  const list = chats.filter((c) => !c.hidden && (!unreadOnly || c.unread || keep.has(c.id)));
+  const list = chats.filter((c) => listed(c) && (!unreadOnly || c.unread || keep.has(c.id)));
   if (unreadOnly) {
     // Unread filter: one flat inbox, newest first; headers would only repeat
     // the filter's own count.

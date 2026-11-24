@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 import { Bell, BellOff, Eye, EyeOff, Mail, MailOpen, Star, StarOff } from "lucide-react";
+import { menuPos } from "../lib/menuPos";
 import { useDismiss } from "../lib/dismiss";
 import type { Chat } from "../../types";
 import type { Flash } from "../lib/toast";
@@ -43,16 +44,8 @@ export function ChatMenu({
   const s = t().sidebar;
   // The channel menu is tall and grows as Teams answers: in the lower half,
   // anchor it by its bottom edge so it opens upwards and stays on screen.
-  const up = menu.y > window.innerHeight / 2;
   return (
-    <div
-      className="tc-menu"
-      style={{
-        left: Math.min(menu.x, window.innerWidth - 220),
-        ...(up ? { bottom: window.innerHeight - menu.y } : { top: menu.y }),
-      }}
-      onMouseDown={(e) => e.stopPropagation()}
-    >
+    <div className="tc-menu" style={menuPos(menu.x, menu.y, menu.y, 220)} onMouseDown={(e) => e.stopPropagation()}>
       {/* Channels: Teams' unread bookmark op is only known for chats. */}
       {menu.chat.isChannel && !menu.chat.unread ? null : (
         <button
@@ -66,9 +59,9 @@ export function ChatMenu({
           {menu.chat.unread ? s.markRead : s.markUnread}
         </button>
       )}
-      {/* Channel favorites are Teams' show/hide, not the Favorites folder;
+      {/* Channels go into the same Favorites folder as chats;
           Notes always sits in the sidebar footer. */}
-      {menu.chat.isChannel || menu.chat.kind === "notes" ? null : (
+      {menu.chat.kind === "notes" ? null : (
         <button
           className="tc-menu-item"
           onClick={() => {

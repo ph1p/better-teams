@@ -6,7 +6,7 @@
 import type { Activity, ActivityKind, WriteResult } from "../types";
 import { chatsvc } from "../services";
 import { getByPrefix, open } from "./idb";
-import { arr, get, isObj, obj, str, toMs, type Dict } from "./raw";
+import { arr, get, isObj, obj, parsed, str, toMs, type Dict } from "./raw";
 import { effectiveHorizon, markRead } from "./readState";
 
 export const FEED_ID = "48:notifications";
@@ -26,17 +26,8 @@ const KINDS: Record<string, ActivityKind> = {
 };
 
 function activityOf(m: Dict): Dict | null {
-  const a = get(m.properties, "activity");
-  if (isObj(a)) return a;
-  if (typeof a === "string" && a) {
-    try {
-      const j: unknown = JSON.parse(a);
-      return isObj(j) ? j : null;
-    } catch {
-      return null;
-    }
-  }
-  return null;
+  const a = parsed(get(m.properties, "activity"));
+  return isObj(a) ? a : null;
 }
 
 function toActivity(raw: unknown, horizon: number): Activity | null {

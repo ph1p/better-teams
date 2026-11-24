@@ -7,7 +7,7 @@
 // (data/groups.ts getChannelActions).
 
 import { t } from "../../i18n";
-import { useEffect, useState, type JSX } from "react";
+import type { JSX } from "react";
 import { AtSign, Bell, BellOff, Check, EyeOff, LogOut, Pencil, Plus, Trash2, Users } from "lucide-react";
 import {
   getChannelActions,
@@ -18,6 +18,7 @@ import {
   type ChannelPreset,
 } from "../../teamsData";
 import { useArm } from "../lib/arm";
+import { useLoad } from "../lib/load";
 import type { Flash } from "../lib/toast";
 import type { Chat } from "../../types";
 
@@ -33,24 +34,9 @@ const PRESETS: Preset[] = [
   { id: "MUTE", label: () => t().chat.presetOff, icon: <BellOff size={14} /> },
 ];
 
-/** Ask Teams once per mount; undefined while loading. */
-function useLoad<T>(id: string, load: (id: string) => Promise<T>): T | undefined {
-  const [v, setV] = useState<T | undefined>(undefined);
-  useEffect(() => {
-    let live = true;
-    void load(id).then((x) => {
-      if (live) setV(x);
-    });
-    return () => {
-      live = false;
-    };
-  }, [id, load]);
-  return v;
-}
-
 export function ChannelPresets({ chat, flash, onDone }: { chat: Chat; flash: Flash; onDone: () => void }): JSX.Element {
   // null: Teams didn't answer (the choice still works).
-  const cur = useLoad<ChannelNotifications | null>(chat.id, getChannelNotifications);
+  const [cur] = useLoad<ChannelNotifications | null>(chat.id, getChannelNotifications);
   const pick = async (preset: Preset): Promise<void> => {
     onDone();
     const res = await setChannelNotifications(chat.id, preset.id, cur);
@@ -101,7 +87,7 @@ export function ChannelLeaveItem({
   onMembers?: () => void;
   onDone: () => void;
 }): JSX.Element | null {
-  const acts = useLoad<ChannelActions | null>(chat.id, getChannelActions);
+  const [acts] = useLoad<ChannelActions | null>(chat.id, getChannelActions);
   const { armed, tryArm } = useArm<Departure>();
   if (!acts || chat.left) return null;
   const rename = acts.rename && !!onRename;

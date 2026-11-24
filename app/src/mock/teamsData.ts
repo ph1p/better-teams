@@ -7,7 +7,7 @@ import { buildQuoteHtml } from "../quote";
 import { ME, ME_OID, PEOPLE } from "./fixtures";
 import * as store from "./store";
 import type { ChannelNotifications, ChannelPreset } from "../services/groups";
-import type { ChannelActions, ChannelMember, CreateResult } from "../data/groups";
+import type { ChannelActions, ChannelMember, CreateResult, TeamChannel } from "../data/groups";
 
 export interface PeopleHit {
   mri: string;
@@ -84,6 +84,19 @@ export async function sendRemote(
   const m = store.post(conversationId, ME, buildQuoteHtml(quote) + mc.html, rootId);
   if (m && mc.mentions !== "[]") m.mentions = parseMentions(mc.mentions);
   return m ? ok : fail("unknown chat");
+}
+
+export async function forwardMessage(
+  targetId: string,
+  fromConversationId: string,
+  messageId: string,
+  text = "",
+): Promise<WriteResult> {
+  await later(null);
+  const body = text.trim();
+  return store.forward(targetId, fromConversationId, messageId, body ? formatMessage(body, []).html : "")
+    ? ok
+    : fail("unknown chat");
 }
 
 export async function searchPeople(query: string, size = 8): Promise<PeopleHit[]> {
@@ -168,7 +181,7 @@ export async function undoDelete(conversationId: string, messageId: string): Pro
 }
 
 // Group chat management and notifications (src/data/groups.ts).
-export type { ChannelNotifications, ChannelPreset, ChannelActions, ChannelMember, CreateResult };
+export type { ChannelNotifications, ChannelPreset, ChannelActions, ChannelMember, CreateResult, TeamChannel };
 
 export async function renameChat(conversationId: string, title: string): Promise<WriteResult> {
   const t = title.trim();
@@ -254,7 +267,27 @@ export async function createChannel(
 
 export async function leaveChannel(a: ChannelActions): Promise<WriteResult> {
   if (!a.channel) return later(fail("can't leave this channel"));
+  if (a.channel === "hide") return setChannelShown(a.channelId, false);
   return later(store.leaveChannel(a.channelId, false) ? ok : fail("not a channel"));
+}
+
+export async function getTeamChannels(teamId: string): Promise<TeamChannel[] | null> {
+  const list = store.teamChannels(teamId);
+  return later(
+    list.length
+      ? list.map((c) => ({
+          id: c.seed.id,
+          name: c.seed.topic || "",
+          general: c.seed.id === teamId,
+          recommended: c.seed.id === teamId || !!c.seed.recommended,
+          shown: !c.channelHidden,
+        }))
+      : null,
+  );
+}
+
+export async function setChannelShown(channelId: string, shown: boolean): Promise<WriteResult> {
+  return later(store.setChannelShown(channelId, shown) ? ok : fail("not a channel"));
 }
 
 export async function leaveTeam(a: ChannelActions): Promise<WriteResult> {

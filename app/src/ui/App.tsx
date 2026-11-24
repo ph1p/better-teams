@@ -1,23 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type MouseEvent } from "react";
 import { useChanged } from "./lib/changed";
 import { useLatest } from "./lib/latest";
-import { markRead } from "../teamsData";
+import { forwardMessage, markRead } from "../teamsData";
 import { openNativeChat } from "../send";
 import { Sidebar, type InboxTab } from "./sidebar/Sidebar";
 import { ChatMenu, type Menu } from "./sidebar/ChatMenu";
-import { buildSections } from "./sidebar/sections";
+import { TeamChannelsMenu, type TeamMenu } from "./sidebar/TeamChannelsMenu";
+import { buildSections, listed } from "./sidebar/sections";
 import { NewChat } from "./sidebar/NewChat";
 import { NewChannel } from "./sidebar/NewChannel";
 import { ChatHeader, MessageSearchBar } from "./chat/ChatHeader";
 import { Timeline } from "./chat/Timeline";
 import { Composer } from "./chat/Composer";
+import { ForwardDialog } from "./chat/ForwardDialog";
 import { ProfilePanel } from "./profile/ProfilePanel";
 import { NotesPanel } from "./notes/NotesPanel";
 import { FileViewer } from "./shared/FileViewer";
-import { messageText } from "./lib/format";
+import { chatTitle, messageText } from "./lib/format";
 import { usePref } from "./lib/prefs";
 import { useToast } from "./lib/toast";
-import type { Activity, Chat } from "../types";
+import type { Activity, Chat, Message as Msg } from "../types";
 import { useChatList } from "./hooks/useChatList";
 import { useMessages } from "./hooks/useMessages";
 import { useActivity } from "./hooks/useActivity";
@@ -51,6 +53,8 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   const [notesOpen, setNotesOpen] = usePref<boolean>("notesOpen", true);
   // Right-click chat menu: {x, y, chat} or null.
   const [menu, setMenu] = useState<Menu | null>(null);
+  // A team label's show/hide channel list, under its button.
+  const [teamMenu, setTeamMenu] = useState<TeamMenu | null>(null);
   // In-conversation message search: open flag + query string.
   const [msgSearch, setMsgSearch] = useState("");
   const [msgSearchOpen, setMsgSearchOpen] = useState(false);
@@ -60,6 +64,8 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
   // expand a collapsed thread before scrolling.
   const msgRoot = useRef<Map<string, string>>(new Map());
   const search = useRef<HTMLInputElement>(null);
+  // Forward dialog: the message and the conversation it came from.
+  const [fwd, setFwd] = useState<{ msg: Msg; from: string } | null>(null);
 
   const selChat = chats.find((c) => c.id === sel);
   const selIsChannel = !!selChat?.isChannel;
@@ -88,7 +94,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     () => [...sections.flatMap((s) => s.rows), ...(selfSlot ? [selfSlot] : [])],
     [sections, selfSlot],
   );
-  const unreadCount = useMemo(() => chats.filter((c) => c.unread && !c.hidden).length, [chats]);
+  const unreadCount = useMemo(() => chats.filter((c) => c.unread && listed(c)).length, [chats]);
 
   // Activity feed: polled always (the bell shows its unread count), listed in
   // the sidebar's Activity tab while the inbox is on.
@@ -132,7 +138,7 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
       const cur = chatsRef.current.find((c) => c.id === sel);
       setKeep(new Set(on && cur && cur.unread ? [cur.id] : []));
       if (!on || (cur && cur.unread)) return;
-      const u = chatsRef.current.find((c) => c.unread && !c.hidden);
+      const u = chatsRef.current.find((c) => c.unread && listed(c));
       if (u) {
         setKeep(new Set([u.id]));
         pick(u.id);
@@ -173,10 +179,29 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
 
   const a = useChatActions({ sel, chatsRef, setChats, pick, flash });
 
+  // Stable for the memoized Message rows; the source chat is read at click time.
+  const onForward = useCallback(
+    (msg: Msg) => {
+      if (selRef.current) setFwd({ msg, from: selRef.current });
+    },
+    [selRef],
+  );
+  const doForward = useCallback(
+    async (target: Chat, comment: string): Promise<string | null> => {
+      if (!fwd) return null;
+      const r = await forwardMessage(target.id, fwd.from, fwd.msg.id, comment);
+      if (!r.ok) return t().app.forwardFailed(r.reason);
+      setFwd(null);
+      flash(t().app.forwarded(chatTitle(target)));
+      return null;
+    },
+    [fwd, flash],
+  );
+
   async function openInTeams(): Promise<void> {
     if (!selChat) return;
     onHide?.();
-    const ok = await openNativeChat(selChat.id, selChat.title);
+    const ok = await openNativeChat(selChat.id, selChat.title, selChat.team);
     if (!ok) console.info("better-teams: chat row not rendered in Teams sidebar:", selChat.title);
   }
 
@@ -253,13 +278,36 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
     setUnreadFilter(true);
   };
 
-  const openActivityItem = useCallback(
-    (item: Activity): void => {
-      pendingJump.current = item.messageId ? { cid: item.threadId, mid: item.messageId } : null;
+  // Switch to a chat and jump to `mid` (if any) once it has loaded.
+  const jumpToMessage = useCallback(
+    (cid: string, mid: string | undefined): void => {
+      pendingJump.current = mid ? { cid, mid } : null;
       setJumpSeq((n) => n + 1);
-      pick(item.threadId);
+      pick(cid);
     },
     [pick],
+  );
+  const openActivityItem = useCallback(
+    (item: Activity): void => jumpToMessage(item.threadId, item.messageId),
+    [jumpToMessage],
+  );
+  // Open a message by conversation + id (a forwarded message's original):
+  // scroll to it here, or switch chats and jump once that chat has loaded.
+  // Reads sel/chats through refs so the handler stays stable for memoized
+  // messages across chat-list refreshes.
+  const openMessage = useCallback(
+    (cid: string, mid: string): void => {
+      if (cid === selRef.current) {
+        if (mid) onJumpTo(mid);
+        return;
+      }
+      if (!chatsRef.current.some((c) => c.id === cid)) {
+        flash(t().app.originalMissing);
+        return;
+      }
+      jumpToMessage(cid, mid);
+    },
+    [selRef, chatsRef, onJumpTo, jumpToMessage, flash],
   );
   useEffect(() => {
     const j = pendingJump.current;
@@ -323,6 +371,10 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
         onOpenProfile={openProfile}
         onMenu={openMenu}
         onAddChannel={(c) => void a.openNewChannel(c)}
+        onTeamChannels={(e, c) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setTeamMenu((m) => (m && m.chat.teamId === c.teamId ? null : { rect, chat: c }));
+        }}
         onHide={onHide}
         onError={(msg) => flash(msg, 4000)}
       />
@@ -401,7 +453,9 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
                     onOpenProfile={openProfile}
                     onQuote={cs.onQuote}
                     onJumpTo={onJumpTo}
+                    onOpenMessage={openMessage}
                     onThreadReply={cs.onThreadReply}
+                    onForward={onForward}
                     onJoinCall={(rootId) => void a.joinCall(rootId)}
                   />
                 </div>
@@ -445,6 +499,8 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
         />
       ) : null}
 
+      {fwd ? <ForwardDialog msg={fwd.msg} chats={chats} onForward={doForward} onClose={() => setFwd(null)} /> : null}
+
       {a.newChannel ? (
         <NewChannel
           team={a.newChannel.team}
@@ -479,6 +535,14 @@ export default function App({ onHide }: { onHide?: () => void }): JSX.Element {
 
       {notesOpen && !profileMri ? <NotesPanel onClose={() => setNotesOpen(false)} /> : null}
 
+      {teamMenu ? (
+        <TeamChannelsMenu
+          menu={teamMenu}
+          chats={chats}
+          onSetShown={a.setChannelShown}
+          onClose={() => setTeamMenu(null)}
+        />
+      ) : null}
       {menu ? (
         <ChatMenu
           menu={menu}

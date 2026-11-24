@@ -93,7 +93,6 @@ export function ProfilePanel({ mri, chats, sel, onPick, onClose, onMessage, onCa
           </div>
         </div>
         <div className="tc-profile-name">{name}</div>
-        {p.email ? <div className="tc-profile-mail">{p.email}</div> : null}
       </div>
       {rows.length ? (
         <div className="tc-profile-details">

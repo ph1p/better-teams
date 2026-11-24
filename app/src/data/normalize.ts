@@ -4,7 +4,7 @@ import { myMri } from "./idb";
 import { profile } from "./profiles";
 import { allowedUrl } from "../services/http";
 import { safeHref } from "../safeUrl";
-import { arr, extOf, get, mriOf, obj, str, toMs, type Dict } from "./raw";
+import { arr, extOf, get, mriOf, obj, parsed, str, toMs, type Dict } from "./raw";
 import { deletedHere, rememberRef } from "./state";
 import { parseCards, type Card } from "../cards";
 import { parseMentions } from "../mentions";
@@ -39,14 +39,7 @@ export function asCallRoot(n: Message, raw: Record<string, unknown>): Message {
     };
   }
   // CDL nests the meeting object; IDB/REST keep it as a JSON string in properties.meeting.
-  let pm: unknown = get(raw.properties, "meeting");
-  if (typeof pm === "string") {
-    try {
-      pm = JSON.parse(pm);
-    } catch {
-      pm = undefined;
-    }
-  }
+  const pm = parsed(get(raw.properties, "meeting"));
   const title =
     str(get(raw.meeting, "meetingTitle")) || str(get(pm, "meetingtitle")) || str(get(raw.properties, "meetingtitle"));
   const esc = title.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -72,8 +65,7 @@ function sharePointSite(url: string): string {
 function parseFiles(raw: unknown): FileRef[] {
   if (!raw) return [];
   try {
-    const parsed: unknown = typeof raw === "string" ? JSON.parse(raw) : raw;
-    return arr(parsed)
+    return arr(parsed(raw))
       .map((f): FileRef => {
         const info = obj(get(f, "fileInfo"));
         const ids = obj(get(f, "sharepointIds"));
@@ -110,14 +102,7 @@ function reactionsOf(m: Dict): Reaction[] {
   // (needed to know if *I* reacted) lives in properties.emotions
   // ([{key, users:[{mri,...}]}]). Merge both into {key, count, mine}.
   const em = obj(get(m.annotationsSummary, "emotions"));
-  let detail: unknown = get(m.properties, "emotions");
-  if (typeof detail === "string") {
-    try {
-      detail = JSON.parse(detail);
-    } catch {
-      detail = null;
-    }
-  }
+  const detail = parsed(get(m.properties, "emotions"));
   const me = myMri();
   const mineOf = (key: string): boolean => {
     const row = Array.isArray(detail) ? detail.find((d) => get(d, "key") === key) : null;
@@ -148,6 +133,26 @@ export interface ChainCtx {
 
 function asImportance(v: unknown): Message["importance"] {
   return v === "high" || v === "urgent" ? v : "normal";
+}
+
+// Forward origin. IDB/REST carry properties.originalMessageContext (object or
+// JSON string; ids under messageId/originalThreadId), CDL a
+// forwardedMessageContext with original* names.
+export function withForward(raw: unknown): { forwarded?: Message["forwarded"] } {
+  const o = obj(parsed(raw));
+  const senderMri = str(o.originalSender) || str(o.originalSenderMri);
+  const threadId = str(o.originalThreadId);
+  const messageId = String(o.messageId ?? o.originalMessageId ?? "");
+  if (!senderMri && !threadId) return {};
+  return {
+    forwarded: {
+      senderMri,
+      sender: profile(senderMri).displayName || "",
+      time: toMs(o.originalSentTime ?? o.originalArrivalTime),
+      messageId,
+      threadId,
+    },
+  };
 }
 
 function withMentions(raw: unknown): { mentions?: Message["mentions"] } {
@@ -185,6 +190,7 @@ export function normMessage(raw: unknown, rc: ChainCtx | null): Message {
     files: parseFiles(props.files),
     ...withCards(str(m.content), props.cards),
     ...withMentions(props.mentions),
+    ...withForward(props.originalMessageContext),
     time,
   };
 }
@@ -277,6 +283,7 @@ export function normCdlMessage(raw: unknown, channel = false): Message | null {
       files: parseFiles(m.files),
       ...withCards(str(m.content), m.cards),
       ...withMentions(m.mentions),
+      ...withForward(m.forwardedMessageContext),
       time,
     },
     m,

@@ -33,3 +33,16 @@ export function splitQuote(content: string): { quoteHtml: string; body: string }
   if (!m) return { quoteHtml: "", body: content || "" };
   return { quoteHtml: m[1], body: (content || "").slice(m[0].length) };
 }
+
+// Split a forwarded message into the forwarder's comment (outside the block)
+// and the original body (inside the Skype Forward blockquote). Greedy to the
+// last </blockquote> so a quote nested in the original stays inside.
+// Not a forward → null.
+export function splitForward(content: string): { comment: string; body: string } | null {
+  const m = /<blockquote[^>]*itemtype="http:\/\/schema\.skype\.com\/Forward"[^>]*>([\s\S]*)<\/blockquote>/i.exec(
+    content || "",
+  );
+  if (!m) return null;
+  const comment = (content.slice(0, m.index) + content.slice(m.index + m[0].length)).trim();
+  return { comment, body: m[1] };
+}

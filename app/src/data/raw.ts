@@ -13,6 +13,15 @@ export const isObj = (v: unknown): v is Dict => typeof v === "object" && v !== n
 export const obj = (v: unknown): Dict => (isObj(v) ? v : {});
 export const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 export const str = (v: unknown): string => (typeof v === "string" ? v : "");
+/** A JSON string parsed (undefined when malformed); any other value as is. */
+export const parsed = (v: unknown): unknown => {
+  if (typeof v !== "string") return v;
+  try {
+    return JSON.parse(v) as unknown;
+  } catch {
+    return undefined;
+  }
+};
 /** Read one property off a possibly-non-object value. */
 export const get = (v: unknown, key: string): unknown => (isObj(v) ? v[key] : undefined);
 
