@@ -893,11 +893,6 @@
 #tc-root .tc-ac-col {
   min-width: 0;
 }
-/* A column whose only image was dropped (untrusted avatar) takes no room.
-   Columns authored empty are indent spacers (Jira) and keep their width. */
-#tc-root .tc-ac-col:empty:not(.spacer) {
-  display: none;
-}
 #tc-root .tc-ac-box.box,
 #tc-root .tc-ac-col.box {
   padding: 8px 10px;

@@ -106,9 +106,6 @@ export function ChannelMembersPanel({
     const r = await addChannelMembers(
       acts,
       people.map((p) => p.mri),
-      people
-        .filter((p) => teamPick && !teamPick.members.some((m) => m.mri.toLowerCase() === p.mri.toLowerCase()))
-        .map((p) => p.mri),
     );
     setBusy(false);
     if (r.ok) {

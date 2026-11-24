@@ -6,6 +6,7 @@ import type { Chat } from "../../types";
 import type { Flash } from "../lib/toast";
 import { t } from "../../i18n";
 import { ChannelLeaveItem, ChannelPresets } from "../chat/ChannelItems";
+import { MenuItem } from "../shared/MenuItem";
 
 // Right-click chat menu position + target.
 export interface Menu {
@@ -45,16 +46,9 @@ export function ChatMenu({
   const s = t().sidebar;
   const c = menu.chat;
   const item = (icon: JSX.Element, label: string, fn: () => void): JSX.Element => (
-    <button
-      className="tc-menu-item"
-      role="menuitem"
-      onClick={() => {
-        fn();
-        onClose();
-      }}
-    >
-      {icon} {label}
-    </button>
+    <MenuItem icon={icon} close={onClose} onPick={fn}>
+      {label}
+    </MenuItem>
   );
   // Channels: Teams' unread bookmark op is only known for chats.
   const unread = !c.isChannel || c.unread;

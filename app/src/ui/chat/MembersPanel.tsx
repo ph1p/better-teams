@@ -130,8 +130,8 @@ export function PeoplePicker({
   const me = myMri();
   const open = hits.filter((h) => h.mri !== me && !exclude(h.mri) && !picked.some((p) => p.mri === h.mri));
   // Outsiders the team can't take stay listed, greyed out, so it's clear why they can't be picked.
-  const shown = team?.canAdd ? open : open.filter((h) => !outsider(h.mri));
   const blocked = team?.canAdd ? [] : open.filter((h) => outsider(h.mri));
+  const shown = blocked.length ? open.filter((h) => !blocked.includes(h)) : open;
   const pick = (p: PeopleHit): void => {
     setPicked((s) => [...s, p]);
     setQ("");

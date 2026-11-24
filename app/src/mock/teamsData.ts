@@ -222,12 +222,12 @@ export async function setChannelNotifications(
   return later(store.channelPreset(channelId, preset) ? ok : fail("not a channel"));
 }
 
-// General can only be left with its team, and not deleted; ids with "private"
-// act as private channels (left on their own), the rest as standard ones
+// General can only be left with its team, and not deleted; private channels
+// (seed channelType) are left on their own, the rest are standard ones
 // (hidden). Every channel can be renamed, and its members managed.
 export async function getChannelActions(channelId: string): Promise<ChannelActions | null> {
   const general = /-general@/.test(channelId);
-  const channel = general ? null : /private/.test(channelId) ? "leave" : "hide";
+  const channel = general ? null : store.channelType(channelId) ? "leave" : "hide";
   return later(
     store.channelPreset(channelId)
       ? {
@@ -299,7 +299,7 @@ export async function listChannelMembers(a: ChannelActions): Promise<ChannelMemb
   // A private channel's team: everyone but the external freelancer, so the
   // picker shows the team-members-only restriction.
   const ms =
-    a.members === "team" && /private/.test(a.channelId)
+    a.members === "team" && store.channelType(a.channelId)
       ? PEOPLE.filter((p) => p.department !== "External").map((p) => p.mri)
       : store.channelMembers(a.channelId);
   return later(
@@ -318,11 +318,7 @@ export async function listChannelMembers(a: ChannelActions): Promise<ChannelMemb
   );
 }
 
-export async function addChannelMembers(
-  a: ChannelActions,
-  mris: string[],
-  _outsideTeam: string[] = [],
-): Promise<WriteResult> {
+export async function addChannelMembers(a: ChannelActions, mris: string[]): Promise<WriteResult> {
   if (!a.addMembers) return later(fail("can't add members here"));
   return later(store.channelMembers(a.channelId, mris) ? ok : fail("not a channel"), 400);
 }

@@ -123,6 +123,8 @@ export interface SeedChat {
   hidden?: boolean;
   /** Channels: hidden in the team's channel list. */
   channelHidden?: boolean;
+  /** Channels: private ones are left on their own and keep their own roster. */
+  channelType?: "private" | "shared";
   /** Channels: shown to members by default (Teams' "Recommended"). */
   recommended?: boolean;
   /** A chat request from someone outside your contacts. */
@@ -513,6 +515,7 @@ export const CHATS: SeedChat[] = [
   {
     id: "19:platform-private-oncall@thread.tacv2",
     kind: "channel",
+    channelType: "private",
     topic: "on-call",
     team: "Platform",
     favorite: true,

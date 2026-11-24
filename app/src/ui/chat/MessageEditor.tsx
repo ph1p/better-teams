@@ -21,20 +21,12 @@ import { scrollNear } from "../lib/pickerKeys";
 const NO_PICKS: MentionPick[] = [];
 
 // A channel's people for @mentions: its own roster (private/shared) or the
-// team's (standard). Fetched on the first "@" per channel, then reused.
-const rosters = new Map<string, Promise<MentionPick[]>>();
+// team's (standard). Fetched on the first "@"; data/groups.ts caches it.
 function channelRoster(channelId: string): Promise<MentionPick[]> {
-  let r = rosters.get(channelId);
-  if (!r) {
-    r = getChannelActions(channelId)
-      .then((a) => (a ? listChannelMembers(a) : null))
-      .then((ms) => (ms ?? []).map((m) => ({ mri: m.mri, name: m.displayName, mentionType: "person" })))
-      .catch(() => NO_PICKS);
-    // A failed or empty load is retried on the next "@".
-    void r.then((x) => x.length || rosters.delete(channelId));
-    rosters.set(channelId, r);
-  }
-  return r;
+  return getChannelActions(channelId)
+    .then((a) => (a ? listChannelMembers(a) : null))
+    .then((ms) => (ms ?? []).map((m): MentionPick => ({ mri: m.mri, name: m.displayName, mentionType: "person" })))
+    .catch(() => NO_PICKS);
 }
 
 // "@query" and ":name" being typed before the caret, and a finished ":name:" (auto-replaced).

@@ -74,14 +74,29 @@ export function fmtTime(ts: number): string {
 export const fmtClock = (ts: number): string => (ts ? fmt().clock.format(ts) : "");
 // The narrow avatar gutter of follow-up messages has no room for "AM"/"PM":
 // "4:58" instead of "04:58 PM". The header above already shows the full time.
-export const fmtGutterClock = (ts: number): string =>
-  ts
-    ? fmt()
-        .gutter.formatToParts(ts)
-        .filter((p) => p.type === "hour" || p.type === "minute" || (p.type === "literal" && p.value.trim()))
-        .map((p) => p.value)
-        .join("")
-    : "";
+// formatToParts allocates per call and every follow-up message renders one on
+// each poll, so results are kept per minute until the locale changes.
+let gutterFor: ReturnType<typeof formatters> | null = null;
+const gutterCache = new Map<number, string>();
+export function fmtGutterClock(ts: number): string {
+  if (!ts) return "";
+  const f = fmt();
+  if (gutterFor !== f || gutterCache.size > 500) {
+    gutterFor = f;
+    gutterCache.clear();
+  }
+  const minute = Math.floor(ts / 60_000);
+  let s = gutterCache.get(minute);
+  if (s === undefined) {
+    s = f.gutter
+      .formatToParts(ts)
+      .filter((p) => p.type === "hour" || p.type === "minute" || (p.type === "literal" && p.value.trim()))
+      .map((p) => p.value)
+      .join("");
+    gutterCache.set(minute, s);
+  }
+  return s;
+}
 
 /** Short date + time ("23.11.26, 19:32"), as Teams shows on forwarded messages. */
 export const fmtStamp = (ts: number): string => (ts ? fmt().stamp.format(ts) : "");

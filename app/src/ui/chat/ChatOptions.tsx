@@ -8,7 +8,8 @@ import { useState, type JSX } from "react";
 import { Bell, BellOff, LogOut, MoreHorizontal, Pencil, Star, StarOff, Users } from "lucide-react";
 import { ChannelLeaveItem, ChannelPresets } from "./ChannelItems";
 import { useDismiss } from "../lib/dismiss";
-import { MENU_MARGIN } from "../lib/menuPos";
+import { menuPos } from "../lib/menuPos";
+import { MenuItem } from "../shared/MenuItem";
 import { useArm } from "../lib/arm";
 import type { Flash } from "../lib/toast";
 import type { Chat } from "../../types";
@@ -45,10 +46,6 @@ export function ChatOptions({
   useDismiss(open, "#tc-root .tc-opts-menu, #tc-root .tc-opts-btn", close);
 
   if (chat.kind === "notes" || chat.app) return null;
-  const act = (fn: () => void) => (): void => {
-    close();
-    fn();
-  };
   // Rename, members and leave only make sense in a group chat we're still in.
   const manage = chat.group && !chat.left;
 
@@ -65,19 +62,14 @@ export function ChatOptions({
         <MoreHorizontal size={15} />
       </button>
       {r ? (
-        <div
-          className="tc-menu tc-opts-menu"
-          role="menu"
-          style={{
-            top: r.bottom + 6,
-            right: Math.max(MENU_MARGIN, window.innerWidth - r.right),
-            maxHeight: window.innerHeight - r.bottom - 6 - MENU_MARGIN,
-          }}
-        >
-          <button className="tc-menu-item" role="menuitem" onClick={act(() => onSetFavorite(chat, !chat.favorite))}>
-            {chat.favorite ? <StarOff size={14} /> : <Star size={14} />}{" "}
+        <div className="tc-menu tc-opts-menu" role="menu" style={menuPos(r.right, r.top, r.bottom, 220, 6, "right")}>
+          <MenuItem
+            icon={chat.favorite ? <StarOff size={14} /> : <Star size={14} />}
+            close={close}
+            onPick={() => onSetFavorite(chat, !chat.favorite)}
+          >
             {chat.favorite ? t().sidebar.removeFavorite : t().sidebar.addFavorite}
-          </button>
+          </MenuItem>
           <div className="tc-menu-sep" />
           {chat.isChannel ? (
             <>
@@ -95,35 +87,39 @@ export function ChatOptions({
             <>
               {manage ? (
                 <>
-                  <button className="tc-menu-item" role="menuitem" onClick={act(onRename)}>
-                    <Pencil size={14} /> {t().chat.rename}
-                  </button>
-                  <button className="tc-menu-item" role="menuitem" onClick={act(onMembers)}>
-                    <Users size={14} /> <span className="tc-menu-grow">{t().chat.members}</span>
+                  <MenuItem icon={<Pencil size={14} />} close={close} onPick={onRename}>
+                    {t().chat.rename}
+                  </MenuItem>
+                  <MenuItem icon={<Users size={14} />} close={close} onPick={onMembers}>
+                    <span className="tc-menu-grow">{t().chat.members}</span>
                     <span className="tc-menu-count">{chat.members.length + 1}</span>
-                  </button>
+                  </MenuItem>
                   <div className="tc-menu-sep" />
                 </>
               ) : null}
-              <button className="tc-menu-item" role="menuitem" onClick={act(() => onSetMuted(chat, !chat.muted))}>
-                {chat.muted ? <Bell size={14} /> : <BellOff size={14} />}{" "}
+              <MenuItem
+                icon={chat.muted ? <Bell size={14} /> : <BellOff size={14} />}
+                close={close}
+                onPick={() => onSetMuted(chat, !chat.muted)}
+              >
                 {chat.muted ? t().common.unmute : t().common.mute}
-              </button>
+              </MenuItem>
               {manage ? (
                 <>
                   <div className="tc-menu-sep" />
-                  <button
-                    className={"tc-menu-item danger" + (armed ? " armed" : "")}
-                    role="menuitem"
-                    onClick={() =>
+                  <MenuItem
+                    icon={<LogOut size={14} />}
+                    danger
+                    armed={!!armed}
+                    onPick={() =>
                       tryArm("leave", () => {
                         close();
                         onLeave(chat);
                       })
                     }
                   >
-                    <LogOut size={14} /> {armed ? t().chat.leaveConfirm : t().chat.leave}
-                  </button>
+                    {armed ? t().chat.leaveConfirm : t().chat.leave}
+                  </MenuItem>
                 </>
               ) : null}
             </>

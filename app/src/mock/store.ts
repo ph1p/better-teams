@@ -258,8 +258,7 @@ export function listChats(): Chat[] {
             teamId: teamIdOf(seed.team || ""),
             ...(general ? { general } : {}),
             ...(c.channelHidden ? { channelHidden: true } : {}),
-            // Mock ids with "private" act as private channels (see teamsData).
-            ...(/private/.test(seed.id) ? { channelType: "private" as const } : {}),
+            ...(seed.channelType ? { channelType: seed.channelType } : {}),
           }
         : {}),
       ...(c.request ? { request: true, inviter: others[0] } : {}),
@@ -461,6 +460,11 @@ export function channelPreset(convId: string, preset?: string): string | null {
   if (!c || c.seed.kind !== "channel") return null;
   if (preset) c.preset = preset;
   return c.preset || "ALL_NEW_MSGS";
+}
+
+/** A channel's type from its seed; undefined for a standard channel or no channel. */
+export function channelType(convId: string): SeedChat["channelType"] {
+  return chats.get(convId)?.seed.channelType;
 }
 
 /** A channel's members; with `add`/`remove` changes them first. Null for no channel. */

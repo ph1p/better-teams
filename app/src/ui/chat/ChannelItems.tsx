@@ -19,6 +19,7 @@ import {
 } from "../../teamsData";
 import { useArm } from "../lib/arm";
 import { useLoad } from "../lib/load";
+import { MenuItem } from "../shared/MenuItem";
 import type { Flash } from "../lib/toast";
 import type { Chat } from "../../types";
 
@@ -106,16 +107,15 @@ export function ChannelLeaveItem({
   const drop = leave || acts.delete;
   const team = acts.create || acts.team;
   const item = (icon: JSX.Element, label: string, fn: () => void): JSX.Element => (
-    <button
-      className="tc-menu-item"
-      role="menuitem"
-      onClick={() => {
-        onDone();
-        fn();
-      }}
-    >
-      {icon} {label}
-    </button>
+    <MenuItem icon={icon} close={onDone} onPick={fn}>
+      {label}
+    </MenuItem>
+  );
+  // Leave and delete arm on the first click and act on the second.
+  const danger = (what: Departure, icon: JSX.Element, label: string, confirm: string): JSX.Element => (
+    <MenuItem icon={icon} danger armed={armed === what} onPick={() => run(what)}>
+      {armed === what ? confirm : label}
+    </MenuItem>
   );
   return (
     <>
@@ -131,24 +131,8 @@ export function ChannelLeaveItem({
       {drop ? (
         <>
           <div className="tc-menu-sep" />
-          {leave ? (
-            <button
-              className={"tc-menu-item danger" + (armed === "channel" ? " armed" : "")}
-              role="menuitem"
-              onClick={() => run("channel")}
-            >
-              <LogOut size={14} /> {armed === "channel" ? t().chat.leaveConfirm : t().chat.leaveChannel}
-            </button>
-          ) : null}
-          {acts.delete ? (
-            <button
-              className={"tc-menu-item danger" + (armed === "delete" ? " armed" : "")}
-              role="menuitem"
-              onClick={() => run("delete")}
-            >
-              <Trash2 size={14} /> {armed === "delete" ? t().chat.deleteConfirm : t().chat.deleteChannel}
-            </button>
-          ) : null}
+          {leave ? danger("channel", <LogOut size={14} />, t().chat.leaveChannel, t().chat.leaveConfirm) : null}
+          {acts.delete ? danger("delete", <Trash2 size={14} />, t().chat.deleteChannel, t().chat.deleteConfirm) : null}
         </>
       ) : null}
       {team ? (
@@ -156,15 +140,7 @@ export function ChannelLeaveItem({
           <div className="tc-menu-sep" />
           <div className="tc-menu-label">{chat.team || t().sidebar.otherTeam}</div>
           {acts.create ? item(<Plus size={14} />, t().chat.newChannel, () => onNewChannel(chat)) : null}
-          {acts.team ? (
-            <button
-              className={"tc-menu-item danger" + (armed === "team" ? " armed" : "")}
-              role="menuitem"
-              onClick={() => run("team")}
-            >
-              <LogOut size={14} /> {armed === "team" ? t().chat.leaveConfirm : t().chat.leaveTeam}
-            </button>
-          ) : null}
+          {acts.team ? danger("team", <LogOut size={14} />, t().chat.leaveTeam, t().chat.leaveConfirm) : null}
         </>
       ) : null}
     </>

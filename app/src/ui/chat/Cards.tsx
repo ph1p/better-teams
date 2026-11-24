@@ -182,8 +182,12 @@ function Columns({ e, ctx }: { e: Dict; ctx: Ctx }): JSX.Element {
         const v = str(col.verticalContentAlignment).toLowerCase();
         if (v === "center") style.alignSelf = "center";
         if (v === "bottom") style.alignSelf = "flex-end";
+        // A column whose items all drop out (an untrusted avatar) takes no
+        // room; one authored empty is an indent spacer (Jira) and keeps it.
+        const items = list(col.items);
+        if (items.length && !items.some((it) => draws(it, ctx))) return null;
         return (
-          <div key={i} className={"tc-ac-col" + (list(col.items).length ? "" : " spacer") + boxCls(col)} style={style}>
+          <div key={i} className={"tc-ac-col" + boxCls(col)} style={style}>
             <Items items={col.items} ctx={ctx} />
           </div>
         );
@@ -257,10 +261,33 @@ function Rich({ e }: { e: Dict }): JSX.Element {
   );
 }
 
-function Element({ e, ctx }: { e: Dict; ctx: Ctx }): JSX.Element | null {
+// Card-toggled visibility wins over the authored isVisible.
+function visibleEl(e: Dict, ctx: Ctx): boolean {
   const id = str(e.id);
-  const visible = id && id in ctx.hidden ? !ctx.hidden[id] : e.isVisible !== false;
-  if (!visible) return null;
+  return id && id in ctx.hidden ? !ctx.hidden[id] : e.isVisible !== false;
+}
+
+const DRAWN = new Set([
+  "TextBlock",
+  "RichTextBlock",
+  "Container",
+  "ColumnSet",
+  "ImageSet",
+  "FactSet",
+  "Table",
+  "ActionSet",
+]);
+
+/** Whether Element draws anything for `e`: mirrors its null returns. */
+function draws(e: Dict, ctx: Ctx): boolean {
+  if (!visibleEl(e, ctx)) return false;
+  if (e.type === "Image") return shown(e);
+  if (DRAWN.has(str(e.type))) return true;
+  return isDict(e.fallback) && draws(e.fallback, ctx);
+}
+
+function Element({ e, ctx }: { e: Dict; ctx: Ctx }): JSX.Element | null {
+  if (!visibleEl(e, ctx)) return null;
   let node: JSX.Element | null;
   switch (e.type) {
     case "TextBlock":
