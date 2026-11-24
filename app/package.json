@@ -1,6 +1,6 @@
 {
   "name": "better-teams-app",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "private": true,
   "description": "A calmer, Slack-like overlay inside the new Microsoft Teams desktop app (macOS)",
   "license": "MIT",
