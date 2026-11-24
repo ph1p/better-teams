@@ -7,27 +7,9 @@
 // This keeps the rich structure Teams emits — inline images (asyncgw, served
 // with the page's own cookies), @mentions, links, lists, bold/italic, inline
 // code, code blocks and quoted replies — instead of flattening to plain text.
-import {
-  Fragment,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-  type JSX,
-} from "react";
-import {
-  highlightLines,
-  initHighlighter,
-  onHighlighterReady,
-  normLang,
-} from "./highlight";
-import {
-  hostOf,
-  isImageUrl,
-  isTrustedImgHost,
-  safeHref,
-  safeImgSrc,
-} from "./safeUrl";
+import { Fragment, useEffect, useMemo, useState, type ReactNode, type JSX } from "react";
+import { highlightLines, initHighlighter, onHighlighterReady, normLang } from "./highlight";
+import { hostOf, isImageUrl, isTrustedImgHost, safeHref, safeImgSrc } from "./safeUrl";
 import { Check, ChevronDown, ChevronUp, Copy } from "lucide-react";
 import { useCopied } from "./ui/lib/clipboard";
 import { codeLangLabel } from "./ui/lib/codeLangs";
@@ -53,15 +35,9 @@ const ENTITIES: Record<string, string> = {
 };
 export function decodeEntities(s: string): string {
   return String(s)
-    .replace(/&#x([0-9a-f]+);/gi, (_, h: string) =>
-      String.fromCodePoint(parseInt(h, 16)),
-    )
-    .replace(/&#(\d+);/g, (_, d: string) =>
-      String.fromCodePoint(parseInt(d, 10)),
-    )
-    .replace(/&([a-z]+);/gi, (m, n: string) =>
-      n in ENTITIES ? ENTITIES[n] : m,
-    );
+    .replace(/&#x([0-9a-f]+);/gi, (_, h: string) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d: string) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&([a-z]+);/gi, (m, n: string) => (n in ENTITIES ? ENTITIES[n] : m));
 }
 
 type Attrs = Record<string, string>;
@@ -120,9 +96,7 @@ function mapTag(name: string, attrs: Attrs): TagMap {
       return ["div", "tc-h"];
     case "span":
       // @mention spans get a pill; everything else is a transparent wrapper.
-      return /Mention/i.test(attrs.itemtype || "")
-        ? ["span", "tc-mention"]
-        : [null, null];
+      return /Mention/i.test(attrs.itemtype || "") ? ["span", "tc-mention"] : [null, null];
     case "a":
       return ["a", null];
     case "img":
@@ -205,28 +179,11 @@ function imgSrc(attrs: Attrs): string {
   return safeImgSrc(attrs.src || "");
 }
 
-const isBr = (n: Node | undefined): n is ElNode =>
-  !!n && typeof n === "object" && n.tag === "br";
-const isBlank = (n: Node | undefined): boolean =>
-  typeof n === "string" && !n.trim();
+const isBr = (n: Node | undefined): n is ElNode => !!n && typeof n === "object" && n.tag === "br";
+const isBlank = (n: Node | undefined): boolean => typeof n === "string" && !n.trim();
 // Block-ish tags that already introduce their own vertical spacing, so a <br>
 // right inside them (or an empty one) is just dead air.
-const BLOCK = new Set([
-  "p",
-  "div",
-  "li",
-  "blockquote",
-  "quote",
-  "ul",
-  "ol",
-  "pre",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-]);
+const BLOCK = new Set(["p", "div", "li", "blockquote", "quote", "ul", "ol", "pre", "h1", "h2", "h3", "h4", "h5", "h6"]);
 
 // Teams wraps quoted replies in stacked <div>/<p> with trailing <br>s, which
 // render as large empty gaps. Prune the tree: collapse runs of <br> to one,
@@ -246,17 +203,11 @@ function prune(node: Node): Node | null {
     out.push(k);
   }
   // Trim trailing <br>/blank.
-  while (
-    out.length &&
-    (isBr(out[out.length - 1]) || isBlank(out[out.length - 1]))
-  )
-    out.pop();
+  while (out.length && (isBr(out[out.length - 1]) || isBlank(out[out.length - 1]))) out.pop();
   node.children = out;
   // Drop a block element that ended up with no visible content.
   if (BLOCK.has(node.tag) && node.tag !== "#root") {
-    const hasContent = out.some((k) =>
-      typeof k === "string" ? k.trim() : true,
-    );
+    const hasContent = out.some((k) => (typeof k === "string" ? k.trim() : true));
     if (!hasContent) return null;
   }
   return node;
@@ -295,13 +246,7 @@ function langHint(node: Node): string {
 // Longer blocks start collapsed to COLLAPSED_LINES (CSS sets the height).
 const COLLAPSE_OVER = 15;
 
-function CodeBlock({
-  code,
-  lang,
-}: {
-  code: string;
-  lang: string;
-}): JSX.Element {
+function CodeBlock({ code, lang }: { code: string; lang: string }): JSX.Element {
   const [ready, bump] = useState(0);
   const [open, setOpen] = useState(false);
   const [copied, copy] = useCopied();
@@ -312,23 +257,14 @@ function CodeBlock({
   }, [lang]);
   // `ready` re-runs the highlight once the highlighter has loaded.
   // oxlint-disable-next-line react-hooks/exhaustive-deps
-  const lines = useMemo(
-    () => (lang ? highlightLines(code, lang) : null),
-    [code, lang, ready],
-  );
+  const lines = useMemo(() => (lang ? highlightLines(code, lang) : null), [code, lang, ready]);
   const count = code.replace(/\n$/, "").split("\n").length;
   const long = count > COLLAPSE_OVER;
   const c = t().chat;
   // Clicks here stay in the block (the message row has its own click handling).
   const stop = (e: React.MouseEvent): void => e.stopPropagation();
   return (
-    <div
-      className={
-        "tc-pre tc-codeblock" +
-        (lines ? " tc-shiki" : "") +
-        (long && !open ? " folded" : "")
-      }
-    >
+    <div className={"tc-pre tc-codeblock" + (lines ? " tc-shiki" : "") + (long && !open ? " folded" : "")}>
       <div className="tc-code-head">
         <span className="tc-code-lang">{codeLangLabel(lang)}</span>
         <button
@@ -350,10 +286,7 @@ function CodeBlock({
             ? lines.map((line, i) => (
                 <span key={i} className="tc-code-line">
                   {line.map((tk, j) => (
-                    <span
-                      key={j}
-                      style={tk.color ? { color: tk.color } : undefined}
-                    >
+                    <span key={j} style={tk.color ? { color: tk.color } : undefined}>
                       {tk.content}
                     </span>
                   ))}
@@ -383,24 +316,11 @@ function CodeBlock({
 // Images from non-Microsoft hosts can be tracking pixels: show a button and
 // load the image only when the user asks. State is per rendered image, so a
 // re-mount (chat switch, reload) asks again. That is intended.
-export function GatedImg({
-  src,
-  alt,
-  link,
-}: {
-  src: string;
-  alt: string;
-  link?: boolean;
-}): JSX.Element {
+export function GatedImg({ src, alt, link }: { src: string; alt: string; link?: boolean }): JSX.Element {
   const [shown, setShown] = useState(false);
   if (shown) return <InlineImg src={src} alt={alt} link={link} />;
   return (
-    <button
-      type="button"
-      className="tc-img-gate"
-      title={src}
-      onClick={() => setShown(true)}
-    >
+    <button type="button" className="tc-img-gate" title={src} onClick={() => setShown(true)}>
       {t().chat.loadImage(hostOf(src))}
       {alt ? <span className="tc-img-gate-alt">{alt}</span> : null}
     </button>
@@ -409,15 +329,7 @@ export function GatedImg({
 
 /** An inline picture. `link`: it stands in for a link to itself (a pasted
  *  image URL), so the viewer offers "copy link" / "open in browser" for it. */
-export function InlineImg({
-  src,
-  alt,
-  link,
-}: {
-  src: string;
-  alt: string;
-  link?: boolean;
-}): JSX.Element {
+export function InlineImg({ src, alt, link }: { src: string; alt: string; link?: boolean }): JSX.Element {
   return (
     <img
       className="tc-inline-img"
@@ -431,18 +343,8 @@ export function InlineImg({
 }
 
 /** A link straight to a picture, shown as the picture (gated when untrusted). */
-export function ImageLink({
-  href,
-  alt,
-}: {
-  href: string;
-  alt: string;
-}): JSX.Element {
-  return isTrustedImgHost(href) ? (
-    <InlineImg src={href} alt={alt} link />
-  ) : (
-    <GatedImg src={href} alt={alt} link />
-  );
+export function ImageLink({ href, alt }: { href: string; alt: string }): JSX.Element {
+  return isTrustedImgHost(href) ? <InlineImg src={href} alt={alt} link /> : <GatedImg src={href} alt={alt} link />;
 }
 
 // Keys come from a per-render counter (`seq`), so siblings stay unique.
@@ -460,29 +362,17 @@ function toReact(node: Node, seq: { n: number }): ReactNode {
     return <CodeBlock key={key} code={code} lang={langHint(node)} />;
   }
 
-  const kids = node.children
-    .map((c) => toReact(c, seq))
-    .filter((k) => k !== null && k !== "");
+  const kids = node.children.map((c) => toReact(c, seq)).filter((k) => k !== null && k !== "");
 
   if (node.tag === "img") {
     const alt = node.attrs.alt || "";
     const src = imgSrc(node.attrs);
     // Teams emoji are tiny <img alt="😀">: render the glyph, not a picture.
-    const emojiish =
-      (node.attrs.itemtype || "").includes("Emoji") || (!src && alt);
+    const emojiish = (node.attrs.itemtype || "").includes("Emoji") || (!src && alt);
     if (emojiish) return alt || null;
     if (!src) return alt || null;
-    if (!isTrustedImgHost(src))
-      return <GatedImg key={key} src={src} alt={alt} />;
-    return (
-      <img
-        key={key}
-        className="tc-inline-img"
-        src={src}
-        alt={alt}
-        loading="lazy"
-      />
-    );
+    if (!isTrustedImgHost(src)) return <GatedImg key={key} src={src} alt={alt} />;
+    return <img key={key} className="tc-inline-img" src={src} alt={alt} loading="lazy" />;
   }
   if (node.tag === "a") {
     const href = safeHref(decodeEntities(node.attrs.href || ""));
@@ -513,14 +403,10 @@ function toReact(node: Node, seq: { n: number }): ReactNode {
   } = {};
   if (cls) props.className = cls;
   // @mention: keep its itemid so a click can find the person in msg.mentions.
-  if (cls === "tc-mention" && node.attrs.itemid)
-    props["data-mention-id"] = node.attrs.itemid;
+  if (cls === "tc-mention" && node.attrs.itemid) props["data-mention-id"] = node.attrs.itemid;
   // Quoted reply: Teams marks it itemtype=".../Reply" itemid=<message id>.
   // Keep the id (the click jumps to the original) and style it apart.
-  if (
-    tag === "blockquote" &&
-    /schema\.skype\.com\/Reply/i.test(node.attrs.itemtype || "")
-  ) {
+  if (tag === "blockquote" && /schema\.skype\.com\/Reply/i.test(node.attrs.itemtype || "")) {
     props.className = "tc-quote tc-reply";
     if (node.attrs.itemid) props["data-reply-id"] = node.attrs.itemid;
   }

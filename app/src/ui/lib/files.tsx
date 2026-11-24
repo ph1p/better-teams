@@ -38,10 +38,7 @@ const KINDS: [FileKind, RegExp][] = [
   ["word", /^(docx?|odt|rtf)$/],
   ["excel", /^(xlsx?|xlsm|csv|ods)$/],
   ["powerpoint", /^(pptx?|odp|key)$/],
-  [
-    "code",
-    /^(js|jsx|ts|tsx|json|ya?ml|xml|html?|css|sh|py|rb|go|rs|java|kt|swift|c|cc|cpp|h|cs|sql|toml|ini)$/,
-  ],
+  ["code", /^(js|jsx|ts|tsx|json|ya?ml|xml|html?|css|sh|py|rb|go|rs|java|kt|swift|c|cc|cpp|h|cs|sql|toml|ini)$/],
   ["archive", /^(zip|tar|gz|tgz|7z|rar)$/],
   ["text", /^(txt|md|log)$/],
 ];
@@ -97,8 +94,7 @@ function set(next: ViewerState | null): void {
 }
 
 export function openViewer(items: ViewerItem[], index = 0): void {
-  if (items.length)
-    set({ items, index: Math.max(0, Math.min(index, items.length - 1)) });
+  if (items.length) set({ items, index: Math.max(0, Math.min(index, items.length - 1)) });
 }
 
 export function closeViewer(): void {
@@ -133,8 +129,7 @@ export async function saveImage(item: ViewerItem): Promise<boolean> {
     const blob = await r.blob();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    const ext =
-      item.ext || (blob.type.split("/")[1] || "png").replace("jpeg", "jpg");
+    const ext = item.ext || (blob.type.split("/")[1] || "png").replace("jpeg", "jpg");
     a.download = /\.\w+$/.test(item.name) ? item.name : `${item.name}.${ext}`;
     document.body.appendChild(a);
     a.click();

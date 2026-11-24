@@ -63,7 +63,12 @@ export function TypingIndicator({ chatId }: { chatId: string }): JSX.Element | n
         {shown.slice(0, MAX_FACES).map((u) => (
           // Our cached/live photo first: the worker's avatarUrl is often a
           // placeholder silhouette that renders as an empty grey disc.
-          <Avatar key={u.id} name={profile(u.id).displayName || firstName(u.id)} uri={avatarUri(u.id) || u.avatarUrl || ""} small />
+          <Avatar
+            key={u.id}
+            name={profile(u.id).displayName || firstName(u.id)}
+            uri={avatarUri(u.id) || u.avatarUrl || ""}
+            small
+          />
         ))}
       </span>
       <span className="tc-typing-dots" aria-hidden="true">
