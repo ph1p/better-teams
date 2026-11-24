@@ -97,6 +97,11 @@ function parseFiles(raw: unknown): FileRef[] {
   }
 }
 
+// Teams keeps "follow this post" (channels) in the same emotions list as the
+// reactions. It is a subscription, not a reaction: never show it as one.
+const NOT_REACTIONS = new Set(["follow"]);
+const isReaction = (r: Reaction): boolean => !!r.key && r.count > 0 && !NOT_REACTIONS.has(r.key);
+
 function reactionsOf(m: Dict): Reaction[] {
   // Counts live in annotationsSummary.emotions ({key:count}); the per-user list
   // (needed to know if *I* reacted) lives in properties.emotions
@@ -115,7 +120,7 @@ function reactionsOf(m: Dict): Reaction[] {
       const users = usersOf(k);
       return { key: k, count: Number(v) || 0, mine: users.includes(me), users };
     })
-    .filter((r) => r.count > 0);
+    .filter(isReaction);
 }
 
 // A soft-deleted message stays visible (as an Undo stub) only while Teams holds
@@ -270,7 +275,7 @@ export function normCdlMessage(raw: unknown, channel = false): Message | null {
         users,
       };
     })
-    .filter((r) => r.key && r.count > 0);
+    .filter(isReaction);
   return asCallRoot(
     {
       id,
