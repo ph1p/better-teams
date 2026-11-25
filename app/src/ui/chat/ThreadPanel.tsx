@@ -104,11 +104,14 @@ export function ThreadPanel(p: ThreadPanelProps) {
       }}
     >
       <PaneResize
-        pref="threadWidth"
+        // A share of the room beside the sidebar: the thread grows with the
+        // window instead of needing a resize every time it opens.
+        pref="threadShare"
         cssVar="--tc-pane-w"
-        def={400}
-        min={320}
-        max={720}
+        share
+        def={0.45}
+        min={340}
+        max={0.7}
         edge="left"
         label={t().chat.resizeThread}
         taken={sideWidth}

@@ -2942,7 +2942,7 @@
   width: var(--tc-pane-w, 320px);
   max-width: 100vw;
 }
-@media (min-width: 960px) {
+@media (min-width: 640px) {
   #tc-root:has(> .tc-pane) {
     grid-template-columns: var(--tc-side-w, 300px) minmax(0, 1fr) var(--tc-pane-w, 320px);
   }
@@ -2958,6 +2958,27 @@
     grid-row: 1;
     box-shadow: none;
     animation: none;
+  }
+  /* Too little room for the pane beside the chat (PaneResize sets
+     .tc-pane-cover): it takes the chat's column instead, the sidebar stays.
+     The chat is only hidden, so its scroll position survives. */
+  #tc-root.tc-pane-cover:has(> .tc-pane) {
+    grid-template-columns: var(--tc-side-w, 300px) minmax(0, 1fr);
+  }
+  #tc-root.tc-pane-cover > .tc-pane {
+    grid-column: 2;
+    border-left: 0;
+  }
+  #tc-root.tc-pane-cover:has(> .tc-pane) > .tc-main {
+    grid-column: 2;
+    grid-row: 1;
+    visibility: hidden;
+  }
+  #tc-root.tc-pane-cover .tc-pane > .tc-side-resize {
+    display: none;
+  }
+  #tc-root.tc-pane-cover:has(> .tc-pane) > .tc-profile:not(.tc-pane) {
+    width: calc(100vw - var(--tc-side-w, 300px));
   }
 }
 /* Narrow windows (phone width, a slim side-by-side window): one column. The
