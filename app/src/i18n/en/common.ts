@@ -2,6 +2,7 @@ export const common = {
   save: "Save",
   cancel: "Cancel",
   close: "Close",
+  back: "Back",
   clear: "Clear",
   remove: "Remove",
   you: "You",

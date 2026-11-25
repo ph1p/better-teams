@@ -2,9 +2,6 @@ import type { Messages } from "../en";
 
 export const composer: Messages["composer"] = {
   jumpToNewest: "Zur neuesten Nachricht",
-  replyInThread: (from) => `Im Thread antworten · ${from}`,
-  postAsNew: "Als neue Unterhaltung posten (Esc)",
-  cancelThreadReply: "Thread-Antwort abbrechen",
   cancelQuote: "Zitat abbrechen",
   attachTitle: "Dateien anfügen (oder hier einfügen / ablegen)",
   attach: "Dateien anfügen",

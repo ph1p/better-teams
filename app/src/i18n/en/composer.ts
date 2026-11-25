@@ -1,8 +1,5 @@
 export const composer = {
   jumpToNewest: "Jump to newest",
-  replyInThread: (from: string) => `Reply in thread · ${from}`,
-  postAsNew: "Post as new conversation (Esc)",
-  cancelThreadReply: "Cancel thread reply",
   cancelQuote: "Cancel quote",
   attachTitle: "Attach files (or paste / drop them here)",
   attach: "Attach files",

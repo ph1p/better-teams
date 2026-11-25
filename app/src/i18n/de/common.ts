@@ -4,6 +4,7 @@ export const common: Messages["common"] = {
   save: "Speichern",
   cancel: "Abbrechen",
   close: "Schließen",
+  back: "Zurück",
   clear: "Löschen",
   remove: "Entfernen",
   you: "Du",

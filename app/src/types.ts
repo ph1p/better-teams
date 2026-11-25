@@ -173,6 +173,9 @@ export interface Activity {
   threadId: string;
   /** "" when none. */
   messageId: string;
+  /** Channel thread the source message replies in ("" when none, or when the
+   *  message is that thread's root). */
+  rootId: string;
   actorMri: string;
   actorName: string;
   /** Plain-text preview of the source message. */

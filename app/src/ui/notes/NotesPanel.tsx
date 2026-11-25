@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { PREFIX, usePref } from "../lib/prefs";
+import { PaneResize, sideWidth } from "../shared/PaneResize";
 import { t } from "../../i18n";
 
 interface NotesPanelProps {
@@ -36,7 +37,17 @@ export function NotesPanel({ onClose }: NotesPanelProps) {
   }, [setText]);
 
   return (
-    <aside className="tc-profile tc-notes">
+    <aside className="tc-profile tc-pane tc-notes">
+      <PaneResize
+        pref="notesWidth"
+        cssVar="--tc-pane-w"
+        def={320}
+        min={260}
+        max={640}
+        edge="left"
+        label={t().app.resizeNotes}
+        taken={sideWidth}
+      />
       <div className="tc-notes-head">
         <span className="tc-notes-title">{t().common.notes}</span>
         <button

@@ -12,6 +12,7 @@ import { NewChannel } from "./sidebar/NewChannel";
 import { ChatHeader, MessageSearchBar } from "./chat/ChatHeader";
 import { Timeline } from "./chat/Timeline";
 import { Composer } from "./chat/Composer";
+import { ThreadPanel } from "./chat/ThreadPanel";
 import { ForwardDialog } from "./chat/ForwardDialog";
 import { ProfilePanel } from "./profile/ProfilePanel";
 import { NotesPanel } from "./notes/NotesPanel";
@@ -53,10 +54,10 @@ export default function App({ onHide }: { onHide?: () => void }) {
   const [teamMenu, setTeamMenu] = useState<TeamMenu | null>(null);
   const [msgSearch, setMsgSearch] = useState("");
   const [msgSearchOpen, setMsgSearchOpen] = useState(false);
-  // Channel threads whose older replies are expanded (by root id).
-  const [openThreads, setOpenThreads] = useState<ReadonlySet<string>>(new Set());
-  // message id -> thread root id for the rendered channel, so jump-to can
-  // expand a collapsed thread before scrolling.
+  // Channel thread shown in the thread pane (its root id), or null.
+  const [threadRoot, setThreadRoot] = useState<string | null>(null);
+  // message id -> thread root id for the rendered channel, so jump-to can open
+  // a reply's thread before scrolling to it.
   const msgRoot = useRef<Map<string, string>>(new Map());
   const search = useRef<HTMLInputElement>(null);
   const [fwd, setFwd] = useState<{ msg: Msg; from: string } | null>(null);
@@ -66,6 +67,8 @@ export default function App({ onHide }: { onHide?: () => void }) {
   const selRef = useLatest(sel);
   const messages = useMessages(sel, selChat, flash);
   const cs = useComposerState(sel, selChat, messages, flash);
+  const openThread = selIsChannel ? threadRoot : null;
+  const ts = useComposerState(sel, selChat, messages, flash, openThread);
   // Refs pulled out, so reading the rest during render is plainly not a ref read.
   const { scroller, content, noMore, loadOlder, unstick, ...m } = messages;
 
@@ -73,7 +76,7 @@ export default function App({ onHide }: { onHide?: () => void }) {
   if (switched && sel) {
     setMsgSearch("");
     setMsgSearchOpen(false);
-    setOpenThreads(new Set());
+    setThreadRoot(null);
     setProfileMri(null);
   }
 
@@ -95,7 +98,7 @@ export default function App({ onHide }: { onHide?: () => void }) {
   const [inboxTab, setInboxTab] = useState<InboxTab>("unread");
   const activityShown = unreadOnly && inboxTab === "activity";
   // A feed item to scroll to once its chat has loaded.
-  const pendingJump = useRef<{ cid: string; mid: string } | null>(null);
+  const pendingJump = useRef<{ cid: string; mid: string; root?: string } | null>(null);
   // Bumped per item click so the jump effect re-runs even when the chat is already open.
   const [jumpSeq, setJumpSeq] = useState(0);
 
@@ -144,9 +147,14 @@ export default function App({ onHide }: { onHide?: () => void }) {
     setMsgSearch("");
     setMsgSearchOpen(false);
   };
+  // Notes and a thread share the right pane; the thread wins while open, and
+  // closing it brings the notes back. The notes button always shows notes.
+  const notesShown = notesOpen && !openThread;
   const toggleNotes = () => {
     setProfileMri(null);
-    setNotesOpen((o) => !o);
+    if (notesShown) return setNotesOpen(false);
+    setThreadRoot(null);
+    setNotesOpen(true);
   };
 
   useShortcuts({
@@ -197,27 +205,32 @@ export default function App({ onHide }: { onHide?: () => void }) {
     const ok = await openNativeChat(selChat.id, selChat.title, selChat.team);
     if (!ok) console.info("better-teams: chat row not rendered in Teams sidebar:", selChat.title);
   }
+  // Stable, so memoised Message rows skip re-rendering on composer keystrokes.
+  const openInTeamsRef = useLatest(openInTeams);
+  const onOpenInTeams = useCallback(() => void openInTeamsRef.current(), [openInTeamsRef]);
 
   const openProfile = useCallback((mri: string) => {
     if (mri) setProfileMri(mri);
   }, []);
 
-  const toggleThread = useCallback((rootId: string) => {
-    setOpenThreads((s) => {
-      const n = new Set(s);
-      if (n.has(rootId)) n.delete(rootId);
-      else n.add(rootId);
-      return n;
-    });
+  // Open a channel post's thread in the pane (a reply opens its root's).
+  const showThread = useCallback((rootId: string) => {
+    setProfileMri(null);
+    setThreadRoot(rootId);
   }, []);
+  const onThreadReply = useCallback((msg: Msg) => showThread(msg.rootId || msg.id), [showThread]);
 
   // Jump to a quoted message: scroll it into view and flash a highlight. If it's
   // not in the DOM (scrolled out / not paged in yet), page older until found.
+  // `rootHint` (a notification's thread) opens a channel reply's thread even
+  // when the reply isn't loaded.
   const onJumpTo = useCallback(
-    (mid: string) => {
+    (mid: string, rootHint?: string) => {
       const target = String(mid);
       const tryScroll = () => {
-        const el = scroller.current?.querySelector(`.tc-msg[data-mid="${CSS.escape(target)}"]`);
+        // The thread pane first: a reply there is also its jump target.
+        const q = `.tc-msg[data-mid="${CSS.escape(target)}"]`;
+        const el = document.querySelector(`#tc-root .tc-thread-panel ${q}`) ?? scroller.current?.querySelector(q);
         if (!el) return false;
         // Else a late resize (paged-in content) re-pins the bottom mid-scroll.
         unstick();
@@ -226,18 +239,23 @@ export default function App({ onHide }: { onHide?: () => void }) {
         setTimeout(() => el.classList.remove("tc-flash"), 1400);
         return true;
       };
-      if (tryScroll()) return;
-      // Hidden in a collapsed channel thread: expand it, then scroll.
-      const root = msgRoot.current.get(target);
-      if (root) {
-        setOpenThreads((s) => new Set(s).add(root));
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            tryScroll();
-          }),
-        );
-        return;
-      }
+      // On screen, or a loaded channel reply: that lives in its thread, so
+      // open the thread in the pane, then scroll there.
+      const find = () => {
+        if (tryScroll()) return true;
+        const root = msgRoot.current.get(target) || rootHint;
+        if (!root || root === target) return false;
+        showThread(root);
+        // The pane mounts on the next commit; a reply that is still syncing
+        // in shows up a little later, so keep looking for a moment.
+        let tries = 0;
+        const settle = () => {
+          if (!tryScroll() && ++tries < 30) requestAnimationFrame(settle);
+        };
+        requestAnimationFrame(settle);
+        return true;
+      };
+      if (find()) return;
       // Not loaded: page older up to a few times, then scroll.
       const startSel = selRef.current;
       let misses = 0;
@@ -248,12 +266,12 @@ export default function App({ onHide }: { onHide?: () => void }) {
         const added = await loadOlder();
         if (!added) misses++;
         requestAnimationFrame(() => {
-          if (selRef.current === startSel && !tryScroll()) void pump();
+          if (selRef.current === startSel && !find()) void pump();
         });
       };
       void pump();
     },
-    [loadOlder, scroller, noMore, selRef, unstick],
+    [loadOlder, scroller, noMore, selRef, unstick, showThread],
   );
 
   // Seen while open: new items arriving with the feed on screen are read too.
@@ -272,15 +290,15 @@ export default function App({ onHide }: { onHide?: () => void }) {
   };
 
   const jumpToMessage = useCallback(
-    (cid: string, mid: string | undefined) => {
-      pendingJump.current = mid ? { cid, mid } : null;
+    (cid: string, mid: string | undefined, root?: string) => {
+      pendingJump.current = mid ? { cid, mid, root } : null;
       setJumpSeq((n) => n + 1);
       pick(cid);
     },
     [pick],
   );
   const openActivityItem = useCallback(
-    (item: Activity) => jumpToMessage(item.threadId, item.messageId),
+    (item: Activity) => jumpToMessage(item.threadId, item.messageId, item.rootId || undefined),
     [jumpToMessage],
   );
   // Open a message by conversation + id (a forwarded message's original):
@@ -315,7 +333,7 @@ export default function App({ onHide }: { onHide?: () => void }) {
     const j = pendingJump.current;
     if (!j || !m.ready || sel !== j.cid) return;
     pendingJump.current = null;
-    requestAnimationFrame(() => onJumpTo(j.mid));
+    requestAnimationFrame(() => onJumpTo(j.mid, j.root));
   }, [jumpSeq, m.ready, sel, onJumpTo]);
 
   const openMenu = useCallback((e: MouseEvent, chat: Chat) => {
@@ -387,7 +405,7 @@ export default function App({ onHide }: { onHide?: () => void }) {
               chat={selChat}
               searchOpen={msgSearchOpen}
               onToggleSearch={() => setMsgSearchOpen((o) => !o)}
-              notesOpen={notesOpen}
+              notesOpen={notesShown}
               onToggleNotes={toggleNotes}
               onOpenProfile={openProfile}
               onJoinCall={(rootId) => void a.joinCall(rootId)}
@@ -436,16 +454,15 @@ export default function App({ onHide }: { onHide?: () => void }) {
                     pending={m.myPending}
                     mq={mq}
                     searchText={msgSearch}
-                    openThreads={openThreads}
-                    onToggleThread={toggleThread}
-                    replyingTo={cs.threadTo?.rootId}
+                    openThread={openThread}
+                    onOpenThread={showThread}
                     msgRootRef={msgRoot}
                     loading={m.loading}
                     ready={m.ready}
                     failed={m.failed}
                     empty={!m.shown.length}
                     onRetry={m.refetch}
-                    onOpenInTeams={() => void openInTeams()}
+                    onOpenInTeams={onOpenInTeams}
                     onReact={m.react}
                     onDelete={m.remove}
                     onRemoveFile={m.removeFile}
@@ -456,7 +473,7 @@ export default function App({ onHide }: { onHide?: () => void }) {
                     onJumpTo={onJumpTo}
                     onOpenMessage={openMessage}
                     onOpenTeamsLink={openTeamsLink}
-                    onThreadReply={cs.onThreadReply}
+                    onThreadReply={onThreadReply}
                     onForward={onForward}
                     onJoinCall={(rootId) => void a.joinCall(rootId)}
                   />
@@ -514,6 +531,35 @@ export default function App({ onHide }: { onHide?: () => void }) {
         />
       ) : null}
 
+      {selChat && openThread ? (
+        <ThreadPanel
+          chat={selChat}
+          rootId={openThread}
+          messages={m.shown}
+          pending={m.myPending}
+          cs={ts}
+          onClose={() => {
+            setThreadRoot(null);
+            cs.composer.current?.focus();
+          }}
+          onReact={m.react}
+          onDelete={m.remove}
+          onRemoveFile={m.removeFile}
+          onUndo={m.undo}
+          onEdit={m.edit}
+          onOpenProfile={openProfile}
+          onJumpTo={onJumpTo}
+          onOpenMessage={openMessage}
+          onOpenTeamsLink={openTeamsLink}
+          onForward={onForward}
+          onOpenInTeams={onOpenInTeams}
+        />
+      ) : null}
+
+      {notesShown ? <NotesPanel onClose={() => setNotesOpen(false)} /> : null}
+
+      {/* After the panes: a profile opens over the thread or notes pane and
+          closing it shows that pane again. */}
       {profileMri ? (
         <ProfilePanel
           mri={profileMri}
@@ -523,7 +569,12 @@ export default function App({ onHide }: { onHide?: () => void }) {
             pick(id);
             setProfileMri(null);
           }}
-          onClose={() => setProfileMri(null)}
+          onBack={openThread || notesShown ? () => setProfileMri(null) : undefined}
+          onClose={() => {
+            setProfileMri(null);
+            setThreadRoot(null);
+            setNotesOpen(false);
+          }}
           onMessage={() => {
             void a.startDirect(profileMri);
             setProfileMri(null);
@@ -534,8 +585,6 @@ export default function App({ onHide }: { onHide?: () => void }) {
           }}
         />
       ) : null}
-
-      {notesOpen && !profileMri ? <NotesPanel onClose={() => setNotesOpen(false)} /> : null}
 
       {teamMenu ? (
         <TeamChannelsMenu

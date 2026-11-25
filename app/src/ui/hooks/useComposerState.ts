@@ -12,13 +12,6 @@ import type { Messages } from "./useMessages";
 import type { Chat, Message as Msg, Quote } from "../../types";
 import type { MentionPick } from "../../mentions";
 
-// Channel thread the composer answers in.
-export interface ThreadTo {
-  rootId: string;
-  from: string;
-  text: string;
-}
-
 const NO_PICKS: readonly MentionPick[] = [];
 
 export interface ComposerState {
@@ -36,20 +29,21 @@ export interface ComposerState {
   removeFile: (index: number) => void;
   quote: Quote | null;
   setQuote: (q: Quote | null) => void;
-  threadTo: ThreadTo | null;
-  setThreadTo: (t: ThreadTo | null) => void;
+  /** Channel thread root this composer answers in (thread pane), else null. */
+  threadRoot: string | null;
   onQuote: (m: Msg) => void;
-  onThreadReply: (m: Msg) => void;
   send: () => Promise<void>;
 }
 
-// Per-chat drafts and @mention picks, the quote / thread-reply target, and the
-// send itself (optimistic, restored on failure).
+// Per-chat drafts and @mention picks, the quote target, and the send itself
+// (optimistic, restored on failure). With a threadRoot it backs the thread
+// pane's composer: drafts are kept per thread and sends go into that thread.
 export function useComposerState(
   sel: string | null,
   selChat: Chat | undefined,
   m: Messages,
   flash: Flash,
+  threadRoot: string | null = null,
 ): ComposerState {
   const composer = useRef<HTMLTextAreaElement>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -60,35 +54,31 @@ export function useComposerState(
   // A message being quote-replied to, shown as a chip above the composer: null
   // or { id, from, text }. Cleared on send or chat switch.
   const [quote, setQuote] = useState<Quote | null>(null);
-  // Channel thread the composer answers in ({ rootId, from, text }), or null
-  // for a new top-level post. Cleared on send or chat switch.
-  const [threadTo, setThreadTo] = useState<ThreadTo | null>(null);
   // Files staged per chat, like drafts.
   const [staged, setStaged] = useState<Record<string, File[]>>({});
 
-  const switched = useChanged(sel + "|" + !!selChat?.isChannel);
-  if (switched && sel) {
-    setQuote(null);
-    setThreadTo(null);
-  }
+  // Drafts, picks and files are keyed per chat, or per chat + thread.
+  const key = sel && threadRoot ? sel + "#" + threadRoot : sel;
+  const switched = useChanged(key + "|" + !!selChat?.isChannel);
+  if (switched && key) setQuote(null);
 
-  const draft = (sel && drafts[sel]) || "";
-  const setDraft = (v: string) => setDrafts((d) => ({ ...d, [sel!]: v }));
+  const draft = (key && drafts[key]) || "";
+  const setDraft = (v: string) => setDrafts((d) => ({ ...d, [key!]: v }));
 
-  const files = (sel && staged[sel]) || [];
+  const files = (key && staged[key]) || [];
   const addFiles = (list: FileList | File[]) => {
     const add = [...list];
-    if (sel && add.length) setStaged((st) => ({ ...st, [sel]: [...(st[sel] || []), ...add] }));
+    if (key && add.length) setStaged((st) => ({ ...st, [key]: [...(st[key] || []), ...add] }));
   };
   const removeFile = (index: number) => {
-    if (sel) setStaged((st) => ({ ...st, [sel]: (st[sel] || []).filter((_, i) => i !== index) }));
+    if (key) setStaged((st) => ({ ...st, [key]: (st[key] || []).filter((_, i) => i !== index) }));
   };
 
   const addPick = (pick: MentionPick) => {
     setMentionPicks((mp) => {
-      const cur = sel ? mp[sel] || [] : [];
+      const cur = key ? mp[key] || [] : [];
       if (cur.some((p) => p.mri === pick.mri)) return mp;
-      return sel ? { ...mp, [sel]: [...cur, pick] } : mp;
+      return key ? { ...mp, [key]: [...cur, pick] } : mp;
     });
   };
 
@@ -104,61 +94,49 @@ export function useComposerState(
     requestAnimationFrame(() => composer.current?.focus());
   }, []);
 
-  // Answer in a channel thread: the composer posts into m's thread until sent
-  // or cancelled. Replies target their thread's root.
-  const onThreadReply = useCallback((msg: Msg) => {
-    setThreadTo({
-      rootId: msg.rootId || msg.id,
-      from: msg.from || (msg.mine ? t().common.you : t().common.unknown),
-      text: oneLine(splitQuote(msg.content).body).slice(0, 200),
-    });
-    requestAnimationFrame(() => composer.current?.focus());
-  }, []);
-
   async function send() {
     const text = draft.trim();
-    if ((!text && !files.length) || !selChat) return;
+    if ((!text && !files.length) || !selChat || !key) return;
     const chat = selChat;
     const q = quote;
-    const thread = chat.isChannel ? threadTo : null;
+    const rootId = threadRoot ?? undefined;
     const sending = files;
     // Files go through Teams' own composer, which has no quote or thread target.
-    if (sending.length && (q || thread)) {
+    if (sending.length && (q || rootId)) {
       flash(t().composer.filesWithQuote, 5000);
       return;
     }
-    const picks = mentionPicks[chat.id] || [];
-    const key = Date.now() + Math.random();
-    setDrafts((d) => ({ ...d, [chat.id]: "" }));
+    const picks = mentionPicks[key] || [];
+    const pendingKey = Date.now() + Math.random();
+    setDrafts((d) => ({ ...d, [key]: "" }));
     typing.resetTyping(chat.id);
     setQuote(null);
-    setThreadTo(null);
-    setMentionPicks((mp) => ({ ...mp, [chat.id]: [] }));
-    setStaged((st) => ({ ...st, [chat.id]: [] }));
+    setMentionPicks((mp) => ({ ...mp, [key]: [] }));
+    setStaged((st) => ({ ...st, [key]: [] }));
     m.addPending({
-      key,
+      key: pendingKey,
       chatId: chat.id,
       text,
       time: Date.now(),
-      rootId: thread?.rootId,
+      rootId,
       files: sending.map((f) => f.name),
     });
-    m.stickToBottom();
+    // A thread reply shows in the thread pane; the channel stays where it is.
+    if (!rootId) m.stickToBottom();
     // Prefer the direct chatsvc endpoint (works for any chat, cached or not).
     // Fall back to driving Teams' native composer only when no token is captured.
     let r = sending.length
       ? await sendFiles(chat.id, chat.title, text, sending)
-      : await sendRemote(chat.id, text, q, picks, thread?.rootId);
+      : await sendRemote(chat.id, text, q, picks, rootId);
     if (!r.ok && r.reason === "no-token") {
       const blocked = nativeFallbackBlocker(q, picks);
       r = blocked ? { ok: false, reason: blocked } : await sendMessage(chat.id, chat.title, text);
     }
     if (!r.ok) {
-      m.dropPending(key);
-      setDrafts((d) => ({ ...d, [chat.id]: d[chat.id] || text }));
-      setMentionPicks((mp) => ({ ...mp, [chat.id]: picks }));
-      setStaged((st) => ({ ...st, [chat.id]: [...sending, ...(st[chat.id] || [])] }));
-      if (thread) setThreadTo((t) => t || thread);
+      m.dropPending(pendingKey);
+      setDrafts((d) => ({ ...d, [key]: d[key] || text }));
+      setMentionPicks((mp) => ({ ...mp, [key]: picks }));
+      setStaged((st) => ({ ...st, [key]: [...sending, ...(st[key] || [])] }));
       if (q) setQuote((cur) => cur || q);
       // Why a send failed, in words; unknown reasons show as-is.
       const known = t().composer.sendErrors;
@@ -171,16 +149,14 @@ export function useComposerState(
     draft,
     setDraft,
     addPick,
-    picks: (sel && mentionPicks[sel]) || NO_PICKS,
+    picks: (key && mentionPicks[key]) || NO_PICKS,
     files,
     addFiles,
     removeFile,
     quote,
     setQuote,
-    threadTo,
-    setThreadTo,
+    threadRoot,
     onQuote,
-    onThreadReply,
     send,
   };
 }

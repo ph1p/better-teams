@@ -62,6 +62,7 @@ export const app = {
   // Notes panel
   closeNotes: "Close notes",
   closeNotesTitle: "Close (⌥N)",
+  resizeNotes: "Resize notes (double-click resets)",
   notesPlaceholder: "Jot anything down. Saved on this Mac only.",
 
   // Profile panel

@@ -1,12 +1,12 @@
 import { t } from "../../i18n";
 import { useLayoutEffect, type JSX, type RefObject } from "react";
-import { ChevronsUpDown, ExternalLink, MessageSquareReply, RotateCw, Video } from "lucide-react";
+import { ChevronRight, ExternalLink, MessageSquareReply, RotateCw, Video } from "lucide-react";
 import { Message } from "./Message";
 import { Avatar } from "../shared/Avatar";
 import { RichHtml } from "../../richText";
 import { formatMessage } from "../../markdown";
-import { fmtClock, fmtDay, messageText } from "../lib/format";
-import { GROUP_GAP_MS, LIVE_CALL_MS, THREAD_TAIL } from "../lib/constants";
+import { avatarUri, continues, fmtClock, fmtDay, fmtTime, messageText } from "../lib/format";
+import { LIVE_CALL_MS } from "../lib/constants";
 import { fileKind, KindIcon } from "../lib/files";
 import { extOf } from "../../data/raw";
 import { useNow } from "../lib/now";
@@ -26,10 +26,9 @@ interface TimelineProps {
   /** Active in-chat search query (lower-cased), "" when off. */
   mq: string;
   searchText: string;
-  openThreads: ReadonlySet<string>;
-  onToggleThread: (rootId: string) => void;
-  /** Root id of the thread the composer answers in, if any. */
-  replyingTo?: string;
+  /** Root id of the thread open in the thread pane, if any. */
+  openThread?: string | null;
+  onOpenThread: (rootId: string) => void;
   /** Filled after render: message id -> thread root id (channels). */
   msgRootRef: RefObject<Map<string, string>>;
   loading: boolean;
@@ -53,10 +52,62 @@ interface TimelineProps {
   onJoinCall: (rootId: string) => void;
 }
 
-const continues = (prev: Msg | null, m: Msg) =>
-  !!prev && prev.fromMri === m.fromMri && m.time - prev.time <= GROUP_GAP_MS;
 
-const renderPending = (p: Pending) => (
+// Below a channel post: who replied, how many, and when last; opens the thread
+// pane. Without replies it is a quiet "Reply" link.
+function ThreadSummary({
+  replies,
+  pending,
+  open,
+  onOpen,
+}: {
+  replies: Msg[];
+  pending: number;
+  open: boolean;
+  onOpen: () => void;
+}) {
+  const posts = replies.filter((m) => !m.call);
+  const n = posts.length + pending;
+  if (!n)
+    return (
+      <button className="tc-thread-reply" onClick={onOpen}>
+        <MessageSquareReply size={14} /> {t().chat.reply}
+      </button>
+    );
+  // Newest repliers first, one face each.
+  const faces: Msg[] = [];
+  for (let i = posts.length - 1; i >= 0 && faces.length < 3; i--)
+    if (!faces.some((f) => f.fromMri === posts[i].fromMri)) faces.push(posts[i]);
+  const last = posts.length ? posts[posts.length - 1].time : 0;
+  return (
+    <button
+      className={"tc-thread-summary" + (open ? " open" : "")}
+      onClick={onOpen}
+      aria-expanded={open}
+      title={t().chat.viewThread}
+    >
+      <span className="tc-thread-faces">
+        {faces.map((f) => (
+          <Avatar key={f.fromMri || f.id} name={f.from} uri={avatarUri(f.fromMri)} small />
+        ))}
+      </span>
+      <span className="tc-thread-count">{t().chat.replies(n)}</span>
+      {last ? <span className="tc-thread-last">{t().chat.lastReply(fmtTime(last))}</span> : null}
+      <span className="tc-thread-view">{t().chat.viewThread}</span>
+      <ChevronRight size={14} className="tc-thread-chev" />
+    </button>
+  );
+}
+
+/** A call that ended, as a one-line marker. */
+export const CallEnd = ({ m }: { m: Msg }) => (
+  <div className="tc-call-end">
+    <Video size={13} /> {messageText(m)} · {fmtClock(m.time)}
+  </div>
+);
+
+/** An own message still sending (text, then upload cards). */
+export const renderPending = (p: Pending) => (
   <div key={p.key} className="tc-msg first pending">
     <Avatar name={t().common.you} />
     <div className="tc-msg-body">
@@ -91,7 +142,7 @@ const renderPending = (p: Pending) => (
 );
 
 export function Timeline(p: TimelineProps) {
-  const { visible, cid, chat, channel, pending: myPending, mq, openThreads, msgRootRef } = p;
+  const { visible, cid, chat, channel, pending: myPending, mq, msgRootRef } = p;
   const now = useNow(30_000);
   useLayoutEffect(() => {
     if (channel) msgRootRef.current = new Map(visible.map((m) => [m.id, m.rootId]));
@@ -122,13 +173,7 @@ export function Timeline(p: TimelineProps) {
     />
   );
   const renderReply = (m: Msg, first: boolean) =>
-    m.call === "end" ? (
-      <div key={m.id} className="tc-call-end">
-        <Video size={13} /> {messageText(m)} · {fmtClock(m.time)}
-      </div>
-    ) : (
-      renderMsg(m, first)
-    );
+    m.call === "end" ? <CallEnd key={m.id} m={m} /> : renderMsg(m, first);
   // Pending thread replies render inside their thread; the rest at the bottom.
   const threadPending = new Set<number>();
   if (channel) {
@@ -162,10 +207,6 @@ export function Timeline(p: TimelineProps) {
       }
       const rootMsg = head.isReply ? null : head;
       const replies = rootMsg ? th.msgs.slice(1) : th.msgs;
-      const expanded = !!mq || openThreads.has(th.root);
-      const hidden = expanded ? 0 : Math.max(0, replies.length - THREAD_TAIL);
-      const tail = replies.slice(hidden);
-      const people = new Set(replies.filter((m) => !m.call).map((m) => m.fromMri)).size;
       const mine = myPending.filter((x) => x.rootId === th.root);
       for (const x of mine) threadPending.add(x.key);
       // Live: Teams' own live state on the conversation (Chat.liveCall) names
@@ -174,38 +215,28 @@ export function Timeline(p: TimelineProps) {
       const live = chat
         ? chat.liveCall === th.root
         : rootMsg?.call === "start" && !th.msgs.some((m) => m.call === "end") && now - rootMsg.time < LIVE_CALL_MS;
+      const open = p.openThread === th.root;
       body.push(
-        <div
-          key={"t" + th.root}
-          className={"tc-thread" + (p.replyingTo === th.root ? " replying" : "") + (live ? " live" : "")}
-        >
+        <div key={"t" + th.root} className={"tc-thread" + (open ? " open" : "") + (live ? " live" : "")}>
           {live ? (
             <span className="tc-live-badge">
               <span className="tc-live-dot" /> {t().chat.live}
             </span>
           ) : null}
           {rootMsg ? renderMsg(rootMsg, true) : <div className="tc-thread-orphan">{t().chat.olderPost}</div>}
-          {replies.length || mine.length ? (
+          {/* Searching: the matching replies show in place, so hits are visible. */}
+          {mq && replies.length ? (
             <div className="tc-thread-replies">
-              {hidden ? (
-                <button className="tc-thread-more" onClick={() => p.onToggleThread(th.root)}>
-                  <ChevronsUpDown size={13} /> {t().chat.earlierReplies(hidden)}
-                  {people > 1 ? <span className="tc-thread-people">{t().chat.threadPeople(people)}</span> : null}
-                </button>
-              ) : null}
-              {tail.map((m, i) => renderReply(m, !continues(i ? tail[i - 1] : null, m)))}
-              {mine.map(renderPending)}
-              {!mq && openThreads.has(th.root) && replies.length > THREAD_TAIL ? (
-                <button className="tc-thread-more" onClick={() => p.onToggleThread(th.root)}>
-                  <ChevronsUpDown size={13} /> {t().chat.collapse}
-                </button>
-              ) : null}
+              {replies.map((m, i) => renderReply(m, !continues(i ? replies[i - 1] : null, m)))}
             </div>
           ) : null}
           <div className="tc-thread-actions">
-            <button className="tc-thread-reply" onClick={() => p.onThreadReply(rootMsg || head)}>
-              <MessageSquareReply size={14} /> {t().chat.reply}
-            </button>
+            <ThreadSummary
+              replies={replies}
+              pending={mine.length}
+              open={open}
+              onOpen={() => p.onOpenThread(th.root)}
+            />
             {live ? (
               <button className="tc-join" onClick={() => p.onJoinCall(th.root)}>
                 <Video size={14} /> {t().chat.joinCall}

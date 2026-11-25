@@ -74,6 +74,7 @@ export const app: Messages["app"] = {
   // Notes panel
   closeNotes: "Notizen schließen",
   closeNotesTitle: "Schließen (⌥N)",
+  resizeNotes: "Notizen-Breite anpassen (Doppelklick setzt zurück)",
   notesPlaceholder: "Notier dir irgendwas. Wird nur auf diesem Mac gespeichert.",
 
   // Profile panel

@@ -614,7 +614,13 @@ export function activity(): Activity[] {
     const byId = new Map(c.messages.map((m) => [m.id, m]));
     for (const m of c.messages) {
       if (m.deleted) continue;
-      const base = { threadId: c.seed.id, messageId: m.id, subtype: "", preview: plain(m.content) };
+      const base = {
+        threadId: c.seed.id,
+        messageId: m.id,
+        rootId: m.isReply ? m.rootId : "",
+        subtype: "",
+        preview: plain(m.content),
+      };
       if (m.fromMri !== ME) {
         const actor = { actorMri: m.fromMri, actorName: m.from };
         if (m.content.includes(`schema.skype.com/Mention`) && m.content.includes(`>${me}</span>`)) {

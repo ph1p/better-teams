@@ -39,6 +39,11 @@ function toActivity(raw: unknown, horizon: number): Activity | null {
   const threadId = str(a.sourceThreadId);
   if (!type || !threadId || !time) return null;
   const sourceMid = a.sourceMessageId ?? a.sourceReplyChainId;
+  const id = (v: unknown) => (v == null || v === 0 ? "" : String(v));
+  const messageId = id(sourceMid);
+  // Channel replies name their thread's root, so the thread opens even when
+  // the reply itself isn't paged in yet.
+  const chain = id(a.sourceReplyChainId);
   return {
     id: String(a.activityId ?? m.id ?? `${threadId}:${time}`),
     kind: KINDS[type] || "other",
@@ -46,7 +51,8 @@ function toActivity(raw: unknown, horizon: number): Activity | null {
     subtype: str(a.activitySubtype),
     time,
     threadId,
-    messageId: sourceMid == null || sourceMid === 0 ? "" : String(sourceMid),
+    messageId,
+    rootId: chain !== messageId ? chain : "",
     actorMri: str(a.sourceUserId),
     actorName: str(a.sourceUserImDisplayName),
     preview: str(a.messagePreview),

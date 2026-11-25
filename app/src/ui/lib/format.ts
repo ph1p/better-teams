@@ -9,6 +9,11 @@ import type { Chat, Message } from "../../types";
 import { locale, t } from "../../i18n";
 import { nameFormat, personName, shortName } from "../../names";
 import { cardSummary } from "../../cards";
+import { GROUP_GAP_MS } from "./constants";
+
+/** m continues prev's cluster: same sender, within GROUP_GAP_MS. */
+export const continues = (prev: Message | null, m: Message) =>
+  !!prev && prev.fromMri === m.fromMri && m.time - prev.time <= GROUP_GAP_MS;
 
 export const isDirect = (c: Chat) => c.kind === "chat" && !c.group && !c.app;
 

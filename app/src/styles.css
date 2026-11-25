@@ -113,6 +113,11 @@
   cursor: col-resize;
   touch-action: none;
 }
+/* Same handle on a right pane's left edge. */
+#tc-root .tc-side-resize.left {
+  right: auto;
+  left: -4px;
+}
 #tc-root .tc-side-resize::after {
   content: "";
   position: absolute;
@@ -1841,7 +1846,7 @@
     border-color 0.15s,
     box-shadow 0.15s;
 }
-#tc-root .tc-thread.replying {
+#tc-root .tc-thread.open {
   border-color: var(--tc-accent);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--tc-accent) 40%, transparent);
 }
@@ -1912,32 +1917,20 @@
   font-style: italic;
   padding: 2px 0 2px 4px;
 }
-#tc-root .tc-thread-more,
 #tc-root .tc-thread-reply {
   @apply inline-flex items-center gap-1.5 cursor-pointer;
   border: 0;
   background: transparent;
-  color: var(--tc-accent);
+  color: var(--tc-fg2);
   font: inherit;
   font-size: 12.5px;
-  font-weight: 600;
+  font-weight: 500;
+  margin: 2px 0 0 40px;
   padding: 3px 6px;
   border-radius: 6px;
 }
-#tc-root .tc-thread-more:hover,
 #tc-root .tc-thread-reply:hover {
   background: var(--tc-hover);
-}
-#tc-root .tc-thread-people {
-  color: var(--tc-fg2);
-  font-weight: 400;
-}
-#tc-root .tc-thread-reply {
-  margin: 2px 0 0 40px;
-  color: var(--tc-fg2);
-  font-weight: 500;
-}
-#tc-root .tc-thread-reply:hover {
   color: var(--tc-accent);
 }
 #tc-root .tc-thread-actions {
@@ -1964,8 +1957,104 @@
   color: #16a34a;
   margin-left: 4px;
 }
-#tc-root .tc-thread-chip {
-  border-color: color-mix(in srgb, var(--tc-accent) 45%, var(--tc-line));
+/* Slack-style reply summary under a channel post: faces, count, last reply;
+   "View thread" replaces the time on hover. */
+#tc-root .tc-thread-summary {
+  @apply inline-flex items-center gap-2 cursor-pointer min-w-0;
+  margin: 2px 0 2px 40px;
+  padding: 4px 8px 4px 4px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tc-fg2);
+  font: inherit;
+  font-size: 12.5px;
+  max-width: calc(100% - 40px);
+}
+#tc-root .tc-thread-summary:hover,
+#tc-root .tc-thread-summary.open {
+  background: var(--tc-bg);
+  border-color: var(--tc-line);
+}
+#tc-root .tc-thread-faces {
+  @apply inline-flex shrink-0;
+}
+#tc-root .tc-thread-faces .tc-av {
+  width: 22px;
+  height: 22px;
+  font-size: 9px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px var(--tc-bg2);
+}
+#tc-root .tc-thread-faces .tc-av + .tc-av {
+  margin-left: -4px;
+}
+#tc-root .tc-thread-count {
+  color: var(--tc-accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+#tc-root .tc-thread-last,
+#tc-root .tc-thread-view {
+  @apply truncate;
+}
+#tc-root .tc-thread-view,
+#tc-root .tc-thread-chev {
+  display: none;
+}
+#tc-root .tc-thread-summary:hover .tc-thread-last,
+#tc-root .tc-thread-summary.open .tc-thread-last {
+  display: none;
+}
+#tc-root .tc-thread-summary:hover .tc-thread-view,
+#tc-root .tc-thread-summary.open .tc-thread-view {
+  display: inline;
+}
+#tc-root .tc-thread-summary:hover .tc-thread-chev,
+#tc-root .tc-thread-summary.open .tc-thread-chev {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Thread pane: a .tc-pane (see the notes drawer) with its own width.
+   .tc-profile (later in the file) sets the drawer background; the thread pane
+   uses the chat's, so its composer sits on the same surface as the main one. */
+#tc-root .tc-profile.tc-thread-panel {
+  background: var(--tc-bg);
+}
+#tc-root .tc-thread-panel .tc-notes-head {
+  margin-bottom: 0;
+}
+#tc-root .tc-thread-panel-title {
+  @apply flex items-baseline gap-2 flex-1 min-w-0;
+}
+#tc-root .tc-thread-panel-title .tc-notes-title {
+  flex: 0 0 auto;
+}
+#tc-root .tc-thread-panel-where {
+  @apply truncate;
+  color: var(--tc-fg2);
+  font-size: 12.5px;
+}
+#tc-root .tc-thread-panel-msgs {
+  @apply flex-1 overflow-y-auto flex flex-col;
+  min-height: 0;
+  padding: 12px 14px 8px;
+}
+#tc-root .tc-thread-panel-sep {
+  @apply flex items-center gap-2;
+  margin: 10px 0 2px;
+  color: var(--tc-fg2);
+  font-size: 12px;
+}
+#tc-root .tc-thread-panel-sep::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--tc-line);
+}
+#tc-root .tc-thread-composer {
+  padding: 6px 14px 14px;
 }
 #tc-root .tc-msg.reply .tc-av.sm {
   width: 24px;
@@ -2804,18 +2893,32 @@
   }
 }
 #tc-root .tc-profile-head {
-  @apply flex justify-end;
+  @apply flex;
   padding: 10px 12px 0;
 }
-/* Notes drawer: reuses the profile drawer shell. It stays open for long
-   stretches, so on a wide window it docks: the chat shrinks beside it instead
-   of running (header actions, composer) underneath. */
+#tc-root .tc-profile-x {
+  margin-left: auto;
+}
+/* Right panes (notes, thread): the profile drawer shell, resizable. Only one
+   is mounted at a time; its PaneResize writes its saved width to --tc-pane-w.
+   They stay open for long stretches, so on a wide window they dock: the chat
+   shrinks beside them instead of running (header actions, composer) underneath. */
+#tc-root .tc-pane {
+  width: var(--tc-pane-w, 320px);
+  max-width: 100vw;
+}
 @media (min-width: 960px) {
-  #tc-root:has(> .tc-notes) {
-    grid-template-columns: var(--tc-side-w, 300px) 1fr 320px;
+  #tc-root:has(> .tc-pane) {
+    grid-template-columns: var(--tc-side-w, 300px) minmax(0, 1fr) var(--tc-pane-w, 320px);
   }
-  #tc-root .tc-notes {
-    position: static;
+  /* A profile opened from a docked pane covers exactly that pane. */
+  #tc-root:has(> .tc-pane) > .tc-profile:not(.tc-pane) {
+    width: var(--tc-pane-w, 320px);
+    box-shadow: none;
+  }
+  #tc-root .tc-pane {
+    width: auto;
+    position: relative;
     grid-column: 3;
     grid-row: 1;
     box-shadow: none;

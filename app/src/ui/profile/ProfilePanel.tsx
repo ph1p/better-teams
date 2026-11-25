@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import {
+  ArrowLeft,
   X,
   Mail as MailIcon,
   Briefcase,
@@ -28,7 +29,10 @@ interface ProfilePanelProps {
   chats: Chat[];
   sel: string | null;
   onPick: (id: string) => void;
+  /** X: closes the profile and the pane it opened over. */
   onClose: () => void;
+  /** Set when the profile covers a pane (thread, notes): back to that pane. */
+  onBack?: () => void;
   onMessage?: () => void;
   onCall?: (kind: "audio" | "video") => void;
 }
@@ -53,9 +57,10 @@ function DetailRow({ icon: Icon, value }: { icon: IconComp; value: string }) {
 }
 
 // Details come from the loaded profile row; fields Teams didn't cache simply don't render.
-export function ProfilePanel({ mri, chats, sel, onPick, onClose, onMessage, onCall }: ProfilePanelProps) {
+export function ProfilePanel({ mri, chats, sel, onPick, onClose, onBack, onMessage, onCall }: ProfilePanelProps) {
   const { statusOf } = usePresence();
-  useDismiss(true, "#tc-root .tc-profile", onClose);
+  // A click elsewhere or Escape only leaves the profile, like the back button.
+  useDismiss(true, "#tc-root .tc-profile", onBack ?? onClose);
   const status = statusOf(mri);
   const ring = status !== "Unknown";
   const p = profile(mri);
@@ -74,7 +79,12 @@ export function ProfilePanel({ mri, chats, sel, onPick, onClose, onMessage, onCa
   return (
     <aside className="tc-profile">
       <div className="tc-profile-head">
-        <button className="tc-profile-close" onClick={onClose} title={t().common.close} aria-label={t().common.close}>
+        {onBack ? (
+          <button className="tc-profile-close" onClick={onBack} title={t().common.back} aria-label={t().common.back}>
+            <ArrowLeft size={16} />
+          </button>
+        ) : null}
+        <button className="tc-profile-close tc-profile-x" onClick={onClose} title={t().common.close} aria-label={t().common.close}>
           <X size={16} />
         </button>
       </div>

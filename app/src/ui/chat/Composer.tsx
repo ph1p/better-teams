@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, MessageSquareReply, Paperclip, Reply, Send, X } from "lucide-react";
+import { ArrowDown, Paperclip, Reply, Send, X } from "lucide-react";
 import { chatTitle } from "../lib/format";
 import { useLatest } from "../lib/latest";
 import { fileKind, KindIcon } from "../lib/files";
@@ -18,14 +18,16 @@ const hasFiles = (e: DragEvent) => !!e.dataTransfer && [...e.dataTransfer.types]
 interface ComposerProps {
   chat: Chat;
   cs: ComposerState;
-  atBottom: boolean;
-  onScrollToBottom: () => void;
+  atBottom?: boolean;
+  onScrollToBottom?: () => void;
   /** Arrow Up in the empty composer (picks the newest message); true when handled. */
   onUpEmpty?: () => boolean;
 }
 
-export function Composer({ chat, cs, atBottom, onScrollToBottom, onUpEmpty }: ComposerProps) {
-  const { composer: composerRef, draft, setDraft, quote, setQuote, threadTo, setThreadTo } = cs;
+export function Composer({ chat, cs, atBottom = true, onScrollToBottom, onUpEmpty }: ComposerProps) {
+  const { composer: composerRef, draft, setDraft, quote, setQuote } = cs;
+  // Thread pane composer: no file staging, typing line or jump button.
+  const thread = cs.threadRoot != null;
   const fileInput = useRef<HTMLInputElement>(null);
   const [dropping, setDropping] = useState(false);
   // Files dropped anywhere on the chat pane get staged. Caught on window in
@@ -34,6 +36,9 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom, onUpEmpty }: Co
   // doesn't make the browser open the file.
   const addFiles = useLatest(cs.addFiles);
   useEffect(() => {
+    // Files go only to the channel's main composer (Teams' file send has no
+    // thread target).
+    if (thread) return;
     let clear = 0;
     const where = (e: DragEvent): "pane" | "overlay" | null => {
       const t = e.target instanceof Element ? e.target : null;
@@ -70,14 +75,14 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom, onUpEmpty }: Co
       window.removeEventListener("dragover", onOver, true);
       window.removeEventListener("drop", onDrop, true);
     };
-  }, [addFiles, composerRef]);
+  }, [addFiles, composerRef, thread]);
 
   const send = () => void cs.send();
 
   return (
-    <div className={"tc-composer" + (dropping ? " dropping" : "")}>
+    <div className={"tc-composer" + (dropping ? " dropping" : "") + (thread ? " tc-thread-composer" : "")}>
       {chat.isChannel ? null : <TypingIndicator chatId={chat.id} />}
-      {!atBottom ? (
+      {!atBottom && onScrollToBottom ? (
         <button
           className="tc-scroll-newest"
           onClick={onScrollToBottom}
@@ -86,23 +91,6 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom, onUpEmpty }: Co
         >
           <ArrowDown size={16} />
         </button>
-      ) : null}
-      {threadTo && chat.isChannel ? (
-        <div className="tc-quote-chip tc-thread-chip">
-          <MessageSquareReply size={13} className="tc-quote-chip-icon" />
-          <div className="tc-quote-chip-body">
-            <span className="tc-quote-chip-from">{t().composer.replyInThread(threadTo.from)}</span>
-            <span className="tc-quote-chip-text">{threadTo.text || "…"}</span>
-          </div>
-          <button
-            className="tc-quote-chip-x"
-            onClick={() => setThreadTo(null)}
-            title={t().composer.postAsNew}
-            aria-label={t().composer.cancelThreadReply}
-          >
-            <X size={13} />
-          </button>
-        </div>
       ) : null}
       {quote ? (
         <div className="tc-quote-chip">
@@ -150,22 +138,22 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom, onUpEmpty }: Co
         onPick={cs.addPick}
         onSubmit={send}
         onEscape={() => {
-          if (quote) setQuote(null);
-          else if (threadTo) setThreadTo(null);
-          else return false;
+          if (!quote) return false;
+          setQuote(null);
           return true;
         }}
         onUpEmpty={onUpEmpty}
-        onFiles={cs.addFiles}
-        notifyTyping
+        onFiles={thread ? undefined : cs.addFiles}
+        notifyTyping={!thread}
         placeholder={
-          threadTo && chat.isChannel
+          thread
             ? t().composer.placeholderThread
             : chat.isChannel
               ? t().composer.placeholderChannel(chatTitle(chat))
               : t().composer.placeholderChat(chatTitle(chat))
         }
         lead={
+          thread ? undefined : (
           <>
             <button
               className="tc-emoji-btn"
@@ -187,6 +175,7 @@ export function Composer({ chat, cs, atBottom, onScrollToBottom, onUpEmpty }: Co
               }}
             />
           </>
+          )
         }
         trail={
           <button
