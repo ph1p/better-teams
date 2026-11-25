@@ -154,27 +154,27 @@ export function Composer({ chat, cs, atBottom = true, onScrollToBottom, onUpEmpt
         }
         lead={
           thread ? undefined : (
-          <>
-            <button
-              className="tc-emoji-btn"
-              onClick={() => fileInput.current?.click()}
-              title={t().composer.attachTitle}
-              aria-label={t().composer.attach}
-            >
-              <Paperclip size={18} />
-            </button>
-            <input
-              ref={fileInput}
-              type="file"
-              multiple
-              hidden
-              onChange={(e) => {
-                if (e.target.files) cs.addFiles(e.target.files);
-                e.target.value = "";
-                composerRef.current?.focus();
-              }}
-            />
-          </>
+            <>
+              <button
+                className="tc-emoji-btn"
+                onClick={() => fileInput.current?.click()}
+                title={t().composer.attachTitle}
+                aria-label={t().composer.attach}
+              >
+                <Paperclip size={18} />
+              </button>
+              <input
+                ref={fileInput}
+                type="file"
+                multiple
+                hidden
+                onChange={(e) => {
+                  if (e.target.files) cs.addFiles(e.target.files);
+                  e.target.value = "";
+                  composerRef.current?.focus();
+                }}
+              />
+            </>
           )
         }
         trail={

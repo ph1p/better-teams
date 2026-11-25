@@ -10,6 +10,7 @@ import { LIVE_CALL_MS } from "../lib/constants";
 import { fileKind, KindIcon } from "../lib/files";
 import { extOf } from "../../data/raw";
 import { useNow } from "../lib/now";
+import { myMri, profile } from "../../teamsData";
 import type { Pending } from "../hooks/useMessages";
 import type { Chat, Message as Msg } from "../../types";
 import type { MentionPick } from "../../mentions";
@@ -51,7 +52,6 @@ interface TimelineProps {
   onForward: (m: Msg) => void;
   onJoinCall: (rootId: string) => void;
 }
-
 
 // Below a channel post: who replied, how many, and when last; opens the thread
 // pane. Without replies it is a quiet "Reply" link.
@@ -106,10 +106,16 @@ export const CallEnd = ({ m }: { m: Msg }) => (
   </div>
 );
 
+// Our own name and photo, as the synced copy will show them.
+const myName = () => {
+  const mri = myMri();
+  return (mri && profile(mri).displayName) || t().common.you;
+};
+
 /** An own message still sending (text, then upload cards). */
 export const renderPending = (p: Pending) => (
   <div key={p.key} className="tc-msg first pending">
-    <Avatar name={t().common.you} />
+    <Avatar name={myName()} uri={avatarUri(myMri())} />
     <div className="tc-msg-body">
       <div className="tc-msg-meta">
         <span className="who">{t().common.you}</span>
@@ -231,12 +237,7 @@ export function Timeline(p: TimelineProps) {
             </div>
           ) : null}
           <div className="tc-thread-actions">
-            <ThreadSummary
-              replies={replies}
-              pending={mine.length}
-              open={open}
-              onOpen={() => p.onOpenThread(th.root)}
-            />
+            <ThreadSummary replies={replies} pending={mine.length} open={open} onOpen={() => p.onOpenThread(th.root)} />
             {live ? (
               <button className="tc-join" onClick={() => p.onJoinCall(th.root)}>
                 <Video size={14} /> {t().chat.joinCall}

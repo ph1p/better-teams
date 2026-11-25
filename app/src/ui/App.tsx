@@ -61,6 +61,12 @@ export default function App({ onHide }: { onHide?: () => void }) {
   const msgRoot = useRef<Map<string, string>>(new Map());
   const search = useRef<HTMLInputElement>(null);
   const [fwd, setFwd] = useState<{ msg: Msg; from: string } | null>(null);
+  // Narrow windows show either the chat list or the open chat, not both.
+  // Opening a chat switches to it; the header's back button returns to the list.
+  const [inChat, setInChat] = useState(false);
+  useEffect(() => {
+    document.getElementById("tc-root")?.classList.toggle("tc-in-chat", inChat && !!sel);
+  }, [inChat, sel]);
 
   const selChat = chats.find((c) => c.id === sel);
   const selIsChannel = !!selChat?.isChannel;
@@ -74,6 +80,7 @@ export default function App({ onHide }: { onHide?: () => void }) {
 
   const switched = useChanged(sel + "|" + selIsChannel);
   if (switched && sel) {
+    setInChat(true);
     setMsgSearch("");
     setMsgSearchOpen(false);
     setThreadRoot(null);
@@ -105,6 +112,7 @@ export default function App({ onHide }: { onHide?: () => void }) {
   const pick = useCallback(
     (id: string) => {
       setSel(id);
+      setInChat(true);
       if (unreadOnly) setKeep((k) => (k.has(id) ? k : new Set(k).add(id)));
       // Opening a chat marks it read in Teams, same as the native client. Fire the
       // write and flip our flag only when the chat was actually unread; put the
@@ -403,6 +411,7 @@ export default function App({ onHide }: { onHide?: () => void }) {
             <ChatHeader
               key={selChat.id}
               chat={selChat}
+              onBack={() => setInChat(false)}
               searchOpen={msgSearchOpen}
               onToggleSearch={() => setMsgSearchOpen((o) => !o)}
               notesOpen={notesShown}

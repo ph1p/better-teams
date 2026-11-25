@@ -84,7 +84,12 @@ export function ProfilePanel({ mri, chats, sel, onPick, onClose, onBack, onMessa
             <ArrowLeft size={16} />
           </button>
         ) : null}
-        <button className="tc-profile-close tc-profile-x" onClick={onClose} title={t().common.close} aria-label={t().common.close}>
+        <button
+          className="tc-profile-close tc-profile-x"
+          onClick={onClose}
+          title={t().common.close}
+          aria-label={t().common.close}
+        >
           <X size={16} />
         </button>
       </div>

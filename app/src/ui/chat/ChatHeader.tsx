@@ -1,6 +1,6 @@
 import { t } from "../../i18n";
 import { useState } from "react";
-import { BellOff, Blocks, MessageSquareText, Phone, Search, StickyNote, Video, X } from "lucide-react";
+import { ArrowLeft, BellOff, Blocks, MessageSquareText, Phone, Search, StickyNote, Video, X } from "lucide-react";
 import { profile, type PeopleHit } from "../../teamsData";
 import { isAppMri } from "../../apps";
 import { ChatIcon } from "../shared/Avatar";
@@ -15,6 +15,8 @@ import type { Chat } from "../../types";
 
 interface ChatHeaderProps {
   chat: Chat;
+  /** Back to the chat list (shown only on narrow windows). */
+  onBack: () => void;
   searchOpen: boolean;
   onToggleSearch: () => void;
   notesOpen: boolean;
@@ -72,6 +74,7 @@ function RenameInput({
 
 export function ChatHeader({
   chat,
+  onBack,
   searchOpen,
   onToggleSearch,
   notesOpen,
@@ -122,6 +125,14 @@ export function ChatHeader({
   return (
     <>
       <div className="tc-main-head">
+        <button
+          className="tc-ghost tc-icon-only tc-head-back"
+          onClick={onBack}
+          title={t().common.back}
+          aria-label={t().common.back}
+        >
+          <ArrowLeft size={18} />
+        </button>
         <ChatIcon chat={chat} size={18} onOpen={onOpenProfile} />
         <div className="tc-head-text">
           <span className="tc-head-title">
