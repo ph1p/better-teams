@@ -470,18 +470,26 @@ async function sendDraft(
 // from this device" entry is backed by a plain multiple file input; setting
 // its files and firing change starts Teams' own upload (AMS + SharePoint, see
 // docs/file-send-flow.md). Each uploaded file then shows as a card in the
-// file well whose title carries its SharePoint URL.
+// file well whose title carries its SharePoint URL (images: a permission chip).
 const FILE_PICKER = '[data-tid="sendMessageCommands-FilePicker"], [data-tid="newMessageCommands-FilePicker"]';
 const FILE_INPUT = '[data-tid="file-upload-from-pc"] input[type="file"]';
 const FILE_WELL = '[data-tid="file-well"]';
-const FILE_CARD = FILE_WELL + ' [data-testid="content-card-custom-title"]';
-const FILE_REMOVE = FILE_WELL + ' [data-testid="close-button"]';
+const WELL_ITEM = FILE_WELL + " [role=group]";
 
-const uploadedCount = () =>
-  [...document.querySelectorAll(FILE_CARD)].filter((e) => /https:\/\//.test(e.getAttribute("aria-label") || "")).length;
+const uploaded = (c: Element) =>
+  /https:\/\//.test(c.querySelector('[data-testid="content-card-custom-title"]')?.getAttribute("aria-label") || "") ||
+  (!!c.querySelector('[data-testid="file-permission-trigger"]') &&
+    !c.querySelector('[data-testid="permission-loading-banner"]'));
 
+const uploadedCount = () => [...document.querySelectorAll(WELL_ITEM)].filter(uploaded).length;
+
+// Image cards have no close-button testid, only a titled button.
 function clearFileWell() {
-  document.querySelectorAll<HTMLElement>(FILE_REMOVE).forEach((b) => b.click());
+  document
+    .querySelectorAll<HTMLElement>(
+      FILE_WELL + ' [data-testid="close-button"], ' + WELL_ITEM + " button[title]:not([aria-haspopup])",
+    )
+    .forEach((b) => b.click());
 }
 
 interface CkEditor {
@@ -508,7 +516,7 @@ export async function sendFiles(
   const composer = await waitFor(findComposer);
   if (!composer) return { ok: false, reason: "no-composer" };
   // Files the user staged in Teams itself would go out with ours.
-  if (document.querySelector(FILE_WELL + " [role=group]")) return { ok: false, reason: "native-busy" };
+  if (document.querySelector(WELL_ITEM)) return { ok: false, reason: "native-busy" };
 
   document.querySelector<HTMLElement>(FILE_PICKER)?.click();
   const input = await waitFor(() => document.querySelector<HTMLInputElement>(FILE_INPUT), 2000);

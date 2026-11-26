@@ -2212,7 +2212,7 @@
 #tc-root .tc-card-acts {
   @apply flex items-center;
   flex: 0 0 auto;
-  gap: 2px;
+  gap: 6px;
   margin-right: 6px;
 }
 #tc-root .tc-card-out,
