@@ -24,7 +24,12 @@ function callNotice(what: string): WriteResult {
   return { ok: false, reason: "mock: calls need Teams" };
 }
 
-export async function startNativeCall(_conversationId: string, title: string, kind: "audio" | "video") {
+export async function startNativeCall(
+  _conversationId: string,
+  title: string,
+  kind: "audio" | "video",
+  _person?: PickPerson,
+) {
   return callNotice(`${kind} call with ${title}`);
 }
 

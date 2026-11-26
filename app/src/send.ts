@@ -98,12 +98,41 @@ async function expandNativeTeam(team: string) {
   return !!(await waitFor(() => head.getAttribute("aria-expanded") === "true", 1500));
 }
 
+// Scroller of the native sidebar tree: the nearest scrollable ancestor of a row.
+function nativeTreeScroller() {
+  let el = nativeAll('[role="treeitem"]')[0]?.parentElement ?? null;
+  while (el && el !== document.body) {
+    if (el.scrollHeight > el.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(el).overflowY)) return el;
+    el = el.parentElement;
+  }
+  return null;
+}
+
+// The sidebar only renders rows near its viewport: page through it from the
+// top until the row shows up. Restores the scroll position when it does not.
+async function scanNativeTree(find: () => HTMLElement | undefined) {
+  const box = nativeTreeScroller();
+  if (!box) return undefined;
+  const start = box.scrollTop;
+  const step = Math.max(200, Math.floor(box.clientHeight * 0.8));
+  for (let top = 0; top < box.scrollHeight; top += step) {
+    box.scrollTop = top;
+    await sleep(120);
+    const row = find();
+    if (row) return row;
+  }
+  box.scrollTop = start;
+  return undefined;
+}
+
 async function clickNativeChat(conversationId: string, title?: string, team?: string) {
   if (nativeThreadId() === conversationId) return true;
-  let row = findNativeRow(conversationId, title, team);
+  const find = () => findNativeRow(conversationId, title, team);
+  let row = find();
   if (!row && team && (await expandNativeTeam(team))) {
-    row = await waitFor(() => findNativeRow(conversationId, title, team), 1500);
+    row = await waitFor(find, 1500);
   }
+  if (!row) row = await scanNativeTree(find);
   if (!row) return false;
   row.scrollIntoView({ block: "center" });
   row.click();
@@ -136,8 +165,16 @@ export async function startNativeCall(
   conversationId: string,
   title: string,
   kind: "audio" | "video",
+  person?: PickPerson,
 ): Promise<WriteResult> {
-  if (!(await openNativeChat(conversationId, title))) return { ok: false, reason: "chat not open in Teams" };
+  // A 1:1 whose sidebar row Teams does not render (collapsed folder, old chat):
+  // Teams' New message picker jumps to the existing 1:1 with that person.
+  let opened = await openNativeChat(conversationId, title);
+  if (!opened && person) {
+    // The caller passes `person` only for 1:1s (send.ts has no chat store).
+    opened = (await openNativeNewChat([person])).ok && nativeThreadId() === conversationId;
+  }
+  if (!opened) return { ok: false, reason: "chat not open in Teams" };
   // Wait for the header to render, then use the direct button or the dropdown.
   await waitFor(() => nativeButton(CALL_DIRECT[kind]) || nativeButton(CALL_MENU_TOGGLE));
   let btn = nativeButton(CALL_DIRECT[kind]);
