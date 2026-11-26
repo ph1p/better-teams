@@ -1,4 +1,5 @@
 import { useLatest } from "../lib/latest";
+import { netState } from "../../services/net";
 import { useCallback, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import {
   addChannelMembers,
@@ -55,10 +56,11 @@ const upnOf = (mri: string) => {
   return p.email || (String(mri || "").match(/[^:]+@[^:]+/) || [""])[0];
 };
 
-const toPick = (p: PeopleHit): PickPerson => ({
-  upn: p.email || upnOf(p.mri),
-  oid: (String(p.mri || "").match(/^8:orgid:([0-9a-f-]{36})$/i) || ["", ""])[1],
+const pickOf = (mri: string, email?: string): PickPerson => ({
+  upn: email || upnOf(mri),
+  oid: (String(mri || "").match(/^8:orgid:([0-9a-f-]{36})$/i) || ["", ""])[1],
 });
+const toPick = (p: PeopleHit) => pickOf(p.mri, p.email);
 
 // Chat-level actions that go through Teams: new chats, calls and meetings,
 // read state and hiding. Writes are optimistic and revert on failure.
@@ -192,6 +194,13 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   // and press its own header call button (send.ts startNativeCall). A person is
   // called through their 1:1 chat. No deep-link fallback: navigating to a
   // teams.microsoft.com/l/ link replaces the Teams page with the web launcher.
+  // Calls and meetings can't start offline (sends can: Teams queues them).
+  const online = useCallback(() => {
+    if (netState() !== "offline") return true;
+    flash(t().app.callOffline, 4000);
+    return false;
+  }, [flash]);
+
   const startCall = useCallback(
     async (mris: string[], kind: "audio" | "video", chat?: Chat) => {
       const target =
@@ -203,12 +212,14 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
         flash(t().app.noDmToCall, 4000);
         return;
       }
+      if (!online()) return;
       // The overlay stays up: Teams' buttons are clicked underneath it, and the
       // call-window guard (mount.tsx) hides the overlay wherever the call shows.
-      const res = await startNativeCall(target.id, target.title, kind);
+      const dm = !target.group && !target.isChannel && target.members.length === 1 ? target.members[0] : "";
+      const res = await startNativeCall(target.id, target.title, kind, dm ? pickOf(dm) : undefined);
       if (!res.ok) flash(t().app.callFailed(res.reason), 4000);
     },
-    [flash, chatsRef],
+    [flash, chatsRef, online],
   );
 
   // Join the selected conversation's running call through Teams' own Join
@@ -216,19 +227,19 @@ export function useChatActions({ sel, chatsRef, setChats, pick, flash }: Deps) {
   const joinCall = useCallback(
     async (rootId: string) => {
       const c = chatsRef.current.find((x) => x.id === sel);
-      if (!c) return;
+      if (!c || !online()) return;
       const res = await joinNativeMeeting(c.id, c.title, rootId, c.team);
       if (!res.ok) flash(t().app.joinFailed(res.reason), 4000);
     },
-    [sel, flash, chatsRef],
+    [sel, flash, chatsRef, online],
   );
 
   const meetNow = useCallback(async () => {
     const c = chatsRef.current.find((x) => x.id === sel);
-    if (!c) return;
+    if (!c || !online()) return;
     const res = await startNativeChannelMeeting(c.id, c.title, c.team);
     if (!res.ok) flash(t().app.meetingFailed(res.reason), 4000);
-  }, [sel, flash, chatsRef]);
+  }, [sel, flash, chatsRef, online]);
 
   // Apply a change to our list at once and put the old fields back (with a
   // flash) when Teams refuses it. Used by every chat action below.

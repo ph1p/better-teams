@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { NetBanner } from "./shared/NetBanner";
 import { useChanged } from "./lib/changed";
 import { useLatest } from "./lib/latest";
 import { forwardMessage, markRead } from "../teamsData";
@@ -406,6 +407,7 @@ export default function App({ onHide }: { onHide?: () => void }) {
       />
 
       <main className="tc-main">
+        <NetBanner />
         {selChat ? (
           <>
             <ChatHeader

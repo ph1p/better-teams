@@ -9,6 +9,7 @@
 // - Never throws; every outcome is a typed Res. Never logs headers or bodies.
 
 import { invalidate, whenToken, type Audience } from "./auth";
+import { suspect } from "./net";
 
 const ALLOWED_HOSTS = [
   /^teams\.microsoft\.com$/,
@@ -71,6 +72,8 @@ export async function call<T = unknown>(aud: Audience, url: string, o: CallOptio
     try {
       r = await once(u, aud, tok, o);
     } catch {
+      // Could be the network, or CORS / a blocked endpoint: let net.ts probe.
+      suspect();
       return { ok: false, status: 0, reason: "fetch-failed" };
     }
     if (r.status === 401 && attempt === 0) {

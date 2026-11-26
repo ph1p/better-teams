@@ -47,6 +47,8 @@
   --tc-danger-hover: #b91c1c;
   --tc-danger-fg: #ef4444;
   --tc-danger-soft: rgba(239, 68, 68, 0.12);
+  --tc-warn-fg: #d97706;
+  --tc-warn-soft: rgba(245, 158, 11, 0.14);
 }
 #tc-root,
 #tc-root * {
@@ -4461,4 +4463,17 @@
 }
 #tc-root .tc-newchat-people .tc-newchat-hits {
   max-height: 180px;
+}
+
+#tc-root .tc-net-banner {
+  flex: 0 0 auto;
+  padding: 6px 18px;
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--tc-line);
+  background: var(--tc-warn-soft);
+  color: var(--tc-warn-fg);
+}
+#tc-root .tc-net-banner.offline {
+  background: var(--tc-danger-soft);
+  color: var(--tc-danger-fg);
 }
