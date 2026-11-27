@@ -62,6 +62,7 @@ function FrameStage({ item }: { item: ViewerItem }) {
         className={loaded ? "" : "loading"}
         onLoad={() => setLoaded(true)}
         allow="fullscreen; clipboard-write"
+        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-downloads"
         referrerPolicy="strict-origin-when-cross-origin"
       />
     </div>
