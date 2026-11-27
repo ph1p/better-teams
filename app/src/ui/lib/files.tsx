@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import type { FileRef } from "../../types";
 import { t } from "../../i18n";
-import { isTrustedImgHost } from "../../safeUrl";
+import { allowedUrl } from "../../services/http";
 
 type FileKind =
   | "image"
@@ -119,7 +119,9 @@ export function useViewer() {
 export async function saveImage(item: ViewerItem) {
   if (!item.image) return false;
   try {
-    const r = await fetch(item.image, { credentials: isTrustedImgHost(item.image) ? "include" : "omit" });
+    // Cookies only for hosts this app signs in to (AMS); a Giphy or other
+    // public image needs none, and the auto-load list is not an auth list.
+    const r = await fetch(item.image, { credentials: allowedUrl(item.image) ? "include" : "omit" });
     if (!r.ok) return false;
     const blob = await r.blob();
     const a = document.createElement("a");
