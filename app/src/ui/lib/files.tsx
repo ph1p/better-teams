@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { FileRef } from "../../types";
 import { t } from "../../i18n";
+import { isTrustedImgHost } from "../../safeUrl";
 
 type FileKind =
   | "image"
@@ -118,7 +119,7 @@ export function useViewer() {
 export async function saveImage(item: ViewerItem) {
   if (!item.image) return false;
   try {
-    const r = await fetch(item.image, { credentials: "include" });
+    const r = await fetch(item.image, { credentials: isTrustedImgHost(item.image) ? "include" : "omit" });
     if (!r.ok) return false;
     const blob = await r.blob();
     const a = document.createElement("a");
